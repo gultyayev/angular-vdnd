@@ -8,6 +8,9 @@
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
     "noImplicitReturns": true,
+    "paths": {
+      "ngx-virtual-dnd": ["./dist/ngx-virtual-dnd"]
+    },
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
     "isolatedModules": true,
@@ -29,6 +32,12 @@
     },
     {
       "path": "./tsconfig.spec.json"
+    },
+    {
+      "path": "./projects/ngx-virtual-dnd/tsconfig.lib.json"
+    },
+    {
+      "path": "./projects/ngx-virtual-dnd/tsconfig.spec.json"
     }
   ]
 }

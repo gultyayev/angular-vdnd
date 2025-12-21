@@ -119,6 +119,42 @@
           }
         }
       }
+    },
+    "ngx-virtual-dnd": {
+      "projectType": "library",
+      "root": "projects/ngx-virtual-dnd",
+      "sourceRoot": "projects/ngx-virtual-dnd/src",
+      "prefix": "vdnd",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:ng-packagr",
+          "configurations": {
+            "production": {
+              "tsConfig": "projects/ngx-virtual-dnd/tsconfig.lib.prod.json"
+            },
+            "development": {
+              "tsConfig": "projects/ngx-virtual-dnd/tsconfig.lib.json"
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "projects/ngx-virtual-dnd/tsconfig.spec.json"
+          }
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": [
+              "projects/ngx-virtual-dnd/**/*.ts",
+              "projects/ngx-virtual-dnd/**/*.html"
+            ],
+            "eslintConfig": "projects/ngx-virtual-dnd/eslint.config.mjs"
+          }
+        }
+      }
     }
   }
 }
