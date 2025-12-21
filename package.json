@@ -7,7 +7,9 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "lint": "ng lint",
-    "test": "jest"
+    "test": "jest",
+    "storybook": "ng run dnd:storybook",
+    "build-storybook": "ng run dnd:build-storybook"
   },
   "prettier": {
     "printWidth": 100,
@@ -53,6 +55,17 @@
     "ts-node": "^10.9.2",
     "typescript": "~5.9.2",
     "typescript-eslint": "8.47.0",
-    "vitest": "^4.0.8"
+    "vitest": "^4.0.8",
+    "storybook": "^10.1.10",
+    "@storybook/angular": "^10.1.10",
+    "@storybook/addon-a11y": "^10.1.10",
+    "@storybook/addon-docs": "^10.1.10",
+    "@storybook/addon-onboarding": "^10.1.10",
+    "@angular-devkit/build-angular": "^21.0.0",
+    "@angular-devkit/architect": "^0.2100.0",
+    "@angular-devkit/core": "^21.0.0",
+    "@angular/platform-browser-dynamic": "^21.0.0",
+    "@compodoc/compodoc": "^1.1.32",
+    "eslint-plugin-storybook": "^10.1.10"
   }
 }
