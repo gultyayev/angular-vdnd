@@ -6,7 +6,8 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "lint": "ng lint"
+    "lint": "ng lint",
+    "test": "jest"
   },
   "prettier": {
     "printWidth": 100,
@@ -37,14 +38,19 @@
     "@angular/cli": "^21.0.3",
     "@angular/compiler-cli": "^21.0.0",
     "@epam/eslint-config-angular": "^2.1.0",
+    "@types/jest": "^30.0.0",
     "angular-eslint": "21.1.0",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0",
+    "jest-preset-angular": "^16.0.0",
     "jsdom": "^27.1.0",
     "prettier": "^3.7.4",
     "stylelint": "^16.26.1",
     "stylelint-config-sass-guidelines": "^12.1.0",
     "svgo": "^4.0.0",
+    "ts-node": "^10.9.2",
     "typescript": "~5.9.2",
     "typescript-eslint": "8.47.0",
     "vitest": "^4.0.8"
