@@ -42,6 +42,8 @@
     "eslint-config-prettier": "^10.1.8",
     "jsdom": "^27.1.0",
     "prettier": "^3.7.4",
+    "stylelint": "^16.26.1",
+    "stylelint-config-sass-guidelines": "^12.1.0",
     "typescript": "~5.9.2",
     "typescript-eslint": "8.47.0",
     "vitest": "^4.0.8"
