@@ -1,3 +1,3 @@
-import { setupZonelessTestEnv } from "jest-preset-angular/setup-env/zoneless";
+import { setupZonelessTestEnv } from 'jest-preset-angular/setup-env/zoneless';
 
 setupZonelessTestEnv();

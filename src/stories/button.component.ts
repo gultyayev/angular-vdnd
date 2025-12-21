@@ -6,13 +6,13 @@ import { Component, Input, Output, EventEmitter } from '@angular/core';
   standalone: true,
   imports: [CommonModule],
   template: ` <button
-  type="button"
-  (click)="onClick.emit($event)"
-  [ngClass]="classes"
-  [ngStyle]="{ 'background-color': backgroundColor }"
->
-  {{ label }}
-</button>`,
+    type="button"
+    (click)="onClick.emit($event)"
+    [ngClass]="classes"
+    [ngStyle]="{ 'background-color': backgroundColor }"
+  >
+    {{ label }}
+  </button>`,
   styleUrls: ['./button.css'],
 })
 export class ButtonComponent {

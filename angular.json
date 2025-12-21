@@ -3,9 +3,7 @@
   "version": 1,
   "cli": {
     "packageManager": "npm",
-    "schematicCollections": [
-      "angular-eslint"
-    ]
+    "schematicCollections": ["angular-eslint"]
   },
   "newProjectRoot": "projects",
   "projects": {
@@ -56,9 +54,7 @@
                 "input": "public"
               }
             ],
-            "styles": [
-              "src/styles.scss"
-            ]
+            "styles": ["src/styles.scss"]
           },
           "configurations": {
             "production": {
@@ -99,10 +95,7 @@
         "lint": {
           "builder": "@angular-eslint/builder:lint",
           "options": {
-            "lintFilePatterns": [
-              "src/**/*.ts",
-              "src/**/*.html"
-            ]
+            "lintFilePatterns": ["src/**/*.ts", "src/**/*.html"]
           }
         },
         "storybook": {
@@ -111,12 +104,7 @@
             "configDir": ".storybook",
             "browserTarget": "dnd:build",
             "compodoc": true,
-            "compodocArgs": [
-              "-e",
-              "json",
-              "-d",
-              "."
-            ],
+            "compodocArgs": ["-e", "json", "-d", "."],
             "port": 6006
           }
         },
@@ -126,12 +114,7 @@
             "configDir": ".storybook",
             "browserTarget": "dnd:build",
             "compodoc": true,
-            "compodocArgs": [
-              "-e",
-              "json",
-              "-d",
-              "."
-            ],
+            "compodocArgs": ["-e", "json", "-d", "."],
             "outputDir": "storybook-static"
           }
         }

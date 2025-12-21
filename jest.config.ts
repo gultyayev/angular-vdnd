@@ -1,5 +1,5 @@
-import type { Config } from "jest";
-import { createCjsPreset } from "jest-preset-angular/presets/index.js";
+import type { Config } from 'jest';
+import { createCjsPreset } from 'jest-preset-angular/presets/index.js';
 
 // Uncomment and add packages that need to be transformed (e.g., ESM-only packages)
 // const packagesToTransform = [
@@ -12,6 +12,6 @@ import { createCjsPreset } from "jest-preset-angular/presets/index.js";
 
 export default {
   ...createCjsPreset(),
-  setupFilesAfterEnv: ["<rootDir>/setup-jest.ts"],
+  setupFilesAfterEnv: ['<rootDir>/setup-jest.ts'],
   // transformIgnorePatterns,
 } satisfies Config;
