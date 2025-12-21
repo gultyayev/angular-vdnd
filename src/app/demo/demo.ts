@@ -8,7 +8,6 @@ import {
   DropEvent,
   DragStateService,
   PlaceholderComponent,
-  END_OF_LIST,
 } from 'ngx-virtual-dnd';
 
 interface Item {
@@ -295,24 +294,27 @@ export class DemoComponent {
   /** Insert placeholder into list if this is the active droppable */
   private insertPlaceholder(items: Item[], droppableId: string): (Item | { isPlaceholder: true; id: string })[] {
     const activeDroppable = this.dragState.activeDroppableId();
-    const placeholderId = this.dragState.placeholderId();
+    const placeholderIndex = this.dragState.placeholderIndex();
 
-    if (activeDroppable !== droppableId || !placeholderId) {
+    if (activeDroppable !== droppableId || placeholderIndex === null) {
       return items;
     }
 
     const result: (Item | { isPlaceholder: true; id: string })[] = [];
 
-    if (placeholderId === END_OF_LIST) {
-      result.push(...items);
-      result.push({ isPlaceholder: true, id: 'placeholder' });
-    } else {
-      for (const item of items) {
-        if (item.id === placeholderId) {
-          result.push({ isPlaceholder: true, id: 'placeholder' });
-        }
-        result.push(item);
+    // Use index-based insertion for stable positioning
+    const insertAt = Math.max(0, Math.min(placeholderIndex, items.length));
+
+    for (let i = 0; i < items.length; i++) {
+      if (i === insertAt) {
+        result.push({ isPlaceholder: true, id: 'placeholder' });
       }
+      result.push(items[i]);
+    }
+
+    // If inserting at end
+    if (insertAt >= items.length) {
+      result.push({ isPlaceholder: true, id: 'placeholder' });
     }
 
     return result;
@@ -322,6 +324,10 @@ export class DemoComponent {
   onDrop(event: DropEvent, targetList: 'list1' | 'list2'): void {
     const sourceList = event.source.droppableId === 'list-1' ? 'list1' : 'list2';
     const item = event.source.data as Item;
+
+    if (!item) {
+      return;
+    }
 
     // Remove from source
     if (sourceList === 'list1') {

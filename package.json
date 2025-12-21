@@ -8,6 +8,9 @@
     "watch": "ng build --watch --configuration development",
     "lint": "ng lint",
     "test": "jest",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:headed": "playwright test --headed",
     "storybook": "ng run dnd:storybook",
     "build-storybook": "ng run dnd:build-storybook"
   },
@@ -45,6 +48,7 @@
     "@angular/platform-browser-dynamic": "^21.0.0",
     "@compodoc/compodoc": "^1.1.32",
     "@epam/eslint-config-angular": "^2.1.0",
+    "@playwright/test": "^1.57.0",
     "@storybook/addon-a11y": "^10.1.10",
     "@storybook/addon-docs": "^10.1.10",
     "@storybook/addon-onboarding": "^10.1.10",

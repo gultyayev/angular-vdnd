@@ -1,55 +1,91 @@
-You are an expert in TypeScript, Angular, and scalable web application development. You write functional, maintainable, performant, and accessible code following Angular and TypeScript best practices.
+# ngx-virtual-dnd
 
-## TypeScript Best Practices
+Angular monorepo containing a drag-and-drop library optimized for virtual scrolling.
+
+## Project Structure
+
+- **Main app** (`/src`) - Demo application showcasing the library
+- **ngx-virtual-dnd** (`/projects/ngx-virtual-dnd`) - Reusable drag-and-drop library
+
+**Prefixes:** `app-` for main app components, `vdnd-` for library components/directives.
+
+## TypeScript
 
 - Use strict type checking
 - Prefer type inference when the type is obvious
-- Avoid the `any` type; use `unknown` when type is uncertain
+- Avoid `any`; use `unknown` when type is uncertain
 
-## Angular Best Practices
+## Angular
 
-- Always use standalone components over NgModules
-- Must NOT set `standalone: true` inside Angular decorators. It's the default in Angular v20+.
+- Always use standalone components (no NgModules)
+- Do NOT set `standalone: true` in decorators (it's the default in Angular v21+)
 - Use signals for state management
-- Implement lazy loading for feature routes
-- Do NOT use the `@HostBinding` and `@HostListener` decorators. Put host bindings inside the `host` object of the `@Component` or `@Directive` decorator instead
-- Use `NgOptimizedImage` for all static images.
-  - `NgOptimizedImage` does not work for inline base64 images.
+- Use `inject()` function instead of constructor injection
+- Put host bindings in the `host` object of `@Component`/`@Directive` decorators (not `@HostBinding`/`@HostListener`)
+- Use `runOutsideAngular` for performance-critical operations (animations, scroll handlers)
 
-## Accessibility Requirements
+## Components
 
-- It MUST pass all AXE checks.
-- It MUST follow all WCAG AA minimums, including focus management, color contrast, and ARIA attributes.
-
-### Components
-
-- Keep components small and focused on a single responsibility
+- Keep components small and focused
 - Use `input()` and `output()` functions instead of decorators
 - Use `computed()` for derived state
-- Set `changeDetection: ChangeDetectionStrategy.OnPush` in `@Component` decorator
+- Set `changeDetection: ChangeDetectionStrategy.OnPush`
 - Prefer inline templates for small components
-- Prefer Reactive forms instead of Template-driven ones
-- Do NOT use `ngClass`, use `class` bindings instead
-- Do NOT use `ngStyle`, use `style` bindings instead
-- When using external templates/styles, use paths relative to the component TS file.
+- Use `class` bindings instead of `ngClass`
+- Use `style` bindings instead of `ngStyle`
 
 ## State Management
 
 - Use signals for local component state
 - Use `computed()` for derived state
-- Keep state transformations pure and predictable
-- Do NOT use `mutate` on signals, use `update` or `set` instead
+- Use `effect()` for reacting to state changes
+- Use `update()` or `set()` on signals (not `mutate`)
 
 ## Templates
 
-- Keep templates simple and avoid complex logic
-- Use native control flow (`@if`, `@for`, `@switch`) instead of `*ngIf`, `*ngFor`, `*ngSwitch`
-- Use the async pipe to handle observables
-- Do not assume globals like (`new Date()`) are available.
-- Do not write arrow functions in templates (they are not supported).
+- Use native control flow (`@if`, `@for`, `@switch`)
+- Use the async pipe for observables
+- Keep templates simple; avoid complex logic
+- Do not use arrow functions in templates
 
 ## Services
 
 - Design services around a single responsibility
-- Use the `providedIn: 'root'` option for singleton services
-- Use the `inject()` function instead of constructor injection
+- Use `providedIn: 'root'` for singleton services
+
+## Library Conventions (ngx-virtual-dnd)
+
+- Use `vdnd-` prefix for all library components/directives
+- Use data attributes for element identification: `data-draggable-id`, `data-droppable-id`
+- `DragStateService` is the single source of truth for drag state
+
+## Testing
+
+- **Unit tests:** Jest with zoneless environment
+- **E2E tests:** Playwright
+- Use Page Object Model pattern for E2E tests
+- Prefer data attributes (`[data-testid]`, `[data-draggable-id]`) over CSS selectors
+
+## Accessibility
+
+- Must pass all AXE checks
+- Follow WCAG AA requirements (focus management, color contrast, ARIA)
+- Support keyboard navigation (space to activate, escape to cancel)
+
+## Tooling
+
+- **Prettier:** single quotes, 100 char width
+- **ESLint:** @epam/eslint-config-angular
+- **Stylelint:** stylelint-config-sass-guidelines
+- **Git hooks:** Lefthook (lint on pre-commit, test on pre-push)
+
+## Quick Reference
+
+| Command             | Description                 |
+| ------------------- | --------------------------- |
+| `npm start`         | Dev server (port 4200)      |
+| `npm test`          | Run unit tests (Jest)       |
+| `npm run e2e`       | Run E2E tests (Playwright)  |
+| `npm run lint`      | Run ESLint                  |
+| `npm run storybook` | Start Storybook (port 6006) |
+| `npm run build`     | Production build            |

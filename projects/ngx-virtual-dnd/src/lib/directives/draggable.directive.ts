@@ -292,30 +292,20 @@ export class DraggableDirective implements OnInit, OnDestroy {
       groupName
     );
 
-    // Find draggable at cursor position (for placeholder)
-    const draggableElement = this.positionCalculator.findDraggableAtPoint(
-      position.x,
-      position.y,
-      element
-    );
-
     const activeDroppableId = droppableElement
       ? this.positionCalculator.getDroppableId(droppableElement)
       : null;
 
     let placeholderId: string | null = null;
+    let placeholderIndex: number | null = null;
 
-    if (draggableElement) {
-      const id = this.positionCalculator.getDraggableId(draggableElement);
-      // Don't use the dragged item itself as placeholder
-      if (id && id !== this.vdndDraggable() && !id.includes('placeholder')) {
-        placeholderId = id;
-      }
-    }
-
-    // If we're over a droppable but no draggable, use END_OF_LIST
-    if (activeDroppableId && !placeholderId) {
-      placeholderId = END_OF_LIST;
+    if (droppableElement) {
+      // Calculate placeholder index based on cursor position using mathematical approach
+      // This is more stable than DOM-based detection because it doesn't get affected
+      // by the placeholder insertion shifting elements around
+      const indexResult = this.calculatePlaceholderIndex(droppableElement, position);
+      placeholderIndex = indexResult.index;
+      placeholderId = indexResult.placeholderId;
     }
 
     // Update drag state
@@ -324,6 +314,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
         cursorPosition: position,
         activeDroppableId,
         placeholderId,
+        placeholderIndex,
       });
 
       // Emit drag move event
@@ -335,6 +326,87 @@ export class DraggableDirective implements OnInit, OnDestroy {
         position,
       });
     });
+  }
+
+  /**
+   * Calculate the placeholder index based on cursor position.
+   * Uses mathematical calculation instead of DOM-based detection to avoid
+   * flickering caused by the placeholder insertion shifting elements.
+   */
+  private calculatePlaceholderIndex(
+    droppableElement: HTMLElement,
+    position: CursorPosition
+  ): { index: number; placeholderId: string } {
+    // Look for virtual scroll container within the droppable
+    const virtualScroll = droppableElement.querySelector('vdnd-virtual-scroll');
+
+    // Get the scrollable element and its properties
+    const scrollableElement = virtualScroll ?? droppableElement;
+    const rect = scrollableElement.getBoundingClientRect();
+    const scrollTop = scrollableElement.scrollTop;
+    const scrollHeight = scrollableElement.scrollHeight;
+
+    // Try to get item height from virtual scroll or estimate from first item
+    let itemHeight = 50; // Default fallback
+    const firstItem = droppableElement.querySelector('[data-draggable-id]');
+    if (firstItem) {
+      const itemRect = firstItem.getBoundingClientRect();
+      itemHeight = itemRect.height || 50;
+    }
+
+    // Calculate total items from scroll height (works with virtual scroll)
+    // This gives us the actual total, not just visible items
+    const totalItemsFromScroll = Math.round(scrollHeight / itemHeight);
+
+    // Also get visible items for ID lookup
+    const allDraggables = droppableElement.querySelectorAll(
+      '[data-draggable-id]:not([data-draggable-id="placeholder"])'
+    );
+
+    // Calculate the logical index based on cursor position
+    // This ignores any placeholder that might be in the DOM
+    const relativeY = position.y - rect.top + scrollTop;
+    const rawIndex = Math.floor(relativeY / itemHeight);
+
+    // Clamp to valid range [0, totalItems]
+    const clampedIndex = Math.max(0, Math.min(rawIndex, totalItemsFromScroll));
+
+    // Determine the placeholderId
+    // If at the end or beyond visible range, use END_OF_LIST
+    if (clampedIndex >= totalItemsFromScroll) {
+      return { index: totalItemsFromScroll, placeholderId: END_OF_LIST };
+    }
+
+    // Try to find the item at the calculated index in the visible items
+    // With virtual scroll, we need to account for the scroll offset
+    const firstVisibleIndex = Math.floor(scrollTop / itemHeight);
+    const visibleIndex = clampedIndex - firstVisibleIndex;
+
+    if (visibleIndex >= 0 && visibleIndex < allDraggables.length) {
+      const targetItem = allDraggables[visibleIndex];
+      const targetId = targetItem?.getAttribute('data-draggable-id');
+
+      // If the target is the item being dragged, skip it
+      if (targetId === this.vdndDraggable()) {
+        // If dragging within the same list, adjust the index
+        return {
+          index: clampedIndex + 1,
+          placeholderId: END_OF_LIST,
+        };
+      }
+
+      return {
+        index: clampedIndex,
+        placeholderId: targetId ?? END_OF_LIST,
+      };
+    }
+
+    // If the target item isn't visible (virtualized), use END_OF_LIST as placeholder ID
+    // but still use the calculated index for positioning
+    return {
+      index: clampedIndex,
+      placeholderId: END_OF_LIST,
+    };
   }
 
   /**

@@ -35,6 +35,9 @@ export class DragStateService {
   /** ID of the item the placeholder should appear before */
   readonly placeholderId = computed(() => this._state().placeholderId);
 
+  /** Index where the placeholder should be inserted */
+  readonly placeholderIndex = computed(() => this._state().placeholderIndex);
+
   /** Current cursor position */
   readonly cursorPosition = computed(() => this._state().cursorPosition);
 
@@ -48,6 +51,7 @@ export class DragStateService {
       sourceDroppableId: item.droppableId,
       activeDroppableId: null,
       placeholderId: null,
+      placeholderIndex: null,
       cursorPosition: null,
     });
   }
@@ -59,6 +63,7 @@ export class DragStateService {
     cursorPosition: CursorPosition;
     activeDroppableId: string | null;
     placeholderId: string | null;
+    placeholderIndex: number | null;
   }): void {
     if (!this._state().isDragging) {
       return;
@@ -69,6 +74,7 @@ export class DragStateService {
       cursorPosition: update.cursorPosition,
       activeDroppableId: update.activeDroppableId,
       placeholderId: update.placeholderId,
+      placeholderIndex: update.placeholderIndex,
     }));
   }
 

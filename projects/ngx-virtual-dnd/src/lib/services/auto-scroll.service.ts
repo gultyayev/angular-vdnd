@@ -116,7 +116,14 @@ export class AutoScrollService {
     const cursor = this.dragState.cursorPosition();
     const isDragging = this.dragState.isDragging();
 
-    if (!isDragging || !cursor) {
+    // Stop monitoring if drag ended
+    if (!isDragging) {
+      this.stopMonitoring();
+      return;
+    }
+
+    // Skip this frame if no cursor position yet, but continue monitoring
+    if (!cursor) {
       this.animationFrameId = requestAnimationFrame(() => this.tick());
       return;
     }
@@ -126,7 +133,9 @@ export class AutoScrollService {
       const rect = element.getBoundingClientRect();
 
       // Check if cursor is inside this container
-      if (!this.positionCalculator.isInsideContainer(cursor, rect)) {
+      const isInside = this.positionCalculator.isInsideContainer(cursor, rect);
+
+      if (!isInside) {
         continue;
       }
 

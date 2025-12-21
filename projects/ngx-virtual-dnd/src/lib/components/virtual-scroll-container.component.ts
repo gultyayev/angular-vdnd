@@ -7,6 +7,8 @@ import {
   ElementRef,
   inject,
   input,
+  OnDestroy,
+  OnInit,
   output,
   signal,
   TemplateRef,
@@ -14,6 +16,7 @@ import {
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { DragStateService } from '../services/drag-state.service';
+import { AutoScrollService, AutoScrollConfig } from '../services/auto-scroll.service';
 
 /**
  * Context provided to the item template.
@@ -117,15 +120,25 @@ export interface VisibleRangeChange {
     }
   `,
 })
-export class VirtualScrollContainerComponent<T> {
+export class VirtualScrollContainerComponent<T> implements OnInit, OnDestroy {
   private readonly dragState = inject(DragStateService);
   private readonly elementRef = inject(ElementRef<HTMLElement>);
+  private readonly autoScrollService = inject(AutoScrollService);
 
   /** The scrollable container element */
   protected readonly contentContainer = viewChild<ElementRef<HTMLElement>>('contentContainer');
 
   /** Template for rendering each item - passed as input instead of content child for reliability */
   itemTemplate = input.required<TemplateRef<VirtualScrollItemContext<T>>>();
+
+  /** Unique ID for this scroll container (used for auto-scroll registration) */
+  scrollContainerId = input<string>();
+
+  /** Whether auto-scroll is enabled when dragging near edges */
+  autoScrollEnabled = input<boolean>(true);
+
+  /** Auto-scroll configuration */
+  autoScrollConfig = input<Partial<AutoScrollConfig>>({});
 
   /** Array of items to render */
   items = input.required<T[]>();
@@ -238,12 +251,33 @@ export class VirtualScrollContainerComponent<T> {
     return result;
   });
 
+  /** Generated ID for auto-scroll registration */
+  private generatedScrollId = `vdnd-scroll-${Math.random().toString(36).slice(2, 9)}`;
+
   constructor() {
     // Emit visible range changes
     effect(() => {
       const range = this.renderRange();
       this.visibleRangeChange.emit(range);
     });
+  }
+
+  ngOnInit(): void {
+    // Register with auto-scroll service
+    if (this.autoScrollEnabled()) {
+      const id = this.scrollContainerId() ?? this.generatedScrollId;
+      this.autoScrollService.registerContainer(
+        id,
+        this.elementRef.nativeElement,
+        this.autoScrollConfig()
+      );
+    }
+  }
+
+  ngOnDestroy(): void {
+    // Unregister from auto-scroll service
+    const id = this.scrollContainerId() ?? this.generatedScrollId;
+    this.autoScrollService.unregisterContainer(id);
   }
 
   /**

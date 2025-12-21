@@ -51,3 +51,5 @@ Thumbs.db
 storybook-static
 
 /reference
+/playwright-report
+/test-results

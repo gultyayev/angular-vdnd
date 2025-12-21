@@ -38,6 +38,8 @@ export interface DragState {
   activeDroppableId: string | null;
   /** ID of the item the placeholder should appear before, or 'END_OF_LIST' */
   placeholderId: string | null;
+  /** Index where the placeholder should be inserted (more stable than placeholderId) */
+  placeholderIndex: number | null;
   /** Current cursor position */
   cursorPosition: CursorPosition | null;
 }
@@ -167,6 +169,7 @@ export const INITIAL_DRAG_STATE: DragState = {
   sourceDroppableId: null,
   activeDroppableId: null,
   placeholderId: null,
+  placeholderIndex: null,
   cursorPosition: null,
 };
 
