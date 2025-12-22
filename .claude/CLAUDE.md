@@ -59,6 +59,17 @@ Angular monorepo containing a drag-and-drop library optimized for virtual scroll
 - Use data attributes for element identification: `data-draggable-id`, `data-droppable-id`
 - `DragStateService` is the single source of truth for drag state
 
+### Library Development Workflow
+
+The demo app imports from `dist/ngx-virtual-dnd` (see `tsconfig.json` paths), NOT from source files.
+
+**After editing any file in `/projects/ngx-virtual-dnd/`:**
+
+1. Rebuild the library: `ng build ngx-virtual-dnd`
+2. Restart the dev server if running
+
+Without rebuilding, changes to library files will NOT appear in the demo app.
+
 ## Testing
 
 - **Unit tests:** Jest with zoneless environment (`npm test`)
@@ -93,11 +104,12 @@ no hanging process in the background left.
 
 ## Quick Reference
 
-| Command             | Description                 |
-| ------------------- | --------------------------- |
-| `npm start`         | Dev server (port 4200)      |
-| `npm test`          | Run unit tests (Jest)       |
-| `npm run e2e`       | Run E2E tests (Playwright)  |
-| `npm run lint`      | Run ESLint                  |
-| `npm run storybook` | Start Storybook (port 6006) |
-| `npm run build`     | Production build            |
+| Command                    | Description                          |
+| -------------------------- | ------------------------------------ |
+| `npm start`                | Dev server (port 4200)               |
+| `npm test`                 | Run unit tests (Jest)                |
+| `npm run e2e`              | Run E2E tests (Playwright)           |
+| `npm run lint`             | Run ESLint                           |
+| `npm run storybook`        | Start Storybook (port 6006)          |
+| `npm run build`            | Production build                     |
+| `ng build ngx-virtual-dnd` | Build library (required after edits) |
