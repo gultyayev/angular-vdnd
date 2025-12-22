@@ -87,7 +87,11 @@ export interface VisibleRangeChange {
         <div
           class="vdnd-virtual-scroll-item"
           [class.vdnd-virtual-scroll-item-sticky]="item.isSticky"
-          [style.height.px]="itemHeight()">
+          [class.vdnd-virtual-scroll-item-dragging]="item.isDragging"
+          [style.height.px]="itemHeight()"
+          [style.position]="item.isDragging ? 'absolute' : null"
+          [style.visibility]="item.isDragging ? 'hidden' : null"
+          [style.pointer-events]="item.isDragging ? 'none' : null">
           <ng-container
             *ngTemplateOutlet="itemTemplate(); context: {
               $implicit: item.data,
@@ -172,7 +176,11 @@ export class VirtualScrollContainerComponent<T> implements OnInit, OnDestroy {
 
   /** Total height of all items (for scrollbar) */
   protected readonly totalHeight = computed(() => {
-    return this.items().length * this.itemHeight();
+    const count = this.items().length;
+    const draggedId = this.draggedItemId();
+    // Subtract 1 when dragging - the dragged item is position:absolute (out of flow)
+    const effectiveCount = draggedId ? count - 1 : count;
+    return effectiveCount * this.itemHeight();
   });
 
   /** First visible item index */
@@ -200,15 +208,43 @@ export class VirtualScrollContainerComponent<T> implements OnInit, OnDestroy {
 
   /** Height of the top spacer (unrendered items above) */
   protected readonly topSpacerHeight = computed(() => {
-    return this.renderRange().start * this.itemHeight();
+    const { start } = this.renderRange();
+    const draggedIndex = this.draggedItemIndex();
+    // If dragged item is in the unrendered top section, subtract 1 (it's position:absolute)
+    const adjustment = draggedIndex >= 0 && draggedIndex < start ? 1 : 0;
+    return Math.max(0, start - adjustment) * this.itemHeight();
   });
 
   /** Height of the bottom spacer (unrendered items below) */
   protected readonly bottomSpacerHeight = computed(() => {
     const total = this.items().length;
-    const end = this.renderRange().end;
+    const { end } = this.renderRange();
+    const draggedIndex = this.draggedItemIndex();
     const unrenderedBelow = Math.max(0, total - end - 1);
-    return unrenderedBelow * this.itemHeight();
+    // If dragged item is in the unrendered bottom section, subtract 1 (it's position:absolute)
+    const adjustment = draggedIndex > end ? 1 : 0;
+    return Math.max(0, unrenderedBelow - adjustment) * this.itemHeight();
+  });
+
+  /** The ID of the currently dragged item (if any) */
+  protected readonly draggedItemId = computed(() => {
+    return this.dragState.draggedItem()?.draggableId ?? null;
+  });
+
+  /** The index of the currently dragged item in the items array (-1 if not found or not dragging) */
+  private readonly draggedItemIndex = computed(() => {
+    const draggedId = this.draggedItemId();
+    if (!draggedId) return -1;
+
+    const items = this.items();
+    const idFn = this.itemIdFn();
+
+    for (let i = 0; i < items.length; i++) {
+      if (idFn(items[i]) === draggedId) {
+        return i;
+      }
+    }
+    return -1;
   });
 
   /** Items to render, including sticky items */
@@ -217,8 +253,9 @@ export class VirtualScrollContainerComponent<T> implements OnInit, OnDestroy {
     const { start, end } = this.renderRange();
     const stickyIds = new Set(this.stickyItemIds());
     const idFn = this.itemIdFn();
+    const draggedId = this.draggedItemId();
 
-    const result: { data: T; index: number; isSticky: boolean }[] = [];
+    const result: { data: T; index: number; isSticky: boolean; isDragging: boolean }[] = [];
     const renderedIds = new Set<string>();
 
     // First, add all items in the visible range
@@ -229,6 +266,7 @@ export class VirtualScrollContainerComponent<T> implements OnInit, OnDestroy {
         data: item,
         index: i,
         isSticky: stickyIds.has(id),
+        isDragging: id === draggedId,
       });
       renderedIds.add(id);
     }
@@ -243,6 +281,7 @@ export class VirtualScrollContainerComponent<T> implements OnInit, OnDestroy {
           data: item,
           index: i,
           isSticky: true,
+          isDragging: id === draggedId,
         });
         renderedIds.add(id);
       }
