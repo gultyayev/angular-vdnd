@@ -8,6 +8,8 @@ export interface DraggedItem {
   droppableId: string;
   /** Reference to the dragged element */
   element: HTMLElement;
+  /** Cloned element for use in drag preview (auto-generated) */
+  clonedElement?: HTMLElement;
   /** Height of the dragged element in pixels */
   height: number;
   /** Width of the dragged element in pixels */

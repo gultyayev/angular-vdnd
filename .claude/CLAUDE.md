@@ -61,10 +61,22 @@ Angular monorepo containing a drag-and-drop library optimized for virtual scroll
 
 ## Testing
 
-- **Unit tests:** Jest with zoneless environment
-- **E2E tests:** Playwright
+- **Unit tests:** Jest with zoneless environment (`npm test`)
+- **E2E tests:** Playwright (`npm run e2e`) - **ALWAYS run after code changes**
 - Use Page Object Model pattern for E2E tests
 - Prefer data attributes (`[data-testid]`, `[data-draggable-id]`) over CSS selectors
+
+### Chrome MCP for Visual Testing
+
+Use `mcp__chrome-devtools` tools for visual debugging and testing:
+
+- `take_snapshot` - Get accessibility tree of the page
+- `take_screenshot` - Capture visual state for verification
+- `navigate_page`, `click`, `fill` - Interact with the running app
+- `list_console_messages` - Check for errors during testing
+
+Always kill the `ng serve` process before reporting a task fixed. There should be
+no hanging process in the background left.
 
 ## Accessibility
 

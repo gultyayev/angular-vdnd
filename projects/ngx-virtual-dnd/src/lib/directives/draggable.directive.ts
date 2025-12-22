@@ -12,6 +12,7 @@ import {
 import { DragStateService } from '../services/drag-state.service';
 import { PositionCalculatorService } from '../services/position-calculator.service';
 import { AutoScrollService } from '../services/auto-scroll.service';
+import { ElementCloneService } from '../services/element-clone.service';
 import {
   CursorPosition,
   DragEndEvent,
@@ -40,6 +41,7 @@ import {
     '[class.vdnd-draggable]': 'true',
     '[class.vdnd-draggable-dragging]': 'isDragging()',
     '[class.vdnd-draggable-disabled]': 'disabled()',
+    '[style.display]': 'isDragging() ? "none" : null',
     '[attr.aria-grabbed]': 'isDragging()',
     '[attr.aria-dropeffect]': '"move"',
     '[tabindex]': 'disabled() ? -1 : 0',
@@ -54,6 +56,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
   private readonly dragState = inject(DragStateService);
   private readonly positionCalculator = inject(PositionCalculatorService);
   private readonly autoScroll = inject(AutoScrollService);
+  private readonly elementClone = inject(ElementCloneService);
   private readonly ngZone = inject(NgZone);
 
   /** Unique identifier for this draggable */
@@ -251,18 +254,26 @@ export class DraggableDirective implements OnInit, OnDestroy {
     const element = this.elementRef.nativeElement;
     const rect = element.getBoundingClientRect();
 
+    // Clone element BEFORE setting isDragging (which triggers display:none via host binding)
+    const clonedElement = this.elementClone.cloneElement(element);
+
     this.ngZone.run(() => {
+      // Set isDragging first - this will trigger the host binding to hide the element
       this.isDragging.set(true);
 
-      // Register with drag state service
-      this.dragState.startDrag({
-        draggableId: this.vdndDraggable(),
-        droppableId: this.getParentDroppableId() ?? '',
-        element,
-        height: rect.height,
-        width: rect.width,
-        data: this.vdndDraggableData(),
-      });
+      // Register with drag state service (pass initial position for preview visibility)
+      this.dragState.startDrag(
+        {
+          draggableId: this.vdndDraggable(),
+          droppableId: this.getParentDroppableId() ?? '',
+          element,
+          clonedElement,
+          height: rect.height,
+          width: rect.width,
+          data: this.vdndDraggableData(),
+        },
+        position
+      );
 
       // Start auto-scroll monitoring
       this.autoScroll.startMonitoring();

@@ -2,9 +2,12 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
+  ElementRef,
   inject,
   input,
   TemplateRef,
+  viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { DragStateService } from '../services/drag-state.service';
@@ -56,6 +59,8 @@ export interface DragPreviewContext<T = unknown> {
           <ng-container
             *ngTemplateOutlet="previewTemplate()!; context: templateContext()">
           </ng-container>
+        } @else if (clonedElement()) {
+          <div class="vdnd-drag-preview-clone" #cloneContainer></div>
         } @else {
           <div class="vdnd-drag-preview-default">
             {{ dragState.draggedItem()?.draggableId }}
@@ -67,6 +72,14 @@ export interface DragPreviewContext<T = unknown> {
   styles: `
     .vdnd-drag-preview {
       box-sizing: border-box;
+    }
+
+    .vdnd-drag-preview-clone {
+      width: 100%;
+      height: 100%;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      border-radius: 4px;
+      overflow: hidden;
     }
 
     .vdnd-drag-preview-default {
@@ -86,6 +99,31 @@ export class DragPreviewComponent<T = unknown> {
 
   /** Offset from cursor to preview (to avoid cursor being on top of preview) */
   cursorOffset = input<{ x: number; y: number }>({ x: 8, y: 8 });
+
+  /** Reference to the clone container element */
+  private readonly cloneContainer = viewChild<ElementRef<HTMLElement>>('cloneContainer');
+
+  /** The cloned element from drag state (used when no custom template is provided) */
+  protected readonly clonedElement = computed(() => {
+    if (this.previewTemplate()) {
+      return null; // Custom template takes precedence
+    }
+    return this.dragState.draggedItem()?.clonedElement ?? null;
+  });
+
+  constructor() {
+    // Effect to insert the cloned element into the container
+    effect(() => {
+      const container = this.cloneContainer()?.nativeElement;
+      const clone = this.clonedElement();
+
+      if (container && clone) {
+        // Clear previous content and append clone
+        container.innerHTML = '';
+        container.appendChild(clone.cloneNode(true));
+      }
+    });
+  }
 
   /** Whether the preview is visible */
   protected readonly isVisible = computed(() => {

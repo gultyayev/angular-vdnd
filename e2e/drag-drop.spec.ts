@@ -51,6 +51,26 @@ test.describe('Drag and Drop', () => {
     await page.mouse.up();
   });
 
+  test('should visually hide the original element during drag', async ({ page }) => {
+    const sourceItem = demoPage.list1Items.first();
+    const sourceBox = await sourceItem.boundingBox();
+    const itemId = await sourceItem.getAttribute('data-draggable-id');
+
+    // Start dragging
+    await sourceItem.hover();
+    await page.mouse.down();
+    await page.mouse.move(sourceBox!.x + 100, sourceBox!.y + 100);
+
+    // The original element should be hidden via CSS (display: none)
+    const originalElement = page.locator(`[data-draggable-id="${itemId}"]`);
+    await expect(originalElement).toHaveCSS('display', 'none');
+
+    await page.mouse.up();
+
+    // After dropping, the element should be visible again
+    await expect(originalElement).not.toHaveCSS('display', 'none');
+  });
+
   test('should reorder item within same list', async () => {
     const firstItemText = await demoPage.getItemText('list1', 0);
     const secondItemText = await demoPage.getItemText('list1', 1);

@@ -6,6 +6,7 @@ export { DragStateService } from './services/drag-state.service';
 export { PositionCalculatorService } from './services/position-calculator.service';
 export { AutoScrollService } from './services/auto-scroll.service';
 export type { AutoScrollConfig } from './services/auto-scroll.service';
+export { ElementCloneService } from './services/element-clone.service';
 
 // Components
 export { VirtualScrollContainerComponent } from './components/virtual-scroll-container.component';

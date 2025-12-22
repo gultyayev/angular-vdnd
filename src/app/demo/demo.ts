@@ -103,16 +103,8 @@ interface Item {
         </div>
       </div>
 
-      <!-- Drag Preview -->
-      <vdnd-drag-preview>
-        <ng-template let-data let-id="draggableId">
-          @if (data) {
-            <div class="drag-preview" [style.background]="data.color">
-              {{ data.name }}
-            </div>
-          }
-        </ng-template>
-      </vdnd-drag-preview>
+      <!-- Drag Preview (auto-clones the original element by default) -->
+      <vdnd-drag-preview></vdnd-drag-preview>
 
       <div class="debug-panel">
         <h3>Drag State</h3>
@@ -177,19 +169,6 @@ interface Item {
       filter: brightness(0.95);
     }
 
-    .item.vdnd-draggable-dragging {
-      opacity: 0.5;
-    }
-
-    .drag-preview {
-      height: 48px;
-      display: flex;
-      align-items: center;
-      padding: 0 16px;
-      border-radius: 4px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-
     .debug-panel {
       margin-top: 20px;
       padding: 16px;
@@ -216,7 +195,7 @@ export class DemoComponent {
   /** List 2 items */
   readonly list2 = signal<Item[]>([]);
 
-  /** IDs of items that should always be rendered (dragged item) */
+  /** IDs of items that should always be rendered (dragged item needs to stay for reference) */
   readonly stickyIds = computed(() => {
     const draggedItem = this.dragState.draggedItem();
     return draggedItem ? [draggedItem.draggableId] : [];

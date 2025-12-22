@@ -26,6 +26,9 @@ export class DragStateService {
   /** The currently dragged item, or null */
   readonly draggedItem = computed(() => this._state().draggedItem);
 
+  /** ID of the currently dragged item, or null (convenience signal for filtering) */
+  readonly draggedItemId = computed(() => this._state().draggedItem?.draggableId ?? null);
+
   /** ID of the droppable where the drag started */
   readonly sourceDroppableId = computed(() => this._state().sourceDroppableId);
 
@@ -44,7 +47,7 @@ export class DragStateService {
   /**
    * Start a drag operation.
    */
-  startDrag(item: DraggedItem): void {
+  startDrag(item: DraggedItem, initialPosition?: CursorPosition): void {
     this._state.set({
       isDragging: true,
       draggedItem: item,
@@ -52,7 +55,7 @@ export class DragStateService {
       activeDroppableId: null,
       placeholderId: null,
       placeholderIndex: null,
-      cursorPosition: null,
+      cursorPosition: initialPosition ?? null,
     });
   }
 
