@@ -13,5 +13,6 @@ import { createCjsPreset } from 'jest-preset-angular/presets/index.js';
 export default {
   ...createCjsPreset(),
   setupFilesAfterEnv: ['<rootDir>/setup-jest.ts'],
+  testPathIgnorePatterns: ['<rootDir>/e2e/'],
   // transformIgnorePatterns,
 } satisfies Config;
