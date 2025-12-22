@@ -1,0 +1,51 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ master ]  # Change to 'main' if your default branch is main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'  # Or your preferred version
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Angular Library
+        run: ng build ngx-virtual-dnd  # Replace with your library project name from angular.json
+
+      - name: Build Angular App
+        run: |
+          ng build --configuration production --base-href "/angular-vdnd/"
+        # Replace 'my-app-name' with your app project name
+        # Replace 'your-repo-name' with your actual repository name (for project sites)
+        # If it's a user/org site (repo named username.github.io), use --base-href "/"
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/dnd/browser  # Replace with your app's output path (check angular.json > projects > my-app-name > architect > build > options > outputPath)
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
