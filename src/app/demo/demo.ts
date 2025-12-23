@@ -53,6 +53,24 @@ interface Item {
             <option value="y">Y (vertical only)</option>
           </select>
         </label>
+        <label>
+          <input
+            type="checkbox"
+            [checked]="dragEnabled()"
+            (change)="toggleDragEnabled($event)"
+            data-testid="drag-enabled-checkbox" />
+          Drag enabled
+        </label>
+        <label>
+          Drag delay (ms):
+          <input
+            type="number"
+            min="0"
+            step="100"
+            [value]="dragDelay()"
+            (input)="updateDragDelay($event)"
+            data-testid="drag-delay-input" />
+        </label>
         <button (click)="regenerateItems()">Regenerate Items</button>
       </div>
 
@@ -68,7 +86,9 @@ interface Item {
               vdndDraggable="{{ item.id }}"
               vdndDraggableGroup="demo"
               [vdndDraggableData]="item"
-              [lockAxis]="lockAxis()">
+              [lockAxis]="lockAxis()"
+              [disabled]="!dragEnabled()"
+              [dragDelay]="dragDelay()">
               {{ item.name }}
             </div>
           }
@@ -208,6 +228,12 @@ export class DemoComponent {
   /** Axis lock setting for drag operations */
   readonly lockAxis = signal<'x' | 'y' | null>(null);
 
+  /** Whether drag-and-drop is enabled */
+  readonly dragEnabled = signal(true);
+
+  /** Delay in milliseconds before drag starts */
+  readonly dragDelay = signal(0);
+
   /** List 1 items */
   readonly list1 = signal<Item[]>([]);
 
@@ -294,6 +320,21 @@ export class DemoComponent {
     const select = event.target as HTMLSelectElement;
     const value = select.value;
     this.lockAxis.set(value === 'x' || value === 'y' ? value : null);
+  }
+
+  /** Toggle drag enabled setting */
+  toggleDragEnabled(event: Event): void {
+    const checkbox = event.target as HTMLInputElement;
+    this.dragEnabled.set(checkbox.checked);
+  }
+
+  /** Update drag delay from input */
+  updateDragDelay(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const value = parseInt(input.value, 10);
+    if (!isNaN(value) && value >= 0) {
+      this.dragDelay.set(value);
+    }
   }
 
   /** Insert placeholder into list if this is the active droppable */

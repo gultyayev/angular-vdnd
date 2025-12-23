@@ -45,6 +45,8 @@ export interface DragState {
   draggedItem: DraggedItem | null;
   /** ID of the droppable where the drag started */
   sourceDroppableId: string | null;
+  /** Original index of the dragged item in the source list */
+  sourceIndex: number | null;
   /** ID of the droppable currently being hovered over */
   activeDroppableId: string | null;
   /** ID of the item the placeholder should appear before, or 'END_OF_LIST' */
@@ -184,6 +186,7 @@ export const INITIAL_DRAG_STATE: DragState = {
   isDragging: false,
   draggedItem: null,
   sourceDroppableId: null,
+  sourceIndex: null,
   activeDroppableId: null,
   placeholderId: null,
   placeholderIndex: null,

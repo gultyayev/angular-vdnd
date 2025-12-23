@@ -46,6 +46,9 @@ export class AutoScrollService {
   /** Active animation frame ID */
   private animationFrameId: number | null = null;
 
+  /** Callback to invoke when scrolling occurs (for placeholder recalculation) */
+  private onScrollCallback: (() => void) | null = null;
+
   /** Current scroll state */
   private scrollState: {
     containerId: string | null;
@@ -81,11 +84,14 @@ export class AutoScrollService {
   /**
    * Start monitoring for auto-scroll.
    * Call this when a drag starts.
+   * @param onScroll Optional callback to invoke when scrolling occurs (for placeholder recalculation)
    */
-  startMonitoring(): void {
+  startMonitoring(onScroll?: () => void): void {
     if (this.animationFrameId !== null) {
       return;
     }
+
+    this.onScrollCallback = onScroll ?? null;
 
     this.ngZone.runOutsideAngular(() => {
       this.tick();
@@ -102,6 +108,7 @@ export class AutoScrollService {
       this.animationFrameId = null;
     }
 
+    this.onScrollCallback = null;
     this.scrollState = {
       containerId: null,
       direction: { x: 0, y: 0 },
@@ -213,6 +220,14 @@ export class AutoScrollService {
       left: scrollX,
       behavior: 'instant',
     });
+
+    // Notify that scroll occurred so placeholder can be recalculated
+    if (this.onScrollCallback) {
+      // Run inside Angular zone for proper change detection
+      this.ngZone.run(() => {
+        this.onScrollCallback?.();
+      });
+    }
   }
 
   /**

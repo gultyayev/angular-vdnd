@@ -79,6 +79,13 @@ export class DraggableDirective implements OnInit, OnDestroy {
   /** Minimum distance to move before drag starts (prevents accidental drags) */
   dragThreshold = input<number>(5);
 
+  /**
+   * Delay in milliseconds before drag starts after pointer down.
+   * User must hold without moving for this duration.
+   * Set to 0 for immediate drag (default behavior).
+   */
+  dragDelay = input<number>(0);
+
   /** Lock dragging to a single axis ('x' = horizontal only, 'y' = vertical only) */
   lockAxis = input<'x' | 'y' | null>(null);
 
@@ -112,6 +119,12 @@ export class DraggableDirective implements OnInit, OnDestroy {
 
   /** Request animation frame ID for drag updates */
   private rafId: number | null = null;
+
+  /** Timer ID for drag delay */
+  private delayTimerId: ReturnType<typeof setTimeout> | null = null;
+
+  /** Whether the delay has been satisfied (user held long enough) */
+  private delayReady = false;
 
   ngOnInit(): void {
     // Set up event listeners
@@ -161,6 +174,18 @@ export class DraggableDirective implements OnInit, OnDestroy {
     this.isTracking = true;
     this.startPosition = this.getPosition(event);
 
+    // Handle drag delay
+    const delay = this.dragDelay();
+    if (delay > 0) {
+      this.delayReady = false;
+      this.delayTimerId = setTimeout(() => {
+        this.delayReady = true;
+        this.delayTimerId = null;
+      }, delay);
+    } else {
+      this.delayReady = true;
+    }
+
     // Add document-level event listeners
     this.ngZone.runOutsideAngular(() => {
       if (isTouch) {
@@ -195,6 +220,14 @@ export class DraggableDirective implements OnInit, OnDestroy {
         return;
       }
 
+      // If delay is configured and not yet ready, cancel the drag attempt
+      // (user moved before the delay was satisfied)
+      if (!this.delayReady) {
+        this.cancelDelayTimer();
+        this.cleanup();
+        return;
+      }
+
       // Start the drag
       this.startDrag(position);
     }
@@ -210,6 +243,17 @@ export class DraggableDirective implements OnInit, OnDestroy {
       this.updateDrag(position);
       this.rafId = null;
     });
+  }
+
+  /**
+   * Cancel the delay timer if active.
+   */
+  private cancelDelayTimer(): void {
+    if (this.delayTimerId !== null) {
+      clearTimeout(this.delayTimerId);
+      this.delayTimerId = null;
+    }
+    this.delayReady = false;
   }
 
   /**
@@ -286,11 +330,15 @@ export class DraggableDirective implements OnInit, OnDestroy {
       ? this.positionCalculator.getDroppableId(droppableElement)
       : this.getParentDroppableId();
 
+    // Calculate source index BEFORE the element is hidden (display: none)
+    // This is critical because getBoundingClientRect() returns all zeros for hidden elements
+    const sourceIndex = this.calculateSourceIndex(element, droppableElement);
+
     let initialPlaceholderId: string | null = null;
     let initialPlaceholderIndex: number | null = null;
 
     if (droppableElement) {
-      const indexResult = this.calculatePlaceholderIndex(droppableElement, position);
+      const indexResult = this.calculatePlaceholderIndex(droppableElement, position, sourceIndex);
       initialPlaceholderIndex = indexResult.index;
       initialPlaceholderId = indexResult.placeholderId;
     }
@@ -313,11 +361,12 @@ export class DraggableDirective implements OnInit, OnDestroy {
         this.lockAxis(),
         activeDroppableId,
         initialPlaceholderId,
-        initialPlaceholderIndex
+        initialPlaceholderIndex,
+        sourceIndex
       );
 
-      // Start auto-scroll monitoring
-      this.autoScroll.startMonitoring();
+      // Start auto-scroll monitoring with a callback to recalculate placeholder
+      this.autoScroll.startMonitoring(() => this.recalculatePlaceholder());
 
       // Emit drag start event
       this.dragStart.emit({
@@ -327,6 +376,45 @@ export class DraggableDirective implements OnInit, OnDestroy {
         position,
       });
     });
+  }
+
+  /**
+   * Calculate the source index of the dragged element BEFORE it's hidden.
+   * This must be called before startDrag updates the state (which triggers display:none).
+   */
+  private calculateSourceIndex(
+    element: HTMLElement,
+    droppableElement: HTMLElement | null
+  ): number {
+    if (!droppableElement) {
+      return 0;
+    }
+
+    const rect = element.getBoundingClientRect();
+    const virtualScroll = droppableElement.querySelector('vdnd-virtual-scroll');
+    const scrollableElement = virtualScroll ?? droppableElement;
+    const containerRect = scrollableElement.getBoundingClientRect();
+    const scrollTop = scrollableElement.scrollTop;
+
+    // Get item height from the element itself
+    const itemHeight = rect.height || 50;
+
+    // Calculate the logical index based on the element's position
+    const relativeY = rect.top - containerRect.top + scrollTop;
+    return Math.round(relativeY / itemHeight);
+  }
+
+  /**
+   * Recalculate placeholder position (called during auto-scroll).
+   */
+  private recalculatePlaceholder(): void {
+    const cursorPosition = this.dragState.cursorPosition();
+    if (!cursorPosition || !this.isDragging()) {
+      return;
+    }
+
+    // Use the last known cursor position with current scroll state
+    this.updateDrag(cursorPosition);
   }
 
   /**
@@ -396,10 +484,15 @@ export class DraggableDirective implements OnInit, OnDestroy {
    * Calculate the placeholder index based on cursor position.
    * Uses mathematical calculation instead of DOM-based detection to avoid
    * flickering caused by the placeholder insertion shifting elements.
+   *
+   * @param droppableElement The droppable container element
+   * @param position Current cursor position
+   * @param sourceIndexOverride Optional source index (used at drag start before element is hidden)
    */
   private calculatePlaceholderIndex(
     droppableElement: HTMLElement,
-    position: CursorPosition
+    position: CursorPosition,
+    sourceIndexOverride?: number
   ): { index: number; placeholderId: string } {
     // Look for virtual scroll container within the droppable
     const virtualScroll = droppableElement.querySelector('vdnd-virtual-scroll');
@@ -410,48 +503,43 @@ export class DraggableDirective implements OnInit, OnDestroy {
     const scrollTop = scrollableElement.scrollTop;
     const scrollHeight = scrollableElement.scrollHeight;
 
-    // Try to get item height from virtual scroll or estimate from first item
+    // Try to get item height from visible items (excluding placeholder)
     let itemHeight = 50; // Default fallback
-    const firstItem = droppableElement.querySelector('[data-draggable-id]');
-    if (firstItem) {
-      const itemRect = firstItem.getBoundingClientRect();
-      itemHeight = itemRect.height || 50;
-    }
-
-    // Calculate total items from scroll height (works with virtual scroll)
-    // This gives us the actual total, not just visible items
-    const totalItemsFromScroll = Math.round(scrollHeight / itemHeight);
-
-    // Also get visible items for ID lookup
-    const allDraggables = droppableElement.querySelectorAll(
+    const visibleItems = droppableElement.querySelectorAll(
       '[data-draggable-id]:not([data-draggable-id="placeholder"])'
     );
-
-    // Calculate the logical index based on cursor position
-    // This ignores any placeholder that might be in the DOM
-    const relativeY = position.y - rect.top + scrollTop;
-    const rawIndex = Math.floor(relativeY / itemHeight);
+    for (const item of visibleItems) {
+      // Skip the dragged item (it has display: none)
+      if ((item as HTMLElement).style.display !== 'none') {
+        const itemRect = item.getBoundingClientRect();
+        if (itemRect.height > 0) {
+          itemHeight = itemRect.height;
+          break;
+        }
+      }
+    }
 
     // Check if we're dragging within the same list
     const sourceDroppableId = this.dragState.sourceDroppableId();
     const currentDroppableId = this.positionCalculator.getDroppableId(droppableElement);
     const isSameList = sourceDroppableId === currentDroppableId;
 
-    // Find the original index of the dragged item (if in same list)
-    let draggedItemOriginalIndex = -1;
-    if (isSameList) {
-      // Find the dragged item in the DOM to determine its original position
-      const draggedId = this.vdndDraggable();
-      const draggedElement = droppableElement.querySelector(
-        `[data-draggable-id="${draggedId}"]`
-      );
-      if (draggedElement) {
-        // Calculate index from element position
-        const draggedRect = draggedElement.getBoundingClientRect();
-        const draggedY = draggedRect.top - rect.top + scrollTop;
-        draggedItemOriginalIndex = Math.round(draggedY / itemHeight);
-      }
+    // Get the source index - use stored value from drag state (calculated before element was hidden)
+    const draggedItemOriginalIndex = isSameList
+      ? (sourceIndexOverride ?? this.dragState.sourceIndex() ?? -1)
+      : -1;
+
+    // Calculate total items from scroll height (works with virtual scroll)
+    // When in same list, the dragged item is hidden so we need to add 1 back
+    let totalItemsFromScroll = Math.round(scrollHeight / itemHeight);
+    if (isSameList && draggedItemOriginalIndex >= 0) {
+      totalItemsFromScroll += 1; // Account for the hidden dragged item
     }
+
+    // Calculate the logical index based on cursor position
+    // This is the visual position in the currently displayed list (with dragged item hidden)
+    const relativeY = position.y - rect.top + scrollTop;
+    const rawIndex = Math.floor(relativeY / itemHeight);
 
     // Adjust index when dragging within same list
     // Because the dragged item is hidden (display: none), items below it shift up visually
@@ -472,20 +560,22 @@ export class DraggableDirective implements OnInit, OnDestroy {
 
     // Try to find the item at the calculated index in the visible items
     // With virtual scroll, we need to account for the scroll offset
-    const firstVisibleIndex = Math.floor(scrollTop / itemHeight);
+    // Also account for the hidden dragged item when calculating first visible index
+    let firstVisibleIndex = Math.floor(scrollTop / itemHeight);
+    if (isSameList && draggedItemOriginalIndex >= 0 && draggedItemOriginalIndex < firstVisibleIndex) {
+      firstVisibleIndex += 1;
+    }
+
     const visibleIndex = clampedIndex - firstVisibleIndex;
+
+    // Filter out the dragged item from visible items for lookup
+    const allDraggables = Array.from(visibleItems).filter(
+      (item) => item.getAttribute('data-draggable-id') !== this.vdndDraggable()
+    );
 
     if (visibleIndex >= 0 && visibleIndex < allDraggables.length) {
       const targetItem = allDraggables[visibleIndex];
       const targetId = targetItem?.getAttribute('data-draggable-id');
-
-      // If the target is the item being dragged, skip to next item
-      if (targetId === this.vdndDraggable()) {
-        return {
-          index: clampedIndex + 1,
-          placeholderId: END_OF_LIST,
-        };
-      }
 
       return {
         index: clampedIndex,
@@ -555,6 +645,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
   private cleanup(): void {
     this.isTracking = false;
     this.startPosition = null;
+    this.cancelDelayTimer();
 
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
