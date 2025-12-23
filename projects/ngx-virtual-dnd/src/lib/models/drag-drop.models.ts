@@ -27,6 +27,15 @@ export interface CursorPosition {
 }
 
 /**
+ * Offset from cursor to the top-left corner of the dragged element.
+ * Used to maintain grab position during drag.
+ */
+export interface GrabOffset {
+  x: number;
+  y: number;
+}
+
+/**
  * Complete state of the drag-and-drop system.
  */
 export interface DragState {
@@ -44,6 +53,12 @@ export interface DragState {
   placeholderIndex: number | null;
   /** Current cursor position */
   cursorPosition: CursorPosition | null;
+  /** Offset from cursor to element top-left (for maintaining grab position) */
+  grabOffset: GrabOffset | null;
+  /** Position when drag started (for axis locking) */
+  initialPosition: CursorPosition | null;
+  /** Axis to lock movement to ('x' = horizontal only, 'y' = vertical only) */
+  lockAxis: 'x' | 'y' | null;
 }
 
 /**
@@ -173,6 +188,9 @@ export const INITIAL_DRAG_STATE: DragState = {
   placeholderId: null,
   placeholderIndex: null,
   cursorPosition: null,
+  grabOffset: null,
+  initialPosition: null,
+  lockAxis: null,
 };
 
 /**

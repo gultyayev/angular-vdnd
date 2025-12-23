@@ -11,6 +11,7 @@ export class DemoPage {
   readonly list2VirtualScroll: Locator;
   readonly list1Wrapper: Locator;
   readonly list2Wrapper: Locator;
+  readonly lockAxisSelect: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -24,6 +25,7 @@ export class DemoPage {
     // List wrappers contain the headings with actual item counts
     this.list1Wrapper = page.locator('.list-wrapper').nth(0);
     this.list2Wrapper = page.locator('.list-wrapper').nth(1);
+    this.lockAxisSelect = page.locator('[data-testid="lock-axis-select"]');
   }
 
   async goto(): Promise<void> {
@@ -98,5 +100,9 @@ export class DemoPage {
   async getScrollTop(list: 'list1' | 'list2'): Promise<number> {
     const container = list === 'list1' ? this.list1VirtualScroll : this.list2VirtualScroll;
     return container.evaluate((el) => el.scrollTop);
+  }
+
+  async setLockAxis(axis: 'x' | 'y' | null): Promise<void> {
+    await this.lockAxisSelect.selectOption(axis ?? '');
   }
 }

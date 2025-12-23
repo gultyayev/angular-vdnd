@@ -20,6 +20,7 @@ import {
   DragMoveEvent,
   DragStartEvent,
   END_OF_LIST,
+  GrabOffset,
 } from '../models/drag-drop.models';
 
 /**
@@ -77,6 +78,9 @@ export class DraggableDirective implements OnInit, OnDestroy {
 
   /** Minimum distance to move before drag starts (prevents accidental drags) */
   dragThreshold = input<number>(5);
+
+  /** Lock dragging to a single axis ('x' = horizontal only, 'y' = vertical only) */
+  lockAxis = input<'x' | 'y' | null>(null);
 
   /** Emits when drag starts */
   dragStart = output<DragStartEvent>();
@@ -258,8 +262,38 @@ export class DraggableDirective implements OnInit, OnDestroy {
     const element = this.elementRef.nativeElement;
     const rect = element.getBoundingClientRect();
 
+    // Calculate grab offset (cursor position relative to element's top-left corner)
+    // This allows the preview to maintain its position relative to where the user grabbed it
+    const grabOffset: GrabOffset = {
+      x: position.x - rect.left,
+      y: position.y - rect.top,
+    };
+
     // Clone element BEFORE updating drag state (which triggers display:none via host binding)
     const clonedElement = this.elementClone.cloneElement(element);
+
+    // Find droppable and calculate initial placeholder position
+    // This fixes the UI glitch by ensuring placeholder is set before the element is hidden
+    const groupName = this.vdndDraggableGroup();
+    const droppableElement = this.positionCalculator.findDroppableAtPoint(
+      position.x,
+      position.y,
+      element,
+      groupName
+    );
+
+    const activeDroppableId = droppableElement
+      ? this.positionCalculator.getDroppableId(droppableElement)
+      : this.getParentDroppableId();
+
+    let initialPlaceholderId: string | null = null;
+    let initialPlaceholderIndex: number | null = null;
+
+    if (droppableElement) {
+      const indexResult = this.calculatePlaceholderIndex(droppableElement, position);
+      initialPlaceholderIndex = indexResult.index;
+      initialPlaceholderId = indexResult.placeholderId;
+    }
 
     this.ngZone.run(() => {
       // Register with drag state service - this triggers isDragging computed to become true
@@ -274,7 +308,12 @@ export class DraggableDirective implements OnInit, OnDestroy {
           width: rect.width,
           data: this.vdndDraggableData(),
         },
-        position
+        position,
+        grabOffset,
+        this.lockAxis(),
+        activeDroppableId,
+        initialPlaceholderId,
+        initialPlaceholderIndex
       );
 
       // Start auto-scroll monitoring
@@ -297,10 +336,22 @@ export class DraggableDirective implements OnInit, OnDestroy {
     const element = this.elementRef.nativeElement;
     const groupName = this.vdndDraggableGroup();
 
-    // Find droppable at cursor position
+    // Apply axis locking to effective position for droppable detection
+    // When axis is locked, use the start position for the locked axis
+    const axisLock = this.lockAxis();
+    let effectivePosition = position;
+
+    if (axisLock && this.startPosition) {
+      effectivePosition = {
+        x: axisLock === 'x' ? this.startPosition.x : position.x,
+        y: axisLock === 'y' ? this.startPosition.y : position.y,
+      };
+    }
+
+    // Find droppable at effective position (respects axis locking)
     const droppableElement = this.positionCalculator.findDroppableAtPoint(
-      position.x,
-      position.y,
+      effectivePosition.x,
+      effectivePosition.y,
       element,
       groupName
     );
@@ -313,15 +364,15 @@ export class DraggableDirective implements OnInit, OnDestroy {
     let placeholderIndex: number | null = null;
 
     if (droppableElement) {
-      // Calculate placeholder index based on cursor position using mathematical approach
+      // Calculate placeholder index based on effective position using mathematical approach
       // This is more stable than DOM-based detection because it doesn't get affected
       // by the placeholder insertion shifting elements around
-      const indexResult = this.calculatePlaceholderIndex(droppableElement, position);
+      const indexResult = this.calculatePlaceholderIndex(droppableElement, effectivePosition);
       placeholderIndex = indexResult.index;
       placeholderId = indexResult.placeholderId;
     }
 
-    // Update drag state
+    // Update drag state with actual cursor position (for preview rendering)
     this.ngZone.run(() => {
       this.dragState.updateDragPosition({
         cursorPosition: position,

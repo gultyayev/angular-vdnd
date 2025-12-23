@@ -3,6 +3,7 @@ import {
   CursorPosition,
   DraggedItem,
   DragState,
+  GrabOffset,
   INITIAL_DRAG_STATE,
 } from '../models/drag-drop.models';
 
@@ -44,18 +45,38 @@ export class DragStateService {
   /** Current cursor position */
   readonly cursorPosition = computed(() => this._state().cursorPosition);
 
+  /** Offset from cursor to element top-left (for maintaining grab position) */
+  readonly grabOffset = computed(() => this._state().grabOffset);
+
+  /** Position when drag started (for axis locking) */
+  readonly initialPosition = computed(() => this._state().initialPosition);
+
+  /** Axis to lock movement to */
+  readonly lockAxis = computed(() => this._state().lockAxis);
+
   /**
    * Start a drag operation.
    */
-  startDrag(item: DraggedItem, initialPosition?: CursorPosition): void {
+  startDrag(
+    item: DraggedItem,
+    initialPosition?: CursorPosition,
+    grabOffset?: GrabOffset,
+    lockAxis?: 'x' | 'y' | null,
+    activeDroppableId?: string | null,
+    placeholderId?: string | null,
+    placeholderIndex?: number | null
+  ): void {
     this._state.set({
       isDragging: true,
       draggedItem: item,
       sourceDroppableId: item.droppableId,
-      activeDroppableId: null,
-      placeholderId: null,
-      placeholderIndex: null,
+      activeDroppableId: activeDroppableId ?? null,
+      placeholderId: placeholderId ?? null,
+      placeholderIndex: placeholderIndex ?? null,
       cursorPosition: initialPosition ?? null,
+      grabOffset: grabOffset ?? null,
+      initialPosition: initialPosition ?? null,
+      lockAxis: lockAxis ?? null,
     });
   }
 

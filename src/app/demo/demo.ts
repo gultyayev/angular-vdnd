@@ -42,6 +42,17 @@ interface Item {
             [value]="itemCount()"
             (input)="updateItemCount($event)" />
         </label>
+        <label>
+          Lock axis:
+          <select
+            [value]="lockAxis() ?? ''"
+            (change)="updateLockAxis($event)"
+            data-testid="lock-axis-select">
+            <option value="">None</option>
+            <option value="x">X (horizontal only)</option>
+            <option value="y">Y (vertical only)</option>
+          </select>
+        </label>
         <button (click)="regenerateItems()">Regenerate Items</button>
       </div>
 
@@ -56,7 +67,8 @@ interface Item {
               [style.background]="item.color"
               vdndDraggable="{{ item.id }}"
               vdndDraggableGroup="demo"
-              [vdndDraggableData]="item">
+              [vdndDraggableData]="item"
+              [lockAxis]="lockAxis()">
               {{ item.name }}
             </div>
           }
@@ -135,6 +147,10 @@ interface Item {
       cursor: pointer;
     }
 
+    .controls select {
+      padding: 4px 8px;
+    }
+
     .lists-container {
       display: flex;
       gap: 40px;
@@ -188,6 +204,9 @@ export class DemoComponent {
 
   /** Number of items to generate */
   readonly itemCount = signal(100);
+
+  /** Axis lock setting for drag operations */
+  readonly lockAxis = signal<'x' | 'y' | null>(null);
 
   /** List 1 items */
   readonly list1 = signal<Item[]>([]);
@@ -268,6 +287,13 @@ export class DemoComponent {
     if (!isNaN(value) && value > 0) {
       this.itemCount.set(value);
     }
+  }
+
+  /** Update axis lock setting from select */
+  updateLockAxis(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    const value = select.value;
+    this.lockAxis.set(value === 'x' || value === 'y' ? value : null);
   }
 
   /** Insert placeholder into list if this is the active droppable */

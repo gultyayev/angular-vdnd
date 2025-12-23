@@ -133,16 +133,33 @@ export class DragPreviewComponent<T = unknown> {
   /** Position of the preview */
   protected readonly position = computed(() => {
     const cursor = this.dragState.cursorPosition();
-    const offset = this.cursorOffset();
+    const grabOffset = this.dragState.grabOffset();
+    const fallbackOffset = this.cursorOffset();
+    const initialPosition = this.dragState.initialPosition();
+    const lockAxis = this.dragState.lockAxis();
 
     if (!cursor) {
       return { x: 0, y: 0 };
     }
 
-    return {
-      x: cursor.x - offset.x,
-      y: cursor.y - offset.y,
-    };
+    // Use grab offset if available (preserves grab position), otherwise fall back to cursorOffset input
+    const offset = grabOffset ?? fallbackOffset;
+
+    let x = cursor.x - offset.x;
+    let y = cursor.y - offset.y;
+
+    // Apply axis locking if configured
+    if (lockAxis && initialPosition) {
+      if (lockAxis === 'x') {
+        // Lock X axis: x stays at initial position
+        x = initialPosition.x - offset.x;
+      } else if (lockAxis === 'y') {
+        // Lock Y axis: y stays at initial position
+        y = initialPosition.y - offset.y;
+      }
+    }
+
+    return { x, y };
   });
 
   /** Dimensions of the preview */
