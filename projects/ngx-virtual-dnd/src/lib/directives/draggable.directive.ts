@@ -1,4 +1,5 @@
 import {
+  computed,
   Directive,
   ElementRef,
   inject,
@@ -86,8 +87,11 @@ export class DraggableDirective implements OnInit, OnDestroy {
   /** Emits when drag ends */
   dragEnd = output<DragEndEvent>();
 
-  /** Whether this element is currently being dragged */
-  readonly isDragging = signal(false);
+  /** Whether this element is currently being dragged (based on global drag state) */
+  readonly isDragging = computed(() => {
+    const draggedItem = this.dragState.draggedItem();
+    return draggedItem?.draggableId === this.vdndDraggable();
+  });
 
   /** Starting position of the drag */
   private startPosition: CursorPosition | null = null;
@@ -254,14 +258,12 @@ export class DraggableDirective implements OnInit, OnDestroy {
     const element = this.elementRef.nativeElement;
     const rect = element.getBoundingClientRect();
 
-    // Clone element BEFORE setting isDragging (which triggers display:none via host binding)
+    // Clone element BEFORE updating drag state (which triggers display:none via host binding)
     const clonedElement = this.elementClone.cloneElement(element);
 
     this.ngZone.run(() => {
-      // Set isDragging first - this will trigger the host binding to hide the element
-      this.isDragging.set(true);
-
-      // Register with drag state service (pass initial position for preview visibility)
+      // Register with drag state service - this triggers isDragging computed to become true
+      // which will apply display:none via host binding
       this.dragState.startDrag(
         {
           draggableId: this.vdndDraggable(),
@@ -379,8 +381,37 @@ export class DraggableDirective implements OnInit, OnDestroy {
     const relativeY = position.y - rect.top + scrollTop;
     const rawIndex = Math.floor(relativeY / itemHeight);
 
+    // Check if we're dragging within the same list
+    const sourceDroppableId = this.dragState.sourceDroppableId();
+    const currentDroppableId = this.positionCalculator.getDroppableId(droppableElement);
+    const isSameList = sourceDroppableId === currentDroppableId;
+
+    // Find the original index of the dragged item (if in same list)
+    let draggedItemOriginalIndex = -1;
+    if (isSameList) {
+      // Find the dragged item in the DOM to determine its original position
+      const draggedId = this.vdndDraggable();
+      const draggedElement = droppableElement.querySelector(
+        `[data-draggable-id="${draggedId}"]`
+      );
+      if (draggedElement) {
+        // Calculate index from element position
+        const draggedRect = draggedElement.getBoundingClientRect();
+        const draggedY = draggedRect.top - rect.top + scrollTop;
+        draggedItemOriginalIndex = Math.round(draggedY / itemHeight);
+      }
+    }
+
+    // Adjust index when dragging within same list
+    // Because the dragged item is hidden (display: none), items below it shift up visually
+    // If cursor is at or after the dragged item's original position, add 1 to compensate
+    let adjustedIndex = rawIndex;
+    if (isSameList && draggedItemOriginalIndex >= 0 && rawIndex >= draggedItemOriginalIndex) {
+      adjustedIndex = rawIndex + 1;
+    }
+
     // Clamp to valid range [0, totalItems]
-    const clampedIndex = Math.max(0, Math.min(rawIndex, totalItemsFromScroll));
+    const clampedIndex = Math.max(0, Math.min(adjustedIndex, totalItemsFromScroll));
 
     // Determine the placeholderId
     // If at the end or beyond visible range, use END_OF_LIST
@@ -397,9 +428,8 @@ export class DraggableDirective implements OnInit, OnDestroy {
       const targetItem = allDraggables[visibleIndex];
       const targetId = targetItem?.getAttribute('data-draggable-id');
 
-      // If the target is the item being dragged, skip it
+      // If the target is the item being dragged, skip to next item
       if (targetId === this.vdndDraggable()) {
-        // If dragging within the same list, adjust the index
         return {
           index: clampedIndex + 1,
           placeholderId: END_OF_LIST,
@@ -425,8 +455,6 @@ export class DraggableDirective implements OnInit, OnDestroy {
    */
   private endDrag(cancelled: boolean): void {
     this.ngZone.run(() => {
-      this.isDragging.set(false);
-
       // Stop auto-scroll monitoring
       this.autoScroll.stopMonitoring();
 
@@ -438,7 +466,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
         data: this.vdndDraggableData(),
       });
 
-      // Clear drag state
+      // Clear drag state - this triggers isDragging computed to become false
       if (cancelled) {
         this.dragState.cancelDrag();
       } else {

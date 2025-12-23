@@ -84,22 +84,13 @@ export interface VisibleRangeChange {
 
       <!-- Rendered items -->
       @for (item of renderedItems(); track trackByFn()(item.index, item.data)) {
-        <div
-          class="vdnd-virtual-scroll-item"
-          [class.vdnd-virtual-scroll-item-sticky]="item.isSticky"
-          [class.vdnd-virtual-scroll-item-dragging]="item.isDragging"
-          [style.height.px]="itemHeight()"
-          [style.position]="item.isDragging ? 'absolute' : null"
-          [style.visibility]="item.isDragging ? 'hidden' : null"
-          [style.pointer-events]="item.isDragging ? 'none' : null">
-          <ng-container
-            *ngTemplateOutlet="itemTemplate(); context: {
-              $implicit: item.data,
-              index: item.index,
-              isSticky: item.isSticky
-            }">
-          </ng-container>
-        </div>
+        <ng-container
+          *ngTemplateOutlet="itemTemplate(); context: {
+            $implicit: item.data,
+            index: item.index,
+            isSticky: item.isSticky
+          }">
+        </ng-container>
       }
 
       <!-- Spacer for items below viewport -->
@@ -117,10 +108,6 @@ export interface VisibleRangeChange {
     .vdnd-virtual-scroll-content {
       position: relative;
       width: 100%;
-    }
-
-    .vdnd-virtual-scroll-item {
-      box-sizing: border-box;
     }
   `,
 })
