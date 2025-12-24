@@ -503,21 +503,15 @@ export class DraggableDirective implements OnInit, OnDestroy {
     const scrollTop = scrollableElement.scrollTop;
     const scrollHeight = scrollableElement.scrollHeight;
 
-    // Try to get item height from visible items (excluding placeholder)
-    let itemHeight = 50; // Default fallback
+    // Get consistent item height from the dragged item (stable throughout the drag)
+    // This prevents drift during auto-scroll when different items become visible
+    const draggedItem = this.dragState.draggedItem();
+    const itemHeight = draggedItem?.height ?? 50;
+
+    // Get visible items for placeholderId lookup later
     const visibleItems = droppableElement.querySelectorAll(
       '[data-draggable-id]:not([data-draggable-id="placeholder"])'
     );
-    for (const item of visibleItems) {
-      // Skip the dragged item (it has display: none)
-      if ((item as HTMLElement).style.display !== 'none') {
-        const itemRect = item.getBoundingClientRect();
-        if (itemRect.height > 0) {
-          itemHeight = itemRect.height;
-          break;
-        }
-      }
-    }
 
     // Check if we're dragging within the same list
     const sourceDroppableId = this.dragState.sourceDroppableId();
@@ -536,9 +530,16 @@ export class DraggableDirective implements OnInit, OnDestroy {
       totalItemsFromScroll += 1; // Account for the hidden dragged item
     }
 
-    // Calculate the logical index based on cursor position
-    // This is the visual position in the currently displayed list (with dragged item hidden)
-    const relativeY = position.y - rect.top + scrollTop;
+    // Calculate the logical index based on the preview's CENTER position
+    // The preview renders at (cursor - grabOffset), so its center is at:
+    // cursor.y - grabOffset.y + itemHeight/2
+    // This ensures the placeholder appears where the preview visually is,
+    // not where the cursor is (which may differ based on where the user grabbed the item)
+    const grabOffset = this.dragState.grabOffset();
+    const previewCenterY = grabOffset
+      ? position.y - grabOffset.y + itemHeight / 2
+      : position.y;
+    const relativeY = previewCenterY - rect.top + scrollTop;
     const rawIndex = Math.floor(relativeY / itemHeight);
 
     // Adjust index when dragging within same list
