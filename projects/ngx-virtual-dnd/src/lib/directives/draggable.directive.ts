@@ -306,11 +306,13 @@ export class DraggableDirective implements OnInit, OnDestroy {
     const element = this.elementRef.nativeElement;
     const rect = element.getBoundingClientRect();
 
-    // Calculate grab offset (cursor position relative to element's top-left corner)
-    // This allows the preview to maintain its position relative to where the user grabbed it
+    // Calculate grab offset using the START position (where user initially pressed down)
+    // NOT the current position (where drag threshold was exceeded)
+    // This ensures the preview maintains its position relative to where the user grabbed it
+    const startPos = this.startPosition ?? position;
     const grabOffset: GrabOffset = {
-      x: position.x - rect.left,
-      y: position.y - rect.top,
+      x: startPos.x - rect.left,
+      y: startPos.y - rect.top,
     };
 
     // Clone element BEFORE updating drag state (which triggers display:none via host binding)
@@ -500,7 +502,10 @@ export class DraggableDirective implements OnInit, OnDestroy {
     const container = (virtualScroll ?? droppableElement) as HTMLElement;
     const rect = container.getBoundingClientRect();
     const scrollTop = container.scrollTop;
-    const itemHeight = this.dragState.draggedItem()?.height ?? 50;
+    // Prefer configured item height from virtual scroll over actual element height
+    // This prevents drift when actual element height differs from grid spacing
+    const configuredHeight = virtualScroll?.getAttribute('data-item-height');
+    const itemHeight = configuredHeight ? parseInt(configuredHeight, 10) : (this.dragState.draggedItem()?.height ?? 50);
 
     // Calculate preview center position
     // Using preview CENTER provides intuitive UX - placeholder appears where preview is
@@ -543,7 +548,9 @@ export class DraggableDirective implements OnInit, OnDestroy {
     const virtualScroll = droppableElement.querySelector('vdnd-virtual-scroll');
     if (virtualScroll) {
       const scrollHeight = (virtualScroll as HTMLElement).scrollHeight;
-      const itemHeight = this.dragState.draggedItem()?.height ?? 50;
+      // Prefer configured item height from virtual scroll over actual element height
+      const configuredHeight = virtualScroll.getAttribute('data-item-height');
+      const itemHeight = configuredHeight ? parseInt(configuredHeight, 10) : (this.dragState.draggedItem()?.height ?? 50);
       // When same-list, scrollHeight reflects N-1 items (one is hidden)
       // Add 1 back to get true total
       const count = Math.floor(scrollHeight / itemHeight);

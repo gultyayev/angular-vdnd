@@ -69,6 +69,7 @@ export interface VisibleRangeChange {
     '[style.height.px]': 'containerHeight()',
     '[style.overflow]': '"auto"',
     '[style.position]': '"relative"',
+    '[attr.data-item-height]': 'itemHeight()',
     '(scroll)': 'onScroll($event)',
   },
   template: `

@@ -192,7 +192,8 @@ interface Item {
     }
 
     .item {
-      height: 48px;
+      height: 50px;
+      box-sizing: border-box;
       display: flex;
       align-items: center;
       padding: 0 16px;
