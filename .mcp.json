@@ -3,6 +3,10 @@
     "jetbrains": {
       "type": "sse",
       "url": "http://localhost:64342/sse"
+    },
+    "angular-cli": {
+      "command": "npx",
+      "args": ["-y", "@angular/cli", "mcp"]
     }
   }
 }
