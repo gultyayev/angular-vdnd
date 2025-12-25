@@ -14,6 +14,8 @@ Angular monorepo containing a drag-and-drop library optimized for virtual scroll
 - Use strict type checking
 - Prefer type inference when the type is obvious
 - Avoid `any`; use `unknown` when type is uncertain
+- Use native ESM private members (`#` syntax) instead of TypeScript's `private` keyword
+  - Exception: Angular signal queries (`viewChild`, `viewChildren`, `contentChild`, `contentChildren`) cannot use ES private fields due to Angular compiler limitations - use TypeScript `private` for these
 
 ## Angular
 

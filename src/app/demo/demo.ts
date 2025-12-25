@@ -103,9 +103,9 @@ interface Item {
             vdndDroppableGroup="demo"
             (drop)="onDrop($event, 'list1')">
             <vdnd-virtual-scroll
+              class="virtual-scroll-container"
               [items]="list1WithPlaceholder()"
               [itemHeight]="50"
-              [containerHeight]="400"
               [stickyItemIds]="stickyIds()"
               [itemIdFn]="getItemId"
               [trackByFn]="trackById"
@@ -123,9 +123,9 @@ interface Item {
             vdndDroppableGroup="demo"
             (drop)="onDrop($event, 'list2')">
             <vdnd-virtual-scroll
+              class="virtual-scroll-container"
               [items]="list2WithPlaceholder()"
               [itemHeight]="50"
-              [containerHeight]="400"
               [stickyItemIds]="stickyIds()"
               [itemIdFn]="getItemId"
               [trackByFn]="trackById"
@@ -184,6 +184,10 @@ interface Item {
       border: 2px solid #ccc;
       border-radius: 8px;
       overflow: hidden;
+    }
+
+    .virtual-scroll-container {
+      height: 400px;
     }
 
     .list.vdnd-droppable-active {

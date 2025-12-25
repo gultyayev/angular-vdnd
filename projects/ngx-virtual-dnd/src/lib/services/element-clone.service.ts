@@ -10,7 +10,7 @@ export class ElementCloneService {
    * CSS properties to copy from source to clone.
    * These are the visual properties that affect appearance.
    */
-  private readonly stylesToCopy = [
+  readonly #stylesToCopy = [
     'background',
     'backgroundColor',
     'backgroundImage',
@@ -52,13 +52,13 @@ export class ElementCloneService {
     const clone = source.cloneNode(true) as HTMLElement;
 
     // Apply computed styles as inline styles
-    this.applyComputedStyles(source, clone);
+    this.#applyComputedStyles(source, clone);
 
     // Handle special elements (canvas, video, etc.)
-    this.handleSpecialElements(source, clone);
+    this.#handleSpecialElements(source, clone);
 
     // Sanitize the clone for safe use as preview
-    this.sanitizeClone(clone);
+    this.#sanitizeClone(clone);
 
     return clone;
   }
@@ -67,14 +67,14 @@ export class ElementCloneService {
    * Apply computed styles from source to target element.
    * Recursively applies to all child elements.
    */
-  private applyComputedStyles(source: HTMLElement, target: HTMLElement): void {
+  #applyComputedStyles(source: HTMLElement, target: HTMLElement): void {
     const computed = window.getComputedStyle(source);
 
     // Copy essential visual properties
-    for (const prop of this.stylesToCopy) {
-      const value = computed.getPropertyValue(this.camelToKebab(prop));
+    for (const prop of this.#stylesToCopy) {
+      const value = computed.getPropertyValue(this.#camelToKebab(prop));
       if (value) {
-        target.style.setProperty(this.camelToKebab(prop), value);
+        target.style.setProperty(this.#camelToKebab(prop), value);
       }
     }
 
@@ -91,7 +91,7 @@ export class ElementCloneService {
       const targetChild = targetChildren[i];
 
       if (sourceChild instanceof HTMLElement && targetChild instanceof HTMLElement) {
-        this.applyComputedStyles(sourceChild, targetChild);
+        this.#applyComputedStyles(sourceChild, targetChild);
       }
     }
   }
@@ -99,7 +99,7 @@ export class ElementCloneService {
   /**
    * Handle special elements that require extra processing.
    */
-  private handleSpecialElements(source: HTMLElement, clone: HTMLElement): void {
+  #handleSpecialElements(source: HTMLElement, clone: HTMLElement): void {
     // Handle canvas elements - copy current content
     const sourceCanvases = source.querySelectorAll('canvas');
     const cloneCanvases = clone.querySelectorAll('canvas');
@@ -165,7 +165,7 @@ export class ElementCloneService {
   /**
    * Sanitize the clone to prevent interaction issues.
    */
-  private sanitizeClone(clone: HTMLElement): void {
+  #sanitizeClone(clone: HTMLElement): void {
     // Remove draggable directive attributes
     clone.removeAttribute('vdndDraggable');
     clone.removeAttribute('data-draggable-id');
@@ -222,7 +222,7 @@ export class ElementCloneService {
   /**
    * Convert camelCase to kebab-case for CSS properties.
    */
-  private camelToKebab(str: string): string {
+  #camelToKebab(str: string): string {
     return str.replace(/([A-Z])/g, '-$1').toLowerCase();
   }
 }

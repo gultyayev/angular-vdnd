@@ -45,9 +45,9 @@ import {
   },
 })
 export class DroppableDirective implements OnInit, OnDestroy {
-  private readonly elementRef = inject(ElementRef<HTMLElement>);
-  private readonly dragState = inject(DragStateService);
-  private readonly autoScroll = inject(AutoScrollService);
+  readonly #elementRef = inject(ElementRef<HTMLElement>);
+  readonly #dragState = inject(DragStateService);
+  readonly #autoScroll = inject(AutoScrollService);
 
   /** Unique identifier for this droppable */
   vdndDroppable = input.required<string>();
@@ -81,7 +81,7 @@ export class DroppableDirective implements OnInit, OnDestroy {
 
   /** Whether this droppable is currently being targeted */
   readonly isActive = computed(() => {
-    const activeId = this.dragState.activeDroppableId();
+    const activeId = this.#dragState.activeDroppableId();
     return activeId === this.vdndDroppable() && !this.disabled();
   });
 
@@ -90,25 +90,25 @@ export class DroppableDirective implements OnInit, OnDestroy {
     if (!this.isActive()) {
       return null;
     }
-    return this.dragState.placeholderId();
+    return this.#dragState.placeholderId();
   });
 
   /** Track previous active state for enter/leave events */
-  private wasActive = false;
+  #wasActive = false;
 
   /** Track previous placeholder for over events */
-  private previousPlaceholder: string | null = null;
+  #previousPlaceholder: string | null = null;
 
   /** Cached state for handling drop (since state is cleared before effect fires) */
-  private cachedDragState: DragState | null = null;
+  #cachedDragState: DragState | null = null;
 
   ngOnInit(): void {
     // Register with auto-scroll service only if this element is actually scrollable
     // (i.e., has overflow: auto/scroll and content taller than container)
-    if (this.autoScrollEnabled() && this.isScrollable()) {
-      this.autoScroll.registerContainer(
+    if (this.autoScrollEnabled() && this.#isScrollable()) {
+      this.#autoScroll.registerContainer(
         this.vdndDroppable(),
-        this.elementRef.nativeElement,
+        this.#elementRef.nativeElement,
         this.autoScrollConfig()
       );
     }
@@ -117,8 +117,8 @@ export class DroppableDirective implements OnInit, OnDestroy {
   /**
    * Check if this element is actually scrollable.
    */
-  private isScrollable(): boolean {
-    const el = this.elementRef.nativeElement;
+  #isScrollable(): boolean {
+    const el = this.#elementRef.nativeElement;
     const style = window.getComputedStyle(el);
     const overflowY = style.overflowY;
     const overflowX = style.overflowX;
@@ -141,24 +141,24 @@ export class DroppableDirective implements OnInit, OnDestroy {
     effect(() => {
       const active = this.isActive();
       const placeholder = this.placeholderId();
-      const draggedItem = this.dragState.draggedItem();
-      const cursorPosition = this.dragState.cursorPosition();
-      const isDragging = this.dragState.isDragging();
+      const draggedItem = this.#dragState.draggedItem();
+      const cursorPosition = this.#dragState.cursorPosition();
+      const isDragging = this.#dragState.isDragging();
 
       // Cache state while active for use during drop handling
       if (active && isDragging && draggedItem) {
-        this.cachedDragState = this.dragState.getStateSnapshot();
+        this.#cachedDragState = this.#dragState.getStateSnapshot();
       }
 
       // Handle drag end (drop)
-      if (!isDragging && this.wasActive && draggedItem === null) {
+      if (!isDragging && this.#wasActive && draggedItem === null) {
         // Drag ended while we were active - this is a drop
-        this.handleDrop();
-        this.cachedDragState = null;
+        this.#handleDrop();
+        this.#cachedDragState = null;
       }
 
       // Handle enter/leave
-      if (active && !this.wasActive) {
+      if (active && !this.#wasActive) {
         // Entered
         if (draggedItem) {
           this.dragEnter.emit({
@@ -166,7 +166,7 @@ export class DroppableDirective implements OnInit, OnDestroy {
             draggedItem,
           });
         }
-      } else if (!active && this.wasActive) {
+      } else if (!active && this.#wasActive) {
         // Left (but not dropped here)
         if (isDragging && draggedItem) {
           this.dragLeave.emit({
@@ -176,12 +176,12 @@ export class DroppableDirective implements OnInit, OnDestroy {
         }
         // Clear cached state when leaving without dropping
         if (isDragging) {
-          this.cachedDragState = null;
+          this.#cachedDragState = null;
         }
       }
 
       // Handle over (placeholder changed)
-      if (active && placeholder !== this.previousPlaceholder) {
+      if (active && placeholder !== this.#previousPlaceholder) {
         if (draggedItem && cursorPosition) {
           this.dragOver.emit({
             droppableId: this.vdndDroppable(),
@@ -192,27 +192,27 @@ export class DroppableDirective implements OnInit, OnDestroy {
         }
       }
 
-      this.wasActive = active;
-      this.previousPlaceholder = placeholder;
+      this.#wasActive = active;
+      this.#previousPlaceholder = placeholder;
     });
   }
 
   ngOnDestroy(): void {
     // Clean up if this droppable is destroyed while being active
     if (this.isActive()) {
-      this.dragState.setActiveDroppable(null);
+      this.#dragState.setActiveDroppable(null);
     }
 
     // Unregister from auto-scroll
-    this.autoScroll.unregisterContainer(this.vdndDroppable());
+    this.#autoScroll.unregisterContainer(this.vdndDroppable());
   }
 
   /**
    * Handle a drop on this droppable.
    */
-  private handleDrop(): void {
+  #handleDrop(): void {
     // Use cached state since the actual state is cleared before this effect fires
-    const state = this.cachedDragState;
+    const state = this.#cachedDragState;
 
     if (!state?.draggedItem || state.activeDroppableId !== this.vdndDroppable()) {
       return;
@@ -222,14 +222,14 @@ export class DroppableDirective implements OnInit, OnDestroy {
     const placeholderId = state.placeholderId ?? END_OF_LIST;
 
     // Calculate source index
-    const sourceIndex = this.getItemIndex(state.draggedItem.draggableId, sourceDroppableId);
+    const sourceIndex = this.#getItemIndex(state.draggedItem.draggableId, sourceDroppableId);
 
     // Use the pre-calculated placeholderIndex if available (more reliable)
     // Fall back to DOM-based calculation if not
     let destinationIndex =
       state.placeholderIndex !== null && state.placeholderIndex !== undefined
         ? state.placeholderIndex
-        : this.getDestinationIndex(placeholderId);
+        : this.#getDestinationIndex(placeholderId);
 
     // Adjust for same-list reordering: if moving within the same list and
     // the destination is after the source, we need to account for the item
@@ -258,7 +258,7 @@ export class DroppableDirective implements OnInit, OnDestroy {
    * Get the index of an item in a droppable.
    * This is a simplified implementation - in practice, the consumer would track this.
    */
-  private getItemIndex(draggableId: string, droppableId: string): number {
+  #getItemIndex(draggableId: string, droppableId: string): number {
     // Find all draggables in the source droppable
     const droppable = document.querySelector(`[data-droppable-id="${droppableId}"]`);
     if (!droppable) {
@@ -278,9 +278,9 @@ export class DroppableDirective implements OnInit, OnDestroy {
   /**
    * Get the destination index based on the placeholder.
    */
-  private getDestinationIndex(placeholderId: string): number {
+  #getDestinationIndex(placeholderId: string): number {
     // Exclude placeholder elements from the count
-    const draggables = this.elementRef.nativeElement.querySelectorAll(
+    const draggables = this.#elementRef.nativeElement.querySelectorAll(
       '[data-draggable-id]:not([data-draggable-id="placeholder"])'
     );
 
@@ -302,27 +302,27 @@ export class DroppableDirective implements OnInit, OnDestroy {
    * Get the element reference (for external use).
    */
   getElement(): HTMLElement {
-    return this.elementRef.nativeElement;
+    return this.#elementRef.nativeElement;
   }
 
   /**
    * Manually scroll this droppable.
    */
   scrollBy(delta: number): void {
-    this.elementRef.nativeElement.scrollTop += delta;
+    this.#elementRef.nativeElement.scrollTop += delta;
   }
 
   /**
    * Get the current scroll position.
    */
   getScrollTop(): number {
-    return this.elementRef.nativeElement.scrollTop;
+    return this.#elementRef.nativeElement.scrollTop;
   }
 
   /**
    * Get the scroll height.
    */
   getScrollHeight(): number {
-    return this.elementRef.nativeElement.scrollHeight;
+    return this.#elementRef.nativeElement.scrollHeight;
   }
 }

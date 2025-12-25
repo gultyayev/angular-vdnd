@@ -9,16 +9,16 @@ import { Injectable } from '@angular/core';
 })
 export class PositionCalculatorService {
   /** Data attribute used to identify droppable elements */
-  private readonly DROPPABLE_ID_ATTR = 'data-droppable-id';
+  readonly #DROPPABLE_ID_ATTR = 'data-droppable-id';
 
   /** Data attribute used to identify droppable groups */
-  private readonly DROPPABLE_GROUP_ATTR = 'data-droppable-group';
+  readonly #DROPPABLE_GROUP_ATTR = 'data-droppable-group';
 
   /** Data attribute used to identify draggable elements */
-  private readonly DRAGGABLE_ID_ATTR = 'data-draggable-id';
+  readonly #DRAGGABLE_ID_ATTR = 'data-draggable-id';
 
   /** Maximum DOM levels to traverse when looking for parent elements */
-  private readonly MAX_PARENT_TRAVERSAL = 15;
+  readonly #MAX_PARENT_TRAVERSAL = 15;
 
   /**
    * Find the droppable element at a given point.
@@ -91,8 +91,8 @@ export class PositionCalculatorService {
     let current: HTMLElement | null = element;
     let count = 0;
 
-    while (current && current.tagName !== 'BODY' && count < this.MAX_PARENT_TRAVERSAL) {
-      const foundGroup = current.getAttribute(this.DROPPABLE_GROUP_ATTR);
+    while (current && current.tagName !== 'BODY' && count < this.#MAX_PARENT_TRAVERSAL) {
+      const foundGroup = current.getAttribute(this.#DROPPABLE_GROUP_ATTR);
 
       if (foundGroup && foundGroup === groupName) {
         return current;
@@ -115,8 +115,8 @@ export class PositionCalculatorService {
     let current: HTMLElement | null = element;
     let count = 0;
 
-    while (current && current.tagName !== 'BODY' && count < this.MAX_PARENT_TRAVERSAL) {
-      const draggableId = current.getAttribute(this.DRAGGABLE_ID_ATTR);
+    while (current && current.tagName !== 'BODY' && count < this.#MAX_PARENT_TRAVERSAL) {
+      const draggableId = current.getAttribute(this.#DRAGGABLE_ID_ATTR);
 
       if (draggableId) {
         return current;
@@ -133,14 +133,14 @@ export class PositionCalculatorService {
    * Get the draggable ID from an element.
    */
   getDraggableId(element: HTMLElement): string | null {
-    return element.getAttribute(this.DRAGGABLE_ID_ATTR);
+    return element.getAttribute(this.#DRAGGABLE_ID_ATTR);
   }
 
   /**
    * Get the droppable ID from an element.
    */
   getDroppableId(element: HTMLElement): string | null {
-    return element.getAttribute(this.DROPPABLE_ID_ATTR);
+    return element.getAttribute(this.#DROPPABLE_ID_ATTR);
   }
 
   /**

@@ -16,46 +16,46 @@ import {
 })
 export class DragStateService {
   /** Internal state signal */
-  private readonly _state = signal<DragState>(INITIAL_DRAG_STATE);
+  readonly #state = signal<DragState>(INITIAL_DRAG_STATE);
 
   /** Read-only access to the full state */
-  readonly state = this._state.asReadonly();
+  readonly state = this.#state.asReadonly();
 
   /** Whether a drag operation is in progress */
-  readonly isDragging = computed(() => this._state().isDragging);
+  readonly isDragging = computed(() => this.#state().isDragging);
 
   /** The currently dragged item, or null */
-  readonly draggedItem = computed(() => this._state().draggedItem);
+  readonly draggedItem = computed(() => this.#state().draggedItem);
 
   /** ID of the currently dragged item, or null (convenience signal for filtering) */
-  readonly draggedItemId = computed(() => this._state().draggedItem?.draggableId ?? null);
+  readonly draggedItemId = computed(() => this.#state().draggedItem?.draggableId ?? null);
 
   /** ID of the droppable where the drag started */
-  readonly sourceDroppableId = computed(() => this._state().sourceDroppableId);
+  readonly sourceDroppableId = computed(() => this.#state().sourceDroppableId);
 
   /** Original index of the dragged item in the source list */
-  readonly sourceIndex = computed(() => this._state().sourceIndex);
+  readonly sourceIndex = computed(() => this.#state().sourceIndex);
 
   /** ID of the droppable currently being hovered over */
-  readonly activeDroppableId = computed(() => this._state().activeDroppableId);
+  readonly activeDroppableId = computed(() => this.#state().activeDroppableId);
 
   /** ID of the item the placeholder should appear before */
-  readonly placeholderId = computed(() => this._state().placeholderId);
+  readonly placeholderId = computed(() => this.#state().placeholderId);
 
   /** Index where the placeholder should be inserted */
-  readonly placeholderIndex = computed(() => this._state().placeholderIndex);
+  readonly placeholderIndex = computed(() => this.#state().placeholderIndex);
 
   /** Current cursor position */
-  readonly cursorPosition = computed(() => this._state().cursorPosition);
+  readonly cursorPosition = computed(() => this.#state().cursorPosition);
 
   /** Offset from cursor to element top-left (for maintaining grab position) */
-  readonly grabOffset = computed(() => this._state().grabOffset);
+  readonly grabOffset = computed(() => this.#state().grabOffset);
 
   /** Position when drag started (for axis locking) */
-  readonly initialPosition = computed(() => this._state().initialPosition);
+  readonly initialPosition = computed(() => this.#state().initialPosition);
 
   /** Axis to lock movement to */
-  readonly lockAxis = computed(() => this._state().lockAxis);
+  readonly lockAxis = computed(() => this.#state().lockAxis);
 
   /**
    * Start a drag operation.
@@ -70,7 +70,7 @@ export class DragStateService {
     placeholderIndex?: number | null,
     sourceIndex?: number | null
   ): void {
-    this._state.set({
+    this.#state.set({
       isDragging: true,
       draggedItem: item,
       sourceDroppableId: item.droppableId,
@@ -94,11 +94,11 @@ export class DragStateService {
     placeholderId: string | null;
     placeholderIndex: number | null;
   }): void {
-    if (!this._state().isDragging) {
+    if (!this.#state().isDragging) {
       return;
     }
 
-    this._state.update((state) => ({
+    this.#state.update((state) => ({
       ...state,
       cursorPosition: update.cursorPosition,
       activeDroppableId: update.activeDroppableId,
@@ -111,11 +111,11 @@ export class DragStateService {
    * Update just the active droppable.
    */
   setActiveDroppable(droppableId: string | null): void {
-    if (!this._state().isDragging) {
+    if (!this.#state().isDragging) {
       return;
     }
 
-    this._state.update((state) => ({
+    this.#state.update((state) => ({
       ...state,
       activeDroppableId: droppableId,
     }));
@@ -125,11 +125,11 @@ export class DragStateService {
    * Update just the placeholder position.
    */
   setPlaceholder(placeholderId: string | null): void {
-    if (!this._state().isDragging) {
+    if (!this.#state().isDragging) {
       return;
     }
 
-    this._state.update((state) => ({
+    this.#state.update((state) => ({
       ...state,
       placeholderId,
     }));
@@ -139,27 +139,27 @@ export class DragStateService {
    * End the drag operation and reset state.
    */
   endDrag(): void {
-    this._state.set(INITIAL_DRAG_STATE);
+    this.#state.set(INITIAL_DRAG_STATE);
   }
 
   /**
    * Cancel the drag operation (same as end for now, but semantically different).
    */
   cancelDrag(): void {
-    this._state.set(INITIAL_DRAG_STATE);
+    this.#state.set(INITIAL_DRAG_STATE);
   }
 
   /**
    * Check if a specific droppable is currently active.
    */
   isDroppableActive(droppableId: string): boolean {
-    return this._state().activeDroppableId === droppableId;
+    return this.#state().activeDroppableId === droppableId;
   }
 
   /**
    * Get the current state snapshot (for event creation).
    */
   getStateSnapshot(): DragState {
-    return this._state();
+    return this.#state();
   }
 }

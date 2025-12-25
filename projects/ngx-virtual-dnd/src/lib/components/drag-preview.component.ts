@@ -100,7 +100,7 @@ export class DragPreviewComponent<T = unknown> {
   /** Offset from cursor to preview (to avoid cursor being on top of preview) */
   cursorOffset = input<{ x: number; y: number }>({ x: 8, y: 8 });
 
-  /** Reference to the clone container element */
+  /** Reference to the clone container element (cannot use ES private with viewChild) */
   private readonly cloneContainer = viewChild<ElementRef<HTMLElement>>('cloneContainer');
 
   /** The cloned element from drag state (used when no custom template is provided) */

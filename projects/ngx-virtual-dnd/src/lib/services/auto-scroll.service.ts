@@ -30,12 +30,12 @@ const DEFAULT_CONFIG: AutoScrollConfig = {
   providedIn: 'root',
 })
 export class AutoScrollService {
-  private readonly dragState = inject(DragStateService);
-  private readonly positionCalculator = inject(PositionCalculatorService);
-  private readonly ngZone = inject(NgZone);
+  readonly #dragState = inject(DragStateService);
+  readonly #positionCalculator = inject(PositionCalculatorService);
+  readonly #ngZone = inject(NgZone);
 
   /** Currently registered scrollable containers */
-  private scrollableContainers = new Map<
+  #scrollableContainers = new Map<
     string,
     {
       element: HTMLElement;
@@ -44,13 +44,13 @@ export class AutoScrollService {
   >();
 
   /** Active animation frame ID */
-  private animationFrameId: number | null = null;
+  #animationFrameId: number | null = null;
 
   /** Callback to invoke when scrolling occurs (for placeholder recalculation) */
-  private onScrollCallback: (() => void) | null = null;
+  #onScrollCallback: (() => void) | null = null;
 
   /** Current scroll state */
-  private scrollState: {
+  #scrollState: {
     containerId: string | null;
     direction: { x: number; y: number };
     speed: number;
@@ -68,7 +68,7 @@ export class AutoScrollService {
     element: HTMLElement,
     config: Partial<AutoScrollConfig> = {}
   ): void {
-    this.scrollableContainers.set(id, {
+    this.#scrollableContainers.set(id, {
       element,
       config: { ...DEFAULT_CONFIG, ...config },
     });
@@ -78,7 +78,7 @@ export class AutoScrollService {
    * Unregister a scrollable container.
    */
   unregisterContainer(id: string): void {
-    this.scrollableContainers.delete(id);
+    this.#scrollableContainers.delete(id);
   }
 
   /**
@@ -87,14 +87,14 @@ export class AutoScrollService {
    * @param onScroll Optional callback to invoke when scrolling occurs (for placeholder recalculation)
    */
   startMonitoring(onScroll?: () => void): void {
-    if (this.animationFrameId !== null) {
+    if (this.#animationFrameId !== null) {
       return;
     }
 
-    this.onScrollCallback = onScroll ?? null;
+    this.#onScrollCallback = onScroll ?? null;
 
-    this.ngZone.runOutsideAngular(() => {
-      this.tick();
+    this.#ngZone.runOutsideAngular(() => {
+      this.#tick();
     });
   }
 
@@ -103,13 +103,13 @@ export class AutoScrollService {
    * Call this when a drag ends.
    */
   stopMonitoring(): void {
-    if (this.animationFrameId !== null) {
-      cancelAnimationFrame(this.animationFrameId);
-      this.animationFrameId = null;
+    if (this.#animationFrameId !== null) {
+      cancelAnimationFrame(this.#animationFrameId);
+      this.#animationFrameId = null;
     }
 
-    this.onScrollCallback = null;
-    this.scrollState = {
+    this.#onScrollCallback = null;
+    this.#scrollState = {
       containerId: null,
       direction: { x: 0, y: 0 },
       speed: 0,
@@ -119,9 +119,9 @@ export class AutoScrollService {
   /**
    * Animation tick - check cursor position and scroll if needed.
    */
-  private tick(): void {
-    const cursor = this.dragState.cursorPosition();
-    const isDragging = this.dragState.isDragging();
+  #tick(): void {
+    const cursor = this.#dragState.cursorPosition();
+    const isDragging = this.#dragState.isDragging();
 
     // Stop monitoring if drag ended
     if (!isDragging) {
@@ -131,23 +131,23 @@ export class AutoScrollService {
 
     // Skip this frame if no cursor position yet, but continue monitoring
     if (!cursor) {
-      this.animationFrameId = requestAnimationFrame(() => this.tick());
+      this.#animationFrameId = requestAnimationFrame(() => this.#tick());
       return;
     }
 
     // Check each container
-    for (const [id, { element, config }] of this.scrollableContainers) {
+    for (const [id, { element, config }] of this.#scrollableContainers) {
       const rect = element.getBoundingClientRect();
 
       // Check if cursor is inside this container
-      const isInside = this.positionCalculator.isInsideContainer(cursor, rect);
+      const isInside = this.#positionCalculator.isInsideContainer(cursor, rect);
 
       if (!isInside) {
         continue;
       }
 
       // Check edges
-      const nearEdge = this.positionCalculator.getNearEdge(cursor, rect, config.threshold);
+      const nearEdge = this.#positionCalculator.getNearEdge(cursor, rect, config.threshold);
 
       // Calculate scroll direction and speed
       const direction = { x: 0, y: 0 };
@@ -178,19 +178,19 @@ export class AutoScrollService {
           speed = Math.min(config.maxSpeed, Math.max(1, config.maxSpeed * distanceRatio));
         }
 
-        this.scrollState = { containerId: id, direction, speed };
-        this.performScroll(element, direction, speed);
+        this.#scrollState = { containerId: id, direction, speed };
+        this.#performScroll(element, direction, speed);
         break;
       }
     }
 
-    this.animationFrameId = requestAnimationFrame(() => this.tick());
+    this.#animationFrameId = requestAnimationFrame(() => this.#tick());
   }
 
   /**
    * Perform the actual scroll operation.
    */
-  private performScroll(
+  #performScroll(
     element: HTMLElement,
     direction: { x: number; y: number },
     speed: number
@@ -222,10 +222,10 @@ export class AutoScrollService {
     });
 
     // Notify that scroll occurred so placeholder can be recalculated
-    if (this.onScrollCallback) {
+    if (this.#onScrollCallback) {
       // Run inside Angular zone for proper change detection
-      this.ngZone.run(() => {
-        this.onScrollCallback?.();
+      this.#ngZone.run(() => {
+        this.#onScrollCallback?.();
       });
     }
   }
@@ -235,8 +235,8 @@ export class AutoScrollService {
    */
   isScrolling(): boolean {
     return (
-      this.scrollState.containerId !== null &&
-      (this.scrollState.direction.x !== 0 || this.scrollState.direction.y !== 0)
+      this.#scrollState.containerId !== null &&
+      (this.#scrollState.direction.x !== 0 || this.#scrollState.direction.y !== 0)
     );
   }
 
@@ -244,6 +244,6 @@ export class AutoScrollService {
    * Get the current scroll direction.
    */
   getScrollDirection(): { x: number; y: number } {
-    return this.scrollState.direction;
+    return this.#scrollState.direction;
   }
 }
