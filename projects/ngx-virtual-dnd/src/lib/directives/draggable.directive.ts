@@ -413,12 +413,13 @@ export class DraggableDirective implements OnInit, OnDestroy {
       return;
     }
 
-    // Use the last known cursor position with current scroll state
+    // Recalculate placeholder based on current scroll position
     this.updateDrag(cursorPosition);
   }
 
   /**
    * Update the drag position.
+   * @param position Current cursor position
    */
   private updateDrag(position: CursorPosition): void {
     const element = this.elementRef.nativeElement;
@@ -494,102 +495,63 @@ export class DraggableDirective implements OnInit, OnDestroy {
     position: CursorPosition,
     sourceIndexOverride?: number
   ): { index: number; placeholderId: string } {
-    // Look for virtual scroll container within the droppable
+    // Get container and measurements
     const virtualScroll = droppableElement.querySelector('vdnd-virtual-scroll');
+    const container = (virtualScroll ?? droppableElement) as HTMLElement;
+    const rect = container.getBoundingClientRect();
+    const scrollTop = container.scrollTop;
+    const itemHeight = this.dragState.draggedItem()?.height ?? 50;
 
-    // Get the scrollable element and its properties
-    const scrollableElement = virtualScroll ?? droppableElement;
-    const rect = scrollableElement.getBoundingClientRect();
-    const scrollTop = scrollableElement.scrollTop;
-    const scrollHeight = scrollableElement.scrollHeight;
+    // Calculate preview center position
+    // Using preview CENTER provides intuitive UX - placeholder appears where preview is
+    const grabOffset = this.dragState.grabOffset();
+    const previewCenterY = position.y - (grabOffset?.y ?? 0) + itemHeight / 2;
 
-    // Get consistent item height from the dragged item (stable throughout the drag)
-    // This prevents drift during auto-scroll when different items become visible
-    const draggedItem = this.dragState.draggedItem();
-    const itemHeight = draggedItem?.height ?? 50;
+    // Convert to visual index (which slot the preview center is in)
+    const relativeY = previewCenterY - rect.top + scrollTop;
+    const visualIndex = Math.floor(relativeY / itemHeight);
 
-    // Get visible items for placeholderId lookup later
-    const visibleItems = droppableElement.querySelectorAll(
-      '[data-draggable-id]:not([data-draggable-id="placeholder"])'
-    );
-
-    // Check if we're dragging within the same list
+    // Check if same-list drag
     const sourceDroppableId = this.dragState.sourceDroppableId();
     const currentDroppableId = this.positionCalculator.getDroppableId(droppableElement);
     const isSameList = sourceDroppableId === currentDroppableId;
 
-    // Get the source index - use stored value from drag state (calculated before element was hidden)
-    const draggedItemOriginalIndex = isSameList
+    // Get source index
+    const sourceIndex = isSameList
       ? (sourceIndexOverride ?? this.dragState.sourceIndex() ?? -1)
       : -1;
 
-    // Calculate total items from scroll height (works with virtual scroll)
-    // When in same list, the dragged item is hidden so we need to add 1 back
-    let totalItemsFromScroll = Math.round(scrollHeight / itemHeight);
-    if (isSameList && draggedItemOriginalIndex >= 0) {
-      totalItemsFromScroll += 1; // Account for the hidden dragged item
+    // Same-list adjustment: if pointing at or after source position, add 1
+    // This accounts for the hidden item shifting everything up visually
+    let placeholderIndex = visualIndex;
+    if (isSameList && sourceIndex >= 0 && visualIndex >= sourceIndex) {
+      placeholderIndex = visualIndex + 1;
     }
 
-    // Calculate the logical index based on the preview's CENTER position
-    // The preview renders at (cursor - grabOffset), so its center is at:
-    // cursor.y - grabOffset.y + itemHeight/2
-    // This ensures the placeholder appears where the preview visually is,
-    // not where the cursor is (which may differ based on where the user grabbed the item)
-    const grabOffset = this.dragState.grabOffset();
-    const previewCenterY = grabOffset
-      ? position.y - grabOffset.y + itemHeight / 2
-      : position.y;
-    const relativeY = previewCenterY - rect.top + scrollTop;
-    const rawIndex = Math.floor(relativeY / itemHeight);
+    // Clamp to valid range
+    const totalItems = this.getTotalItemCount(droppableElement, isSameList);
+    placeholderIndex = Math.max(0, Math.min(placeholderIndex, totalItems));
 
-    // Adjust index when dragging within same list
-    // Because the dragged item is hidden (display: none), items below it shift up visually
-    // If cursor is at or after the dragged item's original position, add 1 to compensate
-    let adjustedIndex = rawIndex;
-    if (isSameList && draggedItemOriginalIndex >= 0 && rawIndex >= draggedItemOriginalIndex) {
-      adjustedIndex = rawIndex + 1;
+    return { index: placeholderIndex, placeholderId: END_OF_LIST };
+  }
+
+  /**
+   * Get the total item count for a droppable.
+   * Accounts for hidden item during same-list drag.
+   */
+  private getTotalItemCount(droppableElement: HTMLElement, isSameList: boolean): number {
+    const virtualScroll = droppableElement.querySelector('vdnd-virtual-scroll');
+    if (virtualScroll) {
+      const scrollHeight = (virtualScroll as HTMLElement).scrollHeight;
+      const itemHeight = this.dragState.draggedItem()?.height ?? 50;
+      // When same-list, scrollHeight reflects N-1 items (one is hidden)
+      // Add 1 back to get true total
+      const count = Math.floor(scrollHeight / itemHeight);
+      return isSameList ? count + 1 : count;
     }
-
-    // Clamp to valid range [0, totalItems]
-    const clampedIndex = Math.max(0, Math.min(adjustedIndex, totalItemsFromScroll));
-
-    // Determine the placeholderId
-    // If at the end or beyond visible range, use END_OF_LIST
-    if (clampedIndex >= totalItemsFromScroll) {
-      return { index: totalItemsFromScroll, placeholderId: END_OF_LIST };
-    }
-
-    // Try to find the item at the calculated index in the visible items
-    // With virtual scroll, we need to account for the scroll offset
-    // Also account for the hidden dragged item when calculating first visible index
-    let firstVisibleIndex = Math.floor(scrollTop / itemHeight);
-    if (isSameList && draggedItemOriginalIndex >= 0 && draggedItemOriginalIndex < firstVisibleIndex) {
-      firstVisibleIndex += 1;
-    }
-
-    const visibleIndex = clampedIndex - firstVisibleIndex;
-
-    // Filter out the dragged item from visible items for lookup
-    const allDraggables = Array.from(visibleItems).filter(
-      (item) => item.getAttribute('data-draggable-id') !== this.vdndDraggable()
-    );
-
-    if (visibleIndex >= 0 && visibleIndex < allDraggables.length) {
-      const targetItem = allDraggables[visibleIndex];
-      const targetId = targetItem?.getAttribute('data-draggable-id');
-
-      return {
-        index: clampedIndex,
-        placeholderId: targetId ?? END_OF_LIST,
-      };
-    }
-
-    // If the target item isn't visible (virtualized), use END_OF_LIST as placeholder ID
-    // but still use the calculated index for positioning
-    return {
-      index: clampedIndex,
-      placeholderId: END_OF_LIST,
-    };
+    // Fallback for non-virtual scroll
+    const items = droppableElement.querySelectorAll('[data-draggable-id]');
+    return items.length + (isSameList ? 1 : 0);
   }
 
   /**

@@ -265,6 +265,7 @@ export class DemoComponent {
       sourceDroppable: state.sourceDroppableId,
       activeDroppable: state.activeDroppableId,
       placeholder: state.placeholderId,
+      placeholderIndex: state.placeholderIndex,
     };
   });
 
