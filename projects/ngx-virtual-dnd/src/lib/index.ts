@@ -17,6 +17,7 @@ export type {
 export { DragPreviewComponent } from './components/drag-preview.component';
 export type { DragPreviewContext } from './components/drag-preview.component';
 export { PlaceholderComponent } from './components/placeholder.component';
+export type { PlaceholderContext } from './components/placeholder.component';
 
 // Directives
 export { DraggableDirective } from './directives/draggable.directive';

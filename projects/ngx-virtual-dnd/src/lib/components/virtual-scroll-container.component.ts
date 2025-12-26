@@ -119,6 +119,10 @@ export interface VisibleRangeChange {
   styles: `
     :host {
       display: block;
+      /* Disable browser scroll anchoring - this prevents scroll position from being
+         adjusted when the DOM changes (e.g., when placeholder position updates).
+         Without this, autoscroll UP would fight with browser's scroll restoration. */
+      overflow-anchor: none;
     }
 
     .vdnd-virtual-scroll-content {

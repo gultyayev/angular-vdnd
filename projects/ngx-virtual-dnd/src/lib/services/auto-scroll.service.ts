@@ -135,6 +135,8 @@ export class AutoScrollService {
       return;
     }
 
+    let scrollPerformed = false;
+
     // Check each container
     for (const [id, { element, config }] of this.#scrollableContainers) {
       const rect = element.getBoundingClientRect();
@@ -180,8 +182,18 @@ export class AutoScrollService {
 
         this.#scrollState = { containerId: id, direction, speed };
         this.#performScroll(element, direction, speed);
+        scrollPerformed = true;
         break;
       }
+    }
+
+    // Reset scroll state if no scrolling was performed
+    if (!scrollPerformed) {
+      this.#scrollState = {
+        containerId: null,
+        direction: { x: 0, y: 0 },
+        speed: 0,
+      };
     }
 
     this.#animationFrameId = requestAnimationFrame(() => this.#tick());

@@ -71,14 +71,30 @@ interface Item {
             (input)="updateDragDelay($event)"
             data-testid="drag-delay-input" />
         </label>
+        <label>
+          <input
+            type="checkbox"
+            [checked]="showVisiblePlaceholder()"
+            (change)="toggleVisiblePlaceholder($event)"
+            data-testid="visible-placeholder-checkbox" />
+          Visible placeholder
+        </label>
         <button (click)="regenerateItems()">Regenerate Items</button>
       </div>
 
       <div class="lists-container">
+        <!-- Custom placeholder template (optional - shows dashed border) -->
+        <ng-template #visiblePlaceholderTpl let-height>
+          <div class="visible-placeholder"></div>
+        </ng-template>
+
         <!-- Shared item template -->
         <ng-template #itemTpl let-item let-index="index">
           @if (item.isPlaceholder) {
-            <vdnd-placeholder [height]="50"></vdnd-placeholder>
+            <vdnd-placeholder
+              [height]="50"
+              [template]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined">
+            </vdnd-placeholder>
           } @else {
             <div
               class="item"
@@ -210,6 +226,15 @@ interface Item {
       filter: brightness(0.95);
     }
 
+    .visible-placeholder {
+      width: 100%;
+      height: 100%;
+      border: 2px dashed #999;
+      border-radius: 4px;
+      background-color: rgba(0, 0, 0, 0.05);
+      box-sizing: border-box;
+    }
+
     .debug-panel {
       margin-top: 20px;
       padding: 16px;
@@ -238,6 +263,9 @@ export class DemoComponent {
 
   /** Delay in milliseconds before drag starts */
   readonly dragDelay = signal(0);
+
+  /** Whether to show a visible placeholder (with border) instead of transparent */
+  readonly showVisiblePlaceholder = signal(false);
 
   /** List 1 items */
   readonly list1 = signal<Item[]>([]);
@@ -341,6 +369,12 @@ export class DemoComponent {
     if (!isNaN(value) && value >= 0) {
       this.dragDelay.set(value);
     }
+  }
+
+  /** Toggle visible placeholder setting */
+  toggleVisiblePlaceholder(event: Event): void {
+    const checkbox = event.target as HTMLInputElement;
+    this.showVisiblePlaceholder.set(checkbox.checked);
   }
 
   /** Insert placeholder into list if this is the active droppable */

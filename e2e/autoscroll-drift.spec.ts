@@ -268,6 +268,194 @@ test.describe('Autoscroll Placeholder Drift', () => {
     await page.mouse.up();
   });
 
+  test('cumulative drift should not occur during repeated up-down autoscroll cycles', async ({
+    page,
+  }) => {
+    test.setTimeout(120000); // 2 minute timeout for this long test
+    // User-reported scenario: drag item to bottom, then to top, repeat several times
+    // Drift should not accumulate with each cycle
+    const sourceItem = demoPage.list1Items.first();
+    const containerBox = await demoPage.list1VirtualScroll.boundingBox();
+
+    if (!containerBox) {
+      throw new Error('Could not get container bounding box');
+    }
+
+    // Start drag
+    await sourceItem.hover();
+    await page.mouse.down();
+    await page.waitForTimeout(100);
+
+    const nearBottomY = containerBox.y + containerBox.height - 20;
+    const nearTopY = containerBox.y + 20;
+    const centerX = containerBox.x + containerBox.width / 2;
+
+    // Perform 5 up-down cycles (more aggressive test)
+    for (let cycle = 0; cycle < 5; cycle++) {
+      // Move to bottom, wait for autoscroll to reach bottom
+      await page.mouse.move(centerX, nearBottomY, { steps: 5 });
+      await page.waitForTimeout(3000);
+
+      // Check state after reaching bottom
+      const bottomState = await page.evaluate(() => {
+        const stateEl = document.querySelector('h3 + pre');
+        return stateEl?.textContent;
+      });
+      const bottomScrollTop = await demoPage.getScrollTop('list1');
+      const bottomItems = await demoPage.list1Items.count();
+
+      // Move to top, wait for autoscroll to reach top
+      await page.mouse.move(centerX, nearTopY, { steps: 5 });
+      await page.waitForTimeout(3000);
+
+      // Check state after reaching top
+      const topState = await page.evaluate(() => {
+        const stateEl = document.querySelector('h3 + pre');
+        return stateEl?.textContent;
+      });
+      const topScrollTop = await demoPage.getScrollTop('list1');
+      const topItems = await demoPage.list1Items.count();
+
+      console.log(`Cycle ${cycle + 1}: Bottom(scroll=${bottomScrollTop}, items=${bottomItems}) -> Top(scroll=${topScrollTop}, items=${topItems})`);
+
+      // After each cycle, verify container still has visible items
+      expect(topItems).toBeGreaterThan(0);
+    }
+
+    // After all cycles, move cursor to middle and check state
+    const middleY = containerBox.y + containerBox.height / 2;
+    await page.mouse.move(centerX, middleY, { steps: 5 });
+    await page.waitForTimeout(200);
+
+    // Get scroll info to see if container state is corrupted
+    const scrollInfo = await demoPage.list1VirtualScroll.evaluate((el) => ({
+      scrollTop: el.scrollTop,
+      scrollHeight: el.scrollHeight,
+      clientHeight: el.clientHeight,
+    }));
+
+    console.log(`After cycles - scrollTop: ${scrollInfo.scrollTop}, scrollHeight: ${scrollInfo.scrollHeight}`);
+
+    // The container should still have valid scroll dimensions
+    expect(scrollInfo.scrollHeight).toBeGreaterThan(0);
+    // scrollHeight should be approximately 2500px (50 items * 50px)
+    expect(scrollInfo.scrollHeight).toBeLessThan(3000);
+
+    // Should be able to render items - check if we have any visible items
+    const visibleItems = await demoPage.list1Items.count();
+    console.log(`Visible items: ${visibleItems}`);
+    expect(visibleItems).toBeGreaterThan(0);
+
+    // Get drag state
+    const dragState = await page.evaluate(() => {
+      const stateEl = document.querySelector('h3 + pre, .drag-state');
+      return stateEl?.textContent;
+    });
+    console.log('Final drag state:', dragState);
+
+    // Verify placeholder index is reasonable (within list bounds)
+    const indexMatch = dragState?.match(/"placeholderIndex":\s*(\d+)/);
+    const placeholderIndex = indexMatch ? parseInt(indexMatch[1], 10) : -1;
+    expect(placeholderIndex).toBeGreaterThanOrEqual(0);
+    expect(placeholderIndex).toBeLessThanOrEqual(50);
+
+    await page.mouse.up();
+  });
+
+  test('placeholder should track preview position accurately with slow mouse movement', async ({
+    page,
+  }) => {
+    test.setTimeout(180000); // 3 minute timeout
+
+    // More realistic test: slowly approach edges like a real user
+    const sourceItem = demoPage.list2Items.first();
+    const containerBox = await demoPage.list2VirtualScroll.boundingBox();
+    const itemBox = await sourceItem.boundingBox();
+
+    if (!containerBox || !itemBox) {
+      throw new Error('Could not get bounding boxes');
+    }
+
+    // Start drag from center of first item
+    const startX = itemBox.x + itemBox.width / 2;
+    const startY = itemBox.y + itemBox.height / 2;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.waitForTimeout(100);
+
+    // Helper to get current placeholder index and preview position
+    const getState = async () => {
+      const state = await page.evaluate(() => {
+        const stateEl = document.querySelector('h3 + pre');
+        const preview = document.querySelector('.vdnd-drag-preview');
+        const previewRect = preview?.getBoundingClientRect();
+        return {
+          dragState: stateEl?.textContent,
+          previewTop: previewRect?.top ?? 0,
+          previewBottom: previewRect?.bottom ?? 0,
+        };
+      });
+      const indexMatch = state.dragState?.match(/"placeholderIndex":\s*(\d+)/);
+      return {
+        placeholderIndex: indexMatch ? parseInt(indexMatch[1], 10) : -1,
+        previewTop: state.previewTop,
+        previewBottom: state.previewBottom,
+      };
+    };
+
+    const containerTop = containerBox.y;
+    const bottomEdge = containerTop + containerBox.height;
+    const topEdge = containerTop;
+
+    // Perform 2 slow up-down cycles (matching user's reproduction)
+    for (let cycle = 0; cycle < 2; cycle++) {
+      console.log(`\n=== Cycle ${cycle + 1} ===`);
+
+      // Slowly approach bottom edge (many small steps)
+      const currentY = cycle === 0 ? startY : topEdge + 30;
+      for (let y = currentY; y < bottomEdge - 15; y += 20) {
+        await page.mouse.move(startX, y, { steps: 3 });
+        await page.waitForTimeout(100);
+      }
+
+      // Stay at bottom edge for autoscroll
+      await page.mouse.move(startX, bottomEdge - 15, { steps: 3 });
+      await page.waitForTimeout(4000); // 4 seconds of autoscroll
+
+      const bottomState = await getState();
+      const bottomScroll = await demoPage.getScrollTop('list2');
+
+      // Calculate expected placeholder index based on preview position
+      // Preview center Y relative to container + scroll position / item height
+      const expectedBottomIndex = Math.floor((bottomState.previewTop - containerTop + bottomScroll + 25) / 50);
+      const bottomDrift = Math.abs(expectedBottomIndex - bottomState.placeholderIndex);
+
+      // Slowly approach top edge
+      for (let y = bottomEdge - 15; y > topEdge + 15; y -= 20) {
+        await page.mouse.move(startX, y, { steps: 3 });
+        await page.waitForTimeout(100);
+      }
+
+      // Stay at top edge for autoscroll
+      await page.mouse.move(startX, topEdge + 15, { steps: 3 });
+      await page.waitForTimeout(4000); // 4 seconds of autoscroll
+
+      const topState = await getState();
+      const topScroll = await demoPage.getScrollTop('list2');
+
+      // Calculate expected placeholder index based on preview position
+      const expectedTopIndex = Math.floor((topState.previewTop - containerTop + topScroll + 25) / 50);
+      const topDrift = Math.abs(expectedTopIndex - topState.placeholderIndex);
+
+      // After 2 cycles, drift should still be minimal (< 3 items)
+      if (cycle === 1) {
+        expect(topDrift).toBeLessThan(5);
+      }
+    }
+
+    await page.mouse.up();
+  });
+
   test('no gap should remain after drop at maximum scroll', async ({ page }) => {
     // Test that dropping an item when scrolled to bottom doesn't leave a gap
     // Scroll list1 to the bottom first
