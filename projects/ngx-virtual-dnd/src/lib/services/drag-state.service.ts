@@ -18,6 +18,12 @@ export class DragStateService {
   /** Internal state signal */
   readonly #state = signal<DragState>(INITIAL_DRAG_STATE);
 
+  /** Flag indicating if the last drag was cancelled (not dropped) */
+  readonly #wasCancelled = signal<boolean>(false);
+
+  /** Whether the last drag was cancelled (for droppable to check before emitting drop) */
+  readonly wasCancelled = this.#wasCancelled.asReadonly();
+
   /** Read-only access to the full state */
   readonly state = this.#state.asReadonly();
 
@@ -70,6 +76,8 @@ export class DragStateService {
     placeholderIndex?: number | null,
     sourceIndex?: number | null
   ): void {
+    // Reset cancellation flag at start of new drag
+    this.#wasCancelled.set(false);
     this.#state.set({
       isDragging: true,
       draggedItem: item,
@@ -136,16 +144,18 @@ export class DragStateService {
   }
 
   /**
-   * End the drag operation and reset state.
+   * End the drag operation and reset state (normal drop).
    */
   endDrag(): void {
+    this.#wasCancelled.set(false);
     this.#state.set(INITIAL_DRAG_STATE);
   }
 
   /**
-   * Cancel the drag operation (same as end for now, but semantically different).
+   * Cancel the drag operation (escape key, disabled, etc.).
    */
   cancelDrag(): void {
+    this.#wasCancelled.set(true);
     this.#state.set(INITIAL_DRAG_STATE);
   }
 

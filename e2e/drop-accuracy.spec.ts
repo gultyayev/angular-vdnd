@@ -73,8 +73,16 @@ test.describe('Drop Position Accuracy', () => {
     await page.mouse.down();
     await page.mouse.move(targetBox!.x + 100, targetBox!.y + 100);
 
+    // Verify drag is in progress before canceling
+    await expect(demoPage.dragPreview).toBeVisible();
+
     // Press escape to cancel
     await page.keyboard.press('Escape');
+
+    await page.waitForTimeout(100);
+
+    // Release mouse (drag was canceled, so this should have no effect)
+    await page.mouse.up();
 
     await page.waitForTimeout(100);
 

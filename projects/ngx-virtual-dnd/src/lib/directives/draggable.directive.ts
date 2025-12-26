@@ -116,6 +116,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
   /** Bound event handlers for cleanup */
   #boundPointerMove: ((e: MouseEvent | TouchEvent) => void) | null = null;
   #boundPointerUp: ((e: MouseEvent | TouchEvent) => void) | null = null;
+  #boundKeyDown: ((e: KeyboardEvent) => void) | null = null;
 
   /** Request animation frame ID for drag updates */
   #rafId: number | null = null;
@@ -130,6 +131,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
     // Set up event listeners
     this.#boundPointerMove = this.#onPointerMove.bind(this);
     this.#boundPointerUp = this.#onPointerUp.bind(this);
+    this.#boundKeyDown = this.#onKeyDown.bind(this);
   }
 
   ngOnDestroy(): void {
@@ -196,6 +198,8 @@ export class DraggableDirective implements OnInit, OnDestroy {
         document.addEventListener('mousemove', this.#boundPointerMove!);
         document.addEventListener('mouseup', this.#boundPointerUp!);
       }
+      // Listen for Escape key on document to cancel drag
+      document.addEventListener('keydown', this.#boundKeyDown!);
     });
   }
 
@@ -631,6 +635,21 @@ export class DraggableDirective implements OnInit, OnDestroy {
       document.removeEventListener('mouseup', this.#boundPointerUp);
       document.removeEventListener('touchend', this.#boundPointerUp);
       document.removeEventListener('touchcancel', this.#boundPointerUp);
+    }
+    if (this.#boundKeyDown) {
+      document.removeEventListener('keydown', this.#boundKeyDown);
+    }
+  }
+
+  /**
+   * Handle keydown events on document to cancel drag with Escape.
+   */
+  #onKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && this.isDragging()) {
+      this.#ngZone.run(() => {
+        this.#endDrag(true);
+        this.#cleanup();
+      });
     }
   }
 }

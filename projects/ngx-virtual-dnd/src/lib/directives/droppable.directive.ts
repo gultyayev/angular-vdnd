@@ -152,8 +152,11 @@ export class DroppableDirective implements OnInit, OnDestroy {
 
       // Handle drag end (drop)
       if (!isDragging && this.#wasActive && draggedItem === null) {
-        // Drag ended while we were active - this is a drop
-        this.#handleDrop();
+        // Check if drag was cancelled (e.g., Escape key)
+        if (!this.#dragState.wasCancelled()) {
+          // Drag ended normally - this is a drop
+          this.#handleDrop();
+        }
         this.#cachedDragState = null;
       }
 
