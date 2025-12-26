@@ -1,15 +1,4 @@
-import {
-  computed,
-  Directive,
-  ElementRef,
-  inject,
-  input,
-  NgZone,
-  OnDestroy,
-  OnInit,
-  output,
-  signal,
-} from '@angular/core';
+import { computed, Directive, ElementRef, inject, input, NgZone, OnDestroy, OnInit, output } from '@angular/core';
 import { DragStateService } from '../services/drag-state.service';
 import { PositionCalculatorService } from '../services/position-calculator.service';
 import { AutoScrollService } from '../services/auto-scroll.service';
@@ -20,7 +9,7 @@ import {
   DragMoveEvent,
   DragStartEvent,
   END_OF_LIST,
-  GrabOffset,
+  GrabOffset
 } from '../models/drag-drop.models';
 
 /**
@@ -511,10 +500,20 @@ export class DraggableDirective implements OnInit, OnDestroy {
     const configuredHeight = virtualScroll?.getAttribute('data-item-height');
     const itemHeight = configuredHeight ? parseInt(configuredHeight, 10) : (this.#dragState.draggedItem()?.height ?? 50);
 
-    // Calculate preview center position
-    // Using preview CENTER provides intuitive UX - placeholder appears where preview is
-    const grabOffset = this.#dragState.grabOffset();
-    const previewCenterY = position.y - (grabOffset?.y ?? 0) + itemHeight / 2;
+    // Get preview center position from ACTUAL rendered element, not calculation
+    // This eliminates accumulated drift from calculation errors during autoscroll
+    const previewElement = document.querySelector('.vdnd-drag-preview') as HTMLElement | null;
+    let previewCenterY: number;
+
+    if (previewElement) {
+      // Use actual rendered position - eliminates accumulated calculation drift
+      const previewRect = previewElement.getBoundingClientRect();
+      previewCenterY = previewRect.top + previewRect.height / 2;
+    } else {
+      // Fallback: calculate from cursor (original logic, used at drag start)
+      const grabOffset = this.#dragState.grabOffset();
+      previewCenterY = position.y - (grabOffset?.y ?? 0) + itemHeight / 2;
+    }
 
     // Convert to visual index (which slot the preview center is in)
     const relativeY = previewCenterY - rect.top + scrollTop;
