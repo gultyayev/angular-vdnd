@@ -11,17 +11,26 @@ import {
   END_OF_LIST,
   GrabOffset
 } from '../models/drag-drop.models';
+import { VDND_GROUP_TOKEN } from './droppable-group.directive';
 
 /**
  * Makes an element draggable within the virtual scroll drag-and-drop system.
  *
  * @example
  * ```html
+ * <!-- With explicit group -->
  * <div
  *   vdndDraggable="item-1"
  *   vdndDraggableGroup="my-group"
  *   [vdndDraggableData]="item">
  *   Drag me!
+ * </div>
+ *
+ * <!-- With inherited group from parent vdndGroup directive -->
+ * <div vdndGroup="my-group">
+ *   <div vdndDraggable="item-1" [vdndDraggableData]="item">
+ *     Drag me!
+ *   </div>
  * </div>
  * ```
  */
@@ -49,12 +58,33 @@ export class DraggableDirective implements OnInit, OnDestroy {
   readonly #autoScroll = inject(AutoScrollService);
   readonly #elementClone = inject(ElementCloneService);
   readonly #ngZone = inject(NgZone);
+  readonly #parentGroup = inject(VDND_GROUP_TOKEN, { optional: true });
 
   /** Unique identifier for this draggable */
   vdndDraggable = input.required<string>();
 
-  /** Drag-and-drop group name */
-  vdndDraggableGroup = input.required<string>();
+  /**
+   * Drag-and-drop group name.
+   * Optional when a parent `vdndGroup` directive provides the group context.
+   */
+  vdndDraggableGroup = input<string>();
+
+  /**
+   * Resolved group name - uses explicit input or falls back to parent group.
+   * Throws error if neither is available.
+   */
+  readonly #effectiveGroup = computed(() => {
+    const explicit = this.vdndDraggableGroup();
+    if (explicit) return explicit;
+
+    const inherited = this.#parentGroup?.group();
+    if (inherited) return inherited;
+
+    throw new Error(
+      `[vdndDraggable="${this.vdndDraggable()}"] requires a group. ` +
+        'Either set vdndDraggableGroup or wrap in a vdndGroup directive.'
+    );
+  });
 
   /** Optional data associated with this draggable */
   vdndDraggableData = input<unknown>();
@@ -313,7 +343,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
 
     // Find droppable and calculate initial placeholder position
     // This fixes the UI glitch by ensuring placeholder is set before the element is hidden
-    const groupName = this.vdndDraggableGroup();
+    const groupName = this.#effectiveGroup();
     const droppableElement = this.#positionCalculator.findDroppableAtPoint(
       position.x,
       position.y,
@@ -418,7 +448,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
    */
   #updateDrag(position: CursorPosition): void {
     const element = this.#elementRef.nativeElement;
-    const groupName = this.vdndDraggableGroup();
+    const groupName = this.#effectiveGroup();
 
     // Apply axis locking to effective position for droppable detection
     // When axis is locked, use the start position for the locked axis
@@ -590,7 +620,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
   #getParentDroppableId(): string | null {
     const droppable = this.#positionCalculator.getDroppableParent(
       this.#elementRef.nativeElement,
-      this.vdndDraggableGroup()
+      this.#effectiveGroup()
     );
 
     return droppable ? this.#positionCalculator.getDroppableId(droppable) : null;

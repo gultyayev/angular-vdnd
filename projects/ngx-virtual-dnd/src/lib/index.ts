@@ -18,7 +18,23 @@ export { DragPreviewComponent } from './components/drag-preview.component';
 export type { DragPreviewContext } from './components/drag-preview.component';
 export { PlaceholderComponent } from './components/placeholder.component';
 export type { PlaceholderContext } from './components/placeholder.component';
+export { VirtualSortableListComponent } from './components/virtual-sortable-list.component';
 
 // Directives
 export { DraggableDirective } from './directives/draggable.directive';
 export { DroppableDirective } from './directives/droppable.directive';
+export { DroppableGroupDirective, VDND_GROUP_TOKEN } from './directives/droppable-group.directive';
+export type { VdndGroupContext } from './directives/droppable-group.directive';
+export { VirtualForDirective } from './directives/virtual-for.directive';
+export type { VirtualForContext } from './directives/virtual-for.directive';
+
+// Utilities
+export {
+  moveItem,
+  reorderItems,
+  applyMove,
+  isNoOpDrop,
+  insertAt,
+  removeAt,
+} from './utils/drop-helpers';
+export type { MoveItemOptions } from './utils/drop-helpers';

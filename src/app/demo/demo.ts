@@ -4,10 +4,13 @@ import {
   DragPreviewComponent,
   DraggableDirective,
   DroppableDirective,
+  DroppableGroupDirective,
   VirtualScrollContainerComponent,
+  VirtualSortableListComponent,
   DropEvent,
   DragStateService,
   PlaceholderComponent,
+  moveItem,
 } from 'ngx-virtual-dnd';
 
 interface Item {
@@ -27,7 +30,9 @@ interface Item {
     DragPreviewComponent,
     DraggableDirective,
     DroppableDirective,
+    DroppableGroupDirective,
     VirtualScrollContainerComponent,
+    VirtualSortableListComponent,
     PlaceholderComponent,
   ],
   template: `
@@ -79,77 +84,152 @@ interface Item {
             data-testid="visible-placeholder-checkbox" />
           Visible placeholder
         </label>
+        <label>
+          <input
+            type="checkbox"
+            [checked]="useSimplifiedApi()"
+            (change)="toggleSimplifiedApi($event)"
+            data-testid="simplified-api-checkbox" />
+          Use simplified API
+        </label>
         <button (click)="regenerateItems()">Regenerate Items</button>
       </div>
 
-      <div class="lists-container">
-        <!-- Custom placeholder template (optional - shows dashed border) -->
-        <ng-template #visiblePlaceholderTpl let-height>
-          <div class="visible-placeholder"></div>
-        </ng-template>
+      <!-- Custom placeholder template (optional - shows dashed border) -->
+      <ng-template #visiblePlaceholderTpl let-height>
+        <div class="visible-placeholder"></div>
+      </ng-template>
 
-        <!-- Shared item template -->
-        <ng-template #itemTpl let-item let-index="index">
-          @if (item.isPlaceholder) {
-            <vdnd-placeholder
-              [height]="50"
-              [template]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined">
-            </vdnd-placeholder>
-          } @else {
+      @if (useSimplifiedApi()) {
+        <!-- ============================================ -->
+        <!-- SIMPLIFIED API (New) -->
+        <!-- Uses VirtualSortableListComponent + DroppableGroupDirective + moveItem utility -->
+        <!-- ============================================ -->
+        <div class="lists-container" vdndGroup="demo">
+          <!-- Simplified item template - no placeholder handling needed! -->
+          <ng-template #simplifiedItemTpl let-item let-isPlaceholder="isPlaceholder">
+            @if (isPlaceholder) {
+              <vdnd-placeholder
+                [height]="50"
+                [template]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined">
+              </vdnd-placeholder>
+            } @else {
+              <div
+                class="item"
+                [style.background]="item.color"
+                vdndDraggable="{{ item.id }}"
+                [vdndDraggableData]="item"
+                [lockAxis]="lockAxis()"
+                [disabled]="!dragEnabled()"
+                [dragDelay]="dragDelay()">
+                {{ item.name }}
+              </div>
+            }
+          </ng-template>
+
+          <!-- List 1 - Just 8 lines! -->
+          <div class="list-wrapper">
+            <h2>List 1 ({{ list1().length }} items) - Simplified</h2>
+            <vdnd-sortable-list
+              class="list"
+              droppableId="list-1"
+              group="demo"
+              [items]="list1()"
+              [itemHeight]="50"
+              [containerHeight]="400"
+              [itemIdFn]="getItemId"
+              [itemTemplate]="simplifiedItemTpl"
+              [placeholderTemplate]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined"
+              (drop)="onDropSimplified($event)">
+            </vdnd-sortable-list>
+          </div>
+
+          <!-- List 2 - Just 8 lines! -->
+          <div class="list-wrapper">
+            <h2>List 2 ({{ list2().length }} items) - Simplified</h2>
+            <vdnd-sortable-list
+              class="list"
+              droppableId="list-2"
+              group="demo"
+              [items]="list2()"
+              [itemHeight]="50"
+              [containerHeight]="400"
+              [itemIdFn]="getItemId"
+              [itemTemplate]="simplifiedItemTpl"
+              [placeholderTemplate]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined"
+              (drop)="onDropSimplified($event)">
+            </vdnd-sortable-list>
+          </div>
+        </div>
+      } @else {
+        <!-- ============================================ -->
+        <!-- VERBOSE API (Original) -->
+        <!-- Uses VirtualScrollContainerComponent + DroppableDirective + manual placeholder -->
+        <!-- ============================================ -->
+        <div class="lists-container">
+          <!-- Shared item template with manual placeholder handling -->
+          <ng-template #itemTpl let-item let-index="index">
+            @if (item.isPlaceholder) {
+              <vdnd-placeholder
+                [height]="50"
+                [template]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined">
+              </vdnd-placeholder>
+            } @else {
+              <div
+                class="item"
+                [style.background]="item.color"
+                vdndDraggable="{{ item.id }}"
+                vdndDraggableGroup="demo"
+                [vdndDraggableData]="item"
+                [lockAxis]="lockAxis()"
+                [disabled]="!dragEnabled()"
+                [dragDelay]="dragDelay()">
+                {{ item.name }}
+              </div>
+            }
+          </ng-template>
+
+          <!-- List 1 -->
+          <div class="list-wrapper">
+            <h2>List 1 ({{ list1().length }} items)</h2>
             <div
-              class="item"
-              [style.background]="item.color"
-              vdndDraggable="{{ item.id }}"
-              vdndDraggableGroup="demo"
-              [vdndDraggableData]="item"
-              [lockAxis]="lockAxis()"
-              [disabled]="!dragEnabled()"
-              [dragDelay]="dragDelay()">
-              {{ item.name }}
+              class="list"
+              vdndDroppable="list-1"
+              vdndDroppableGroup="demo"
+              (drop)="onDrop($event, 'list1')">
+              <vdnd-virtual-scroll
+                class="virtual-scroll-container"
+                [items]="list1WithPlaceholder()"
+                [itemHeight]="50"
+                [stickyItemIds]="stickyIds()"
+                [itemIdFn]="getItemId"
+                [trackByFn]="trackById"
+                [itemTemplate]="itemTpl">
+              </vdnd-virtual-scroll>
             </div>
-          }
-        </ng-template>
+          </div>
 
-        <!-- List 1 -->
-        <div class="list-wrapper">
-          <h2>List 1 ({{ list1().length }} items)</h2>
-          <div
-            class="list"
-            vdndDroppable="list-1"
-            vdndDroppableGroup="demo"
-            (drop)="onDrop($event, 'list1')">
-            <vdnd-virtual-scroll
-              class="virtual-scroll-container"
-              [items]="list1WithPlaceholder()"
-              [itemHeight]="50"
-              [stickyItemIds]="stickyIds()"
-              [itemIdFn]="getItemId"
-              [trackByFn]="trackById"
-              [itemTemplate]="itemTpl">
-            </vdnd-virtual-scroll>
+          <!-- List 2 -->
+          <div class="list-wrapper">
+            <h2>List 2 ({{ list2().length }} items)</h2>
+            <div
+              class="list"
+              vdndDroppable="list-2"
+              vdndDroppableGroup="demo"
+              (drop)="onDrop($event, 'list2')">
+              <vdnd-virtual-scroll
+                class="virtual-scroll-container"
+                [items]="list2WithPlaceholder()"
+                [itemHeight]="50"
+                [stickyItemIds]="stickyIds()"
+                [itemIdFn]="getItemId"
+                [trackByFn]="trackById"
+                [itemTemplate]="itemTpl">
+              </vdnd-virtual-scroll>
+            </div>
           </div>
         </div>
-
-        <!-- List 2 -->
-        <div class="list-wrapper">
-          <h2>List 2 ({{ list2().length }} items)</h2>
-          <div
-            class="list"
-            vdndDroppable="list-2"
-            vdndDroppableGroup="demo"
-            (drop)="onDrop($event, 'list2')">
-            <vdnd-virtual-scroll
-              class="virtual-scroll-container"
-              [items]="list2WithPlaceholder()"
-              [itemHeight]="50"
-              [stickyItemIds]="stickyIds()"
-              [itemIdFn]="getItemId"
-              [trackByFn]="trackById"
-              [itemTemplate]="itemTpl">
-            </vdnd-virtual-scroll>
-          </div>
-        </div>
-      </div>
+      }
 
       <!-- Drag Preview (auto-clones the original element by default) -->
       <vdnd-drag-preview></vdnd-drag-preview>
@@ -267,6 +347,9 @@ export class DemoComponent {
   /** Whether to show a visible placeholder (with border) instead of transparent */
   readonly showVisiblePlaceholder = signal(false);
 
+  /** Whether to use the simplified API (VirtualSortableListComponent + moveItem) */
+  readonly useSimplifiedApi = signal(false);
+
   /** List 1 items */
   readonly list1 = signal<Item[]>([]);
 
@@ -377,6 +460,12 @@ export class DemoComponent {
     this.showVisiblePlaceholder.set(checkbox.checked);
   }
 
+  /** Toggle simplified API setting */
+  toggleSimplifiedApi(event: Event): void {
+    const checkbox = event.target as HTMLInputElement;
+    this.useSimplifiedApi.set(checkbox.checked);
+  }
+
   /** Insert placeholder into list if this is the active droppable */
   private insertPlaceholder(items: Item[], droppableId: string): (Item | { isPlaceholder: true; id: string })[] {
     const activeDroppable = this.dragState.activeDroppableId();
@@ -406,7 +495,7 @@ export class DemoComponent {
     return result;
   }
 
-  /** Handle drop events */
+  /** Handle drop events (verbose API) */
   onDrop(event: DropEvent, targetList: 'list1' | 'list2'): void {
     const sourceList = event.source.droppableId === 'list-1' ? 'list1' : 'list2';
     const item = event.source.data as Item;
@@ -437,6 +526,17 @@ export class DemoComponent {
         return newItems;
       });
     }
+  }
+
+  /**
+   * Handle drop events (simplified API).
+   * Uses the moveItem utility - just ONE line of code!
+   */
+  onDropSimplified(event: DropEvent): void {
+    moveItem(event, {
+      'list-1': this.list1,
+      'list-2': this.list2,
+    });
   }
 
   /** Track by function for items */

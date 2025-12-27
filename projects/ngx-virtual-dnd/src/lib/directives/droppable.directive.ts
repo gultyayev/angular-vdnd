@@ -20,17 +20,26 @@ import {
   DropEvent,
   END_OF_LIST,
 } from '../models/drag-drop.models';
+import { VDND_GROUP_TOKEN } from './droppable-group.directive';
 
 /**
  * Marks an element as a valid drop target within the virtual scroll drag-and-drop system.
  *
  * @example
  * ```html
+ * <!-- With explicit group -->
  * <div
  *   vdndDroppable="list-1"
  *   vdndDroppableGroup="my-group"
  *   (drop)="onDrop($event)">
  *   <!-- Draggable items here -->
+ * </div>
+ *
+ * <!-- With inherited group from parent vdndGroup directive -->
+ * <div vdndGroup="my-group">
+ *   <div vdndDroppable="list-1" (drop)="onDrop($event)">
+ *     <!-- Draggable items here -->
+ *   </div>
  * </div>
  * ```
  */
@@ -38,7 +47,7 @@ import {
   selector: '[vdndDroppable]',
   host: {
     '[attr.data-droppable-id]': 'vdndDroppable()',
-    '[attr.data-droppable-group]': 'vdndDroppableGroup()',
+    '[attr.data-droppable-group]': 'effectiveGroup()',
     '[class.vdnd-droppable]': 'true',
     '[class.vdnd-droppable-active]': 'isActive()',
     '[class.vdnd-droppable-disabled]': 'disabled()',
@@ -48,12 +57,33 @@ export class DroppableDirective implements OnInit, OnDestroy {
   readonly #elementRef = inject(ElementRef<HTMLElement>);
   readonly #dragState = inject(DragStateService);
   readonly #autoScroll = inject(AutoScrollService);
+  readonly #parentGroup = inject(VDND_GROUP_TOKEN, { optional: true });
 
   /** Unique identifier for this droppable */
   vdndDroppable = input.required<string>();
 
-  /** Drag-and-drop group name */
-  vdndDroppableGroup = input.required<string>();
+  /**
+   * Drag-and-drop group name.
+   * Optional when a parent `vdndGroup` directive provides the group context.
+   */
+  vdndDroppableGroup = input<string>();
+
+  /**
+   * Resolved group name - uses explicit input or falls back to parent group.
+   * Throws error if neither is available.
+   */
+  readonly effectiveGroup = computed(() => {
+    const explicit = this.vdndDroppableGroup();
+    if (explicit) return explicit;
+
+    const inherited = this.#parentGroup?.group();
+    if (inherited) return inherited;
+
+    throw new Error(
+      `[vdndDroppable="${this.vdndDroppable()}"] requires a group. ` +
+        'Either set vdndDroppableGroup or wrap in a vdndGroup directive.'
+    );
+  });
 
   /** Optional data associated with this droppable */
   vdndDroppableData = input<unknown>();

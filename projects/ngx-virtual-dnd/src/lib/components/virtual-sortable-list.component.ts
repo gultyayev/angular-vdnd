@@ -1,0 +1,172 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  input,
+  output,
+  TemplateRef,
+} from '@angular/core';
+import { VirtualScrollContainerComponent, VirtualScrollItemContext, VisibleRangeChange } from './virtual-scroll-container.component';
+import { DroppableDirective } from '../directives/droppable.directive';
+import { PlaceholderContext } from './placeholder.component';
+import { AutoScrollConfig } from '../services/auto-scroll.service';
+import {
+  DragEnterEvent,
+  DragLeaveEvent,
+  DragOverEvent,
+  DropEvent,
+} from '../models/drag-drop.models';
+
+/**
+ * A high-level component that combines droppable, virtual scroll, and placeholder
+ * functionality into a single, easy-to-use component.
+ *
+ * This component significantly reduces boilerplate by automatically handling:
+ * - Placeholder insertion at the correct position
+ * - Sticky item management for the dragged item
+ * - Virtual scrolling with proper drag-and-drop integration
+ * - Droppable container setup
+ *
+ * @example
+ * ```html
+ * <!-- Before (verbose): ~45 lines of boilerplate -->
+ * <div vdndDroppable="list-1" vdndDroppableGroup="demo" (drop)="onDrop($event)">
+ *   <vdnd-virtual-scroll
+ *     [items]="itemsWithPlaceholder()"
+ *     [itemHeight]="50"
+ *     [stickyItemIds]="stickyIds()"
+ *     [itemIdFn]="getItemId"
+ *     [trackByFn]="trackById"
+ *     [itemTemplate]="itemTpl">
+ *   </vdnd-virtual-scroll>
+ * </div>
+ *
+ * <!-- After (concise): ~8 lines -->
+ * <vdnd-sortable-list
+ *   droppableId="list-1"
+ *   group="demo"
+ *   [items]="list()"
+ *   [itemHeight]="50"
+ *   [itemIdFn]="getItemId"
+ *   [itemTemplate]="itemTpl"
+ *   (drop)="onDrop($event)">
+ * </vdnd-sortable-list>
+ * ```
+ */
+@Component({
+  selector: 'vdnd-sortable-list',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [VirtualScrollContainerComponent, DroppableDirective],
+  host: {
+    class: 'vdnd-sortable-list',
+    '[style.display]': '"block"',
+  },
+  template: `
+    <div
+      class="vdnd-sortable-list-droppable"
+      [vdndDroppable]="droppableId()"
+      [vdndDroppableGroup]="group()"
+      [vdndDroppableData]="droppableData()"
+      [disabled]="disabled()"
+      (dragEnter)="dragEnter.emit($event)"
+      (dragLeave)="dragLeave.emit($event)"
+      (dragOver)="dragOver.emit($event)"
+      (drop)="drop.emit($event)">
+      <vdnd-virtual-scroll
+        [items]="items()"
+        [itemHeight]="itemHeight()"
+        [itemIdFn]="itemIdFn()"
+        [trackByFn]="trackByFn()"
+        [itemTemplate]="itemTemplate()"
+        [droppableId]="droppableId()"
+        [autoPlaceholder]="true"
+        [autoStickyDraggedItem]="true"
+        [placeholderTemplate]="placeholderTemplate()"
+        [containerHeight]="containerHeight()"
+        [overscan]="overscan()"
+        [autoScrollEnabled]="autoScrollEnabled()"
+        [autoScrollConfig]="autoScrollConfig()"
+        (visibleRangeChange)="visibleRangeChange.emit($event)"
+        (scrollPositionChange)="scrollPositionChange.emit($event)">
+      </vdnd-virtual-scroll>
+    </div>
+  `,
+  styles: `
+    :host {
+      display: block;
+    }
+  `,
+})
+export class VirtualSortableListComponent<T> {
+  // ========== Required Inputs ==========
+
+  /** Unique identifier for this droppable list */
+  droppableId = input.required<string>();
+
+  /** Drag-and-drop group name */
+  group = input.required<string>();
+
+  /** Array of items to render */
+  items = input.required<T[]>();
+
+  /** Height of each item in pixels */
+  itemHeight = input.required<number>();
+
+  /** Function to get a unique ID from an item */
+  itemIdFn = input.required<(item: T) => string>();
+
+  /** Template for rendering each item */
+  itemTemplate = input.required<TemplateRef<VirtualScrollItemContext<T>>>();
+
+  // ========== Optional Inputs ==========
+
+  /**
+   * Track-by function for the @for loop.
+   * Optional - if not provided, will be derived from itemIdFn.
+   */
+  trackByFn = input<(index: number, item: T) => string | number>();
+
+  /** Optional data associated with this droppable */
+  droppableData = input<unknown>();
+
+  /** Whether this sortable list is disabled */
+  disabled = input<boolean>(false);
+
+  /** Custom template for the placeholder */
+  placeholderTemplate = input<TemplateRef<PlaceholderContext>>();
+
+  /**
+   * Height of the container in pixels.
+   * If not provided, uses CSS-based height detection.
+   */
+  containerHeight = input<number>();
+
+  /** Number of items to render above/below the visible area */
+  overscan = input<number>(3);
+
+  /** Enable auto-scroll when dragging near edges */
+  autoScrollEnabled = input<boolean>(true);
+
+  /** Auto-scroll configuration */
+  autoScrollConfig = input<Partial<AutoScrollConfig>>({});
+
+  // ========== Outputs ==========
+
+  /** Emits when an item is dropped on this list */
+  drop = output<DropEvent>();
+
+  /** Emits when a dragged item enters this list */
+  dragEnter = output<DragEnterEvent>();
+
+  /** Emits when a dragged item leaves this list */
+  dragLeave = output<DragLeaveEvent>();
+
+  /** Emits while a dragged item is over this list */
+  dragOver = output<DragOverEvent>();
+
+  /** Emits when the visible range changes */
+  visibleRangeChange = output<VisibleRangeChange>();
+
+  /** Emits when scroll position changes */
+  scrollPositionChange = output<number>();
+}

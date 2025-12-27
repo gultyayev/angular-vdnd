@@ -19,6 +19,7 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import { DragStateService } from '../services/drag-state.service';
 import { AutoScrollService, AutoScrollConfig } from '../services/auto-scroll.service';
+import { PlaceholderContext } from './placeholder.component';
 
 /**
  * Context provided to the item template.
@@ -26,10 +27,12 @@ import { AutoScrollService, AutoScrollConfig } from '../services/auto-scroll.ser
 export interface VirtualScrollItemContext<T> {
   /** The item data */
   $implicit: T;
-  /** The item's index in the original array */
+  /** The item's index in the original array (-1 for placeholders) */
   index: number;
   /** Whether this item is "sticky" (always rendered) */
   isSticky: boolean;
+  /** Whether this item is an auto-inserted placeholder */
+  isPlaceholder?: boolean;
 }
 
 /**
@@ -99,12 +102,13 @@ export interface VisibleRangeChange {
       </div>
 
       <!-- Rendered items -->
-      @for (item of renderedItems(); track trackByFn()(item.index, item.data)) {
+      @for (item of renderedItems(); track item.isPlaceholder ? 'placeholder' : effectiveTrackByFn()(item.index, item.data)) {
         <ng-container
           *ngTemplateOutlet="itemTemplate(); context: {
             $implicit: item.data,
             index: item.index,
-            isSticky: item.isSticky
+            isSticky: item.isSticky,
+            isPlaceholder: item.isPlaceholder
           }">
         </ng-container>
       }
@@ -187,8 +191,71 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   /** Function to get a unique ID from an item */
   itemIdFn = input.required<(item: T) => string>();
 
-  /** Track-by function for the @for loop */
-  trackByFn = input.required<(index: number, item: T) => string | number>();
+  /**
+   * Track-by function for the @for loop.
+   * Optional - if not provided, will be derived from itemIdFn.
+   */
+  trackByFn = input<(index: number, item: T) => string | number>();
+
+  /**
+   * ID of the droppable this virtual scroll belongs to.
+   * Required for auto-placeholder insertion.
+   */
+  droppableId = input<string>();
+
+  /**
+   * Whether to automatically insert a placeholder at the correct position.
+   * Requires droppableId to be set.
+   * @default true
+   */
+  autoPlaceholder = input<boolean>(true);
+
+  /**
+   * Custom template for the placeholder.
+   * Only used when autoPlaceholder is enabled.
+   */
+  placeholderTemplate = input<TemplateRef<PlaceholderContext>>();
+
+  /**
+   * Whether to automatically add the dragged item to the sticky list.
+   * This ensures the dragged item remains visible during virtual scrolling.
+   * @default true
+   */
+  autoStickyDraggedItem = input<boolean>(true);
+
+  /**
+   * Effective track-by function - uses provided trackByFn or derives from itemIdFn.
+   */
+  protected readonly effectiveTrackByFn = computed(() => {
+    const userFn = this.trackByFn();
+    if (userFn) return userFn;
+
+    const idFn = this.itemIdFn();
+    return (_index: number, item: T) => idFn(item);
+  });
+
+  /**
+   * Effective sticky item IDs - combines user-provided IDs with auto-sticky dragged item.
+   */
+  protected readonly effectiveStickyIds = computed(() => {
+    const userIds = this.stickyItemIds();
+
+    if (!this.autoStickyDraggedItem()) {
+      return userIds;
+    }
+
+    const draggedId = this.draggedItemId();
+    if (!draggedId) {
+      return userIds;
+    }
+
+    // Avoid creating new array if dragged ID is already in the list
+    if (userIds.includes(draggedId)) {
+      return userIds;
+    }
+
+    return [...userIds, draggedId];
+  });
 
   /** Emits when the visible range changes */
   visibleRangeChange = output<VisibleRangeChange>();
@@ -274,19 +341,40 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
     return -1;
   });
 
-  /** Items to render, including sticky items */
+  /** Items to render, including sticky items and auto-placeholder */
   protected readonly renderedItems = computed(() => {
     const items = this.items();
     const { start, end } = this.#renderRange();
-    const stickyIds = new Set(this.stickyItemIds());
+    const stickyIds = new Set(this.effectiveStickyIds());
     const idFn = this.itemIdFn();
     const draggedId = this.draggedItemId();
 
-    const result: { data: T; index: number; isSticky: boolean; isDragging: boolean }[] = [];
+    // Check if we should insert a placeholder
+    const shouldInsertPlaceholder = this.#shouldInsertPlaceholder();
+    const placeholderIndex = shouldInsertPlaceholder ? this.#dragState.placeholderIndex() : null;
+
+    const result: {
+      data: T;
+      index: number;
+      isSticky: boolean;
+      isDragging: boolean;
+      isPlaceholder?: boolean;
+    }[] = [];
     const renderedIds = new Set<string>();
 
-    // First, add all items in the visible range
+    // First, add all items in the visible range (with placeholder insertion)
     for (let i = start; i <= end && i < items.length; i++) {
+      // Insert placeholder before this item if needed
+      if (placeholderIndex !== null && placeholderIndex === i) {
+        result.push({
+          data: { __vdndPlaceholder: true } as unknown as T,
+          index: -1,
+          isSticky: false,
+          isDragging: false,
+          isPlaceholder: true,
+        });
+      }
+
       const item = items[i];
       const id = idFn(item);
       result.push({
@@ -296,6 +384,17 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
         isDragging: id === draggedId,
       });
       renderedIds.add(id);
+    }
+
+    // Insert placeholder at end if needed
+    if (placeholderIndex !== null && placeholderIndex >= items.length) {
+      result.push({
+        data: { __vdndPlaceholder: true } as unknown as T,
+        index: -1,
+        isSticky: false,
+        isDragging: false,
+        isPlaceholder: true,
+      });
     }
 
     // Then, add any sticky items that aren't already rendered
@@ -315,6 +414,17 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
     }
 
     return result;
+  });
+
+  /**
+   * Determines if a placeholder should be automatically inserted.
+   */
+  readonly #shouldInsertPlaceholder = computed(() => {
+    if (!this.autoPlaceholder()) return false;
+    if (!this.droppableId()) return false;
+
+    const activeDroppable = this.#dragState.activeDroppableId();
+    return activeDroppable === this.droppableId();
   });
 
   /** Generated ID for auto-scroll registration */
