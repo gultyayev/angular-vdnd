@@ -19,14 +19,17 @@ test.describe('Axis Lock', () => {
     await sourceItem.hover();
     await page.mouse.down();
 
-    // Get initial preview position
+    // Get initial preview position (wait for preview to be positioned in WebKit)
     await page.mouse.move(sourceBox!.x + 10, sourceBox!.y + 10, { steps: 2 });
+    await demoPage.dragPreview.waitFor({ state: 'visible' });
+    await page.waitForTimeout(50); // Allow layout to settle
     const initialPreviewBox = await demoPage.dragPreview.boundingBox();
 
     // Move diagonally by a significant amount
     const deltaX = 100;
     const deltaY = 80;
     await page.mouse.move(sourceBox!.x + 10 + deltaX, sourceBox!.y + 10 + deltaY, { steps: 5 });
+    await page.waitForTimeout(50); // Allow layout to settle
 
     // Get final preview position
     const finalPreviewBox = await demoPage.dragPreview.boundingBox();
@@ -51,14 +54,17 @@ test.describe('Axis Lock', () => {
     await sourceItem.hover();
     await page.mouse.down();
 
-    // Get initial preview position
+    // Get initial preview position (wait for preview to be positioned in WebKit)
     await page.mouse.move(sourceBox!.x + 10, sourceBox!.y + 10, { steps: 2 });
+    await demoPage.dragPreview.waitFor({ state: 'visible' });
+    await page.waitForTimeout(50); // Allow layout to settle
     const initialPreviewBox = await demoPage.dragPreview.boundingBox();
 
     // Move diagonally by a significant amount
     const deltaX = 100;
     const deltaY = 80;
     await page.mouse.move(sourceBox!.x + 10 + deltaX, sourceBox!.y + 10 + deltaY, { steps: 5 });
+    await page.waitForTimeout(50); // Allow layout to settle
 
     // Get final preview position
     const finalPreviewBox = await demoPage.dragPreview.boundingBox();
@@ -85,14 +91,17 @@ test.describe('Axis Lock', () => {
     await sourceItem.hover();
     await page.mouse.down();
 
-    // Get initial preview position
+    // Get initial preview position (wait for preview to be positioned in WebKit)
     await page.mouse.move(sourceBox!.x + 10, sourceBox!.y + 10, { steps: 2 });
+    await demoPage.dragPreview.waitFor({ state: 'visible' });
+    await page.waitForTimeout(50); // Allow layout to settle
     const initialPreviewBox = await demoPage.dragPreview.boundingBox();
 
     // Move diagonally by a significant amount
     const deltaX = 100;
     const deltaY = 80;
     await page.mouse.move(sourceBox!.x + 10 + deltaX, sourceBox!.y + 10 + deltaY, { steps: 5 });
+    await page.waitForTimeout(50); // Allow layout to settle
 
     // Get final preview position
     const finalPreviewBox = await demoPage.dragPreview.boundingBox();

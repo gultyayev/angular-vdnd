@@ -32,6 +32,10 @@ export class DemoPage {
     await this.page.goto('/');
     // Wait for items to be rendered
     await this.list1Items.first().waitFor({ state: 'visible' });
+    // Ensure lists are scrolled to top (WebKit may preserve scroll across navigations)
+    await this.scrollList('list1', 0);
+    await this.scrollList('list2', 0);
+    await this.page.waitForTimeout(50);
   }
 
   async getItemCount(list: 'list1' | 'list2'): Promise<number> {
@@ -60,10 +64,11 @@ export class DemoPage {
     sourceList: 'list1' | 'list2',
     itemIndex: number,
     targetList: 'list1' | 'list2',
-    targetIndex: number
+    targetIndex: number,
   ): Promise<void> {
     const sourceItems = sourceList === 'list1' ? this.list1Items : this.list2Items;
-    const targetContainer = targetList === 'list1' ? this.list1VirtualScroll : this.list2VirtualScroll;
+    const targetContainer =
+      targetList === 'list1' ? this.list1VirtualScroll : this.list2VirtualScroll;
 
     const sourceItem = sourceItems.nth(itemIndex);
     const sourceBox = await sourceItem.boundingBox();
@@ -73,21 +78,32 @@ export class DemoPage {
       throw new Error('Could not get bounding boxes for drag operation');
     }
 
-    // Calculate target position
+    // Calculate target position accounting for current scroll position
+    // Target the center of the slot
     const itemHeight = 50; // Known from component config
     const targetY = Math.min(
       targetBox.y + targetIndex * itemHeight + itemHeight / 2,
-      targetBox.y + targetBox.height - 10
+      targetBox.y + targetBox.height - 10,
     );
     const targetX = targetBox.x + targetBox.width / 2;
 
     // Perform drag with steps for smooth movement
     await sourceItem.hover();
     await this.page.mouse.down();
-    await this.page.mouse.move(targetX, targetY, { steps: 10 });
-    await this.page.waitForTimeout(50); // Small delay to ensure drop registration
+
+    // Move slightly to initiate drag (critical for WebKit - triggers drag detection)
+    await this.page.mouse.move(sourceBox.x + 5, sourceBox.y + 5, { steps: 2 });
+
+    // Wait for drag preview to appear (critical for WebKit timing)
+    await this.dragPreview.waitFor({ state: 'visible', timeout: 1000 }).catch(() => {});
+    await this.page.waitForTimeout(50); // Allow preview to be positioned
+
+    // Move to target with more steps for smoother movement
+    await this.page.mouse.move(targetX, targetY, { steps: 15 });
+    // Longer wait for placeholder calculation - WebKit needs more time especially for same-list drags
+    await this.page.waitForTimeout(150);
     await this.page.mouse.up();
-    await this.page.waitForTimeout(100); // Wait for state updates
+    await this.page.waitForTimeout(200); // Wait for state updates
   }
 
   async scrollList(list: 'list1' | 'list2', scrollTop: number): Promise<void> {

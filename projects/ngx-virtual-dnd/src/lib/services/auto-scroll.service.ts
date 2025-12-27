@@ -1,4 +1,4 @@
-import { Injectable, NgZone, inject } from '@angular/core';
+import { inject, Injectable, NgZone } from '@angular/core';
 import { DragStateService } from './drag-state.service';
 import { PositionCalculatorService } from './position-calculator.service';
 
@@ -234,10 +234,14 @@ export class AutoScrollService {
     });
 
     // Notify that scroll occurred so placeholder can be recalculated
+    // Delay to next frame - gives Safari time to update hit-testing cache
+    // Safari caches hit-testing results and only invalidates on user-initiated scroll,
+    // not programmatic scrollBy(). RAF delay allows Safari to catch up.
     if (this.#onScrollCallback) {
-      // Run inside Angular zone for proper change detection
-      this.#ngZone.run(() => {
-        this.#onScrollCallback?.();
+      requestAnimationFrame(() => {
+        this.#ngZone.run(() => {
+          this.#onScrollCallback?.();
+        });
       });
     }
   }

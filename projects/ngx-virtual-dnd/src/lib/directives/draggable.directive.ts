@@ -493,6 +493,9 @@ export class DraggableDirective implements OnInit, OnDestroy {
     // Get container and measurements
     const virtualScroll = droppableElement.querySelector('vdnd-virtual-scroll');
     const container = (virtualScroll ?? droppableElement) as HTMLElement;
+    // Force layout flush - critical for Safari after programmatic scroll
+    // Safari caches hit-testing results and only invalidates on user-initiated scroll
+    void container.offsetHeight;
     const rect = container.getBoundingClientRect();
     const scrollTop = container.scrollTop;
     // Prefer configured item height from virtual scroll over actual element height
@@ -500,20 +503,12 @@ export class DraggableDirective implements OnInit, OnDestroy {
     const configuredHeight = virtualScroll?.getAttribute('data-item-height');
     const itemHeight = configuredHeight ? parseInt(configuredHeight, 10) : (this.#dragState.draggedItem()?.height ?? 50);
 
-    // Get preview center position from ACTUAL rendered element, not calculation
-    // This eliminates accumulated drift from calculation errors during autoscroll
-    const previewElement = document.querySelector('.vdnd-drag-preview') as HTMLElement | null;
-    let previewCenterY: number;
-
-    if (previewElement) {
-      // Use actual rendered position - eliminates accumulated calculation drift
-      const previewRect = previewElement.getBoundingClientRect();
-      previewCenterY = previewRect.top + previewRect.height / 2;
-    } else {
-      // Fallback: calculate from cursor (original logic, used at drag start)
-      const grabOffset = this.#dragState.grabOffset();
-      previewCenterY = position.y - (grabOffset?.y ?? 0) + itemHeight / 2;
-    }
+    // Calculate preview center position mathematically
+    // The preview is positioned at: cursorPosition - grabOffset (see drag-preview.component.ts)
+    // So preview center = cursorPosition.y - grabOffset.y + itemHeight/2
+    // Using math avoids Safari's stale getBoundingClientRect() issue during autoscroll
+    const grabOffset = this.#dragState.grabOffset();
+    const previewCenterY = position.y - (grabOffset?.y ?? 0) + itemHeight / 2;
 
     // Convert to visual index (which slot the preview center is in)
     const relativeY = previewCenterY - rect.top + scrollTop;

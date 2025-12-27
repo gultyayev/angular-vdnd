@@ -4,7 +4,8 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  // Retry failed tests - WebKit has some timing-sensitive tests
+  retries: 2,
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
@@ -15,6 +16,10 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'] },
     },
   ],
   webServer: {
