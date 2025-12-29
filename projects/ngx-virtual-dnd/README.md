@@ -10,9 +10,10 @@ A performant drag-and-drop library for Angular that works seamlessly with virtua
 - Mouse and touch support
 - Accessible with ARIA attributes and keyboard support
 - Signal-based state management
-- **New:** Simplified high-level API with `VirtualSortableListComponent`
-- **New:** Group inheritance with `DroppableGroupDirective`
-- **New:** Utility functions for drop handling (`moveItem`, `reorderItems`)
+- Simplified high-level API with `VirtualSortableListComponent`
+- Group inheritance with `DroppableGroupDirective`
+- Utility functions for drop handling (`moveItem`, `reorderItems`)
+- **External scroll container support** via `vdndScrollable` directive
 - No external dependencies (except Angular)
 
 ## Installation
@@ -289,6 +290,93 @@ A virtual scroll container that only renders visible items.
 | `trackByFn`       | `(index: number, item: T) => string` | Track-by function for the loop                    |
 | `itemTemplate`    | `TemplateRef`                        | Template for rendering each item                  |
 
+### VirtualForDirective with Custom Scroll Containers
+
+For advanced use cases where you need virtual scrolling inside an external scroll container (e.g., a custom scrollable div, a framework-provided scroll host), use the `vdndScrollable` directive with `*vdndVirtualFor`:
+
+```html
+<div vdndScrollable style="overflow: auto; height: 400px;">
+  <ng-container
+    *vdndVirtualFor="
+    let item of items();
+    itemHeight: 50;
+    trackBy: trackById;
+    droppableId: 'list-1';
+    let isPlaceholder = isPlaceholder
+  "
+  >
+    @if (isPlaceholder) {
+    <vdnd-placeholder [height]="50"></vdnd-placeholder>
+    } @else {
+    <div vdndDraggable="{{ item.id }}" vdndDraggableGroup="my-group">{{ item.name }}</div>
+    }
+  </ng-container>
+</div>
+```
+
+The `vdndScrollable` directive marks the element as the scroll container and provides it to `*vdndVirtualFor` via dependency injection.
+
+#### ScrollableDirective
+
+Marks an element as a scroll container for virtual scrolling.
+
+```html
+<div
+  vdndScrollable
+  [scrollContainerId]="'my-scroll-container'"
+  [autoScrollEnabled]="true"
+  [autoScrollConfig]="{ threshold: 50, maxSpeed: 15 }"
+  style="overflow: auto; height: 400px;"
+>
+  <!-- content with *vdndVirtualFor -->
+</div>
+```
+
+| Input               | Type               | Description                                   |
+| ------------------- | ------------------ | --------------------------------------------- |
+| `scrollContainerId` | `string`           | Optional ID for auto-scroll registration      |
+| `autoScrollEnabled` | `boolean`          | Enable auto-scroll near edges (default: true) |
+| `autoScrollConfig`  | `AutoScrollConfig` | Auto-scroll configuration                     |
+
+#### VirtualForDirective
+
+A structural directive for virtual scrolling within custom scroll containers.
+
+```html
+<ng-container
+  *vdndVirtualFor="
+  let item of items();
+  itemHeight: 50;
+  trackBy: trackById;
+  overscan: 3;
+  droppableId: 'list-1';
+  autoPlaceholder: true;
+  let index = index;
+  let isPlaceholder = isPlaceholder
+"
+>
+  <!-- item template -->
+</ng-container>
+```
+
+| Input             | Type                                  | Description                                   |
+| ----------------- | ------------------------------------- | --------------------------------------------- |
+| `of`              | `T[]`                                 | Array of items to iterate over                |
+| `itemHeight`      | `number`                              | Height of each item in pixels                 |
+| `trackBy`         | `(index: number, item: T) => unknown` | Track-by function for efficient updates       |
+| `overscan`        | `number`                              | Items to render outside viewport (default: 3) |
+| `droppableId`     | `string`                              | Droppable ID for auto-placeholder support     |
+| `autoPlaceholder` | `boolean`                             | Auto-insert placeholder (default: true)       |
+
+| Context Variable | Type      | Description                                  |
+| ---------------- | --------- | -------------------------------------------- |
+| `$implicit`      | `T`       | The item data                                |
+| `index`          | `number`  | Item index (-1 for placeholders)             |
+| `first`          | `boolean` | Whether this is the first visible item       |
+| `last`           | `boolean` | Whether this is the last visible item        |
+| `count`          | `number`  | Total item count                             |
+| `isPlaceholder`  | `boolean` | Whether this is an auto-inserted placeholder |
+
 ### DragPreviewComponent
 
 Renders a preview that follows the cursor during drag.
@@ -408,6 +496,53 @@ export class DragStateService {
   readonly cursorPosition: Signal<CursorPosition | null>;
 }
 ```
+
+### Custom Scroll Container (Advanced)
+
+For advanced use cases, you can implement your own scroll container by providing the `VDND_SCROLL_CONTAINER` token:
+
+```typescript
+import { VDND_SCROLL_CONTAINER, VdndScrollContainer } from 'ngx-virtual-dnd';
+
+@Directive({
+  selector: '[myCustomScrollable]',
+  providers: [{ provide: VDND_SCROLL_CONTAINER, useExisting: MyCustomScrollableDirective }],
+})
+export class MyCustomScrollableDirective implements VdndScrollContainer {
+  readonly #elementRef = inject(ElementRef<HTMLElement>);
+  readonly #scrollTop = signal(0);
+  readonly #containerHeight = signal(0);
+
+  get nativeElement(): HTMLElement {
+    return this.#elementRef.nativeElement;
+  }
+
+  scrollTop(): number {
+    return this.#scrollTop();
+  }
+
+  containerHeight(): number {
+    return this.#containerHeight();
+  }
+
+  scrollTo(options: ScrollToOptions): void {
+    this.nativeElement.scrollTo(options);
+  }
+
+  // Set up scroll listeners and resize observers to update signals...
+}
+```
+
+The `VdndScrollContainer` interface requires:
+
+| Method/Property     | Type                                 | Description                                |
+| ------------------- | ------------------------------------ | ------------------------------------------ |
+| `nativeElement`     | `HTMLElement`                        | The scrollable DOM element                 |
+| `scrollTop()`       | `number`                             | Current scroll position (must be reactive) |
+| `containerHeight()` | `number`                             | Container height (must be reactive)        |
+| `scrollTo()`        | `(options: ScrollToOptions) => void` | Scroll to a position                       |
+
+**Important:** The `scrollTop()` and `containerHeight()` methods must be backed by signals so that changes trigger re-computation in `*vdndVirtualFor`.
 
 ## Event Types
 

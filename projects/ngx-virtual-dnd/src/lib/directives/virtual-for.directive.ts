@@ -6,14 +6,13 @@ import {
   EmbeddedViewRef,
   inject,
   input,
-  NgZone,
   OnDestroy,
   OnInit,
-  signal,
   TemplateRef,
-  ViewContainerRef,
+  ViewContainerRef
 } from '@angular/core';
 import { DragStateService } from '../services/drag-state.service';
+import { VDND_SCROLL_CONTAINER } from '../tokens/scroll-container.token';
 
 /**
  * Context provided to the template for each virtual item.
@@ -38,12 +37,13 @@ export interface VirtualForContext<T> {
  * Provides maximum flexibility for advanced use cases where the component wrapper
  * is not suitable.
  *
- * The directive must be placed inside a scrollable container (overflow: auto/scroll).
- * It will automatically detect the scroll container and manage virtual rendering.
+ * The directive must be placed inside a container marked with the `vdndScrollable`
+ * directive, which provides the scroll container context via dependency injection.
  *
  * @example
+ * Basic usage:
  * ```html
- * <div class="custom-scroll-container" style="overflow: auto; height: 400px">
+ * <div vdndScrollable style="overflow: auto; height: 400px">
  *   <ng-container *vdndVirtualFor="let item of items(); itemHeight: 50; trackBy: trackById">
  *     <div class="item">{{ item.name }}</div>
  *   </ng-container>
@@ -51,9 +51,19 @@ export interface VirtualForContext<T> {
  * ```
  *
  * @example
+ * With Ionic ion-content:
+ * ```html
+ * <ion-content vdndScrollable class="ion-content-scroll-host">
+ *   <ng-container *vdndVirtualFor="let item of items(); itemHeight: 50; trackBy: trackById">
+ *     <div class="item">{{ item.name }}</div>
+ *   </ng-container>
+ * </ion-content>
+ * ```
+ *
+ * @example
  * With placeholder support:
  * ```html
- * <div class="scroll-container" style="overflow: auto; height: 400px">
+ * <div vdndScrollable style="overflow: auto; height: 400px">
  *   <ng-container *vdndVirtualFor="
  *     let item of items();
  *     itemHeight: 50;
@@ -77,23 +87,8 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   readonly #templateRef = inject(TemplateRef<VirtualForContext<T>>);
   readonly #viewContainer = inject(ViewContainerRef);
   readonly #elementRef = inject(ElementRef<Comment>);
-  readonly #ngZone = inject(NgZone);
   readonly #dragState = inject(DragStateService);
-
-  /** ResizeObserver for container height detection */
-  #resizeObserver: ResizeObserver | null = null;
-
-  /** Scroll event cleanup function */
-  #scrollCleanup: (() => void) | null = null;
-
-  /** The scrollable container element */
-  #scrollContainer: HTMLElement | null = null;
-
-  /** Current scroll position */
-  readonly #scrollTop = signal(0);
-
-  /** Measured container height */
-  readonly #containerHeight = signal(0);
+  readonly #scrollContainer = inject(VDND_SCROLL_CONTAINER);
 
   /** Pool of views for reuse */
   readonly #viewPool: EmbeddedViewRef<VirtualForContext<T>>[] = [];
@@ -132,12 +127,12 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   readonly #firstVisibleIndex = computed(() => {
     const itemHeight = this.vdndVirtualForItemHeight();
     if (itemHeight <= 0) return 0;
-    return Math.floor(this.#scrollTop() / itemHeight);
+    return Math.floor(this.#scrollContainer.scrollTop() / itemHeight);
   });
 
   /** Number of visible items */
   readonly #visibleCount = computed(() => {
-    const height = this.#containerHeight();
+    const height = this.#scrollContainer.containerHeight();
     const itemHeight = this.vdndVirtualForItemHeight();
     if (height <= 0 || itemHeight <= 0) return 0;
     return Math.ceil(height / itemHeight);
@@ -178,85 +173,12 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.#findScrollContainer();
-    this.#setupScrollListener();
-    this.#setupResizeObserver();
     this.#updateSpacers();
   }
 
   ngOnDestroy(): void {
-    this.#scrollCleanup?.();
-    this.#resizeObserver?.disconnect();
     this.#viewPool.forEach((view) => view.destroy());
     this.#activeViews.forEach((view) => view.destroy());
-  }
-
-  /**
-   * Find the nearest scrollable ancestor.
-   */
-  #findScrollContainer(): void {
-    let element = this.#elementRef.nativeElement.parentElement;
-
-    while (element) {
-      const style = getComputedStyle(element);
-      if (
-        style.overflowY === 'auto' ||
-        style.overflowY === 'scroll' ||
-        style.overflow === 'auto' ||
-        style.overflow === 'scroll'
-      ) {
-        this.#scrollContainer = element;
-        return;
-      }
-      element = element.parentElement;
-    }
-
-    console.warn('[vdndVirtualFor] No scrollable container found. Virtual scrolling may not work correctly.');
-  }
-
-  /**
-   * Set up scroll event listener.
-   */
-  #setupScrollListener(): void {
-    if (!this.#scrollContainer) return;
-
-    const onScroll = () => {
-      this.#ngZone.run(() => {
-        this.#scrollTop.set(this.#scrollContainer!.scrollTop);
-      });
-    };
-
-    this.#ngZone.runOutsideAngular(() => {
-      this.#scrollContainer!.addEventListener('scroll', onScroll, { passive: true });
-    });
-
-    this.#scrollCleanup = () => {
-      this.#scrollContainer?.removeEventListener('scroll', onScroll);
-    };
-  }
-
-  /**
-   * Set up resize observer for container.
-   */
-  #setupResizeObserver(): void {
-    if (!this.#scrollContainer) return;
-
-    this.#ngZone.runOutsideAngular(() => {
-      this.#resizeObserver = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          const height = entry.contentRect.height;
-          if (Math.abs(height - this.#containerHeight()) > 1) {
-            this.#ngZone.run(() => {
-              this.#containerHeight.set(height);
-            });
-          }
-        }
-      });
-      this.#resizeObserver.observe(this.#scrollContainer!);
-    });
-
-    // Initial height measurement
-    this.#containerHeight.set(this.#scrollContainer.clientHeight);
   }
 
   /**
