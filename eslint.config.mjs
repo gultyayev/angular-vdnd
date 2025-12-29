@@ -5,7 +5,7 @@ import eslintConfigAngular from '@epam/eslint-config-angular';
 
 export default [
   {
-    ignores: ['*.config.ts', 'setup-jest.ts', '.storybook/', 'src/stories/'],
+    ignores: ['*.config.ts', 'setup-jest.ts', '.storybook/', 'src/stories/', 'e2e'],
   },
   ...eslintConfigAngular,
   {

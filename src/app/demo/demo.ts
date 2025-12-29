@@ -411,7 +411,7 @@ interface Item {
             </span>
           </button>
           @if (debugExpanded()) {
-            <pre class="debug-content">{{ debugState() | json }}</pre>
+            <pre class="debug-content drag-state">{{ debugState() | json }}</pre>
           }
         </section>
       </main>

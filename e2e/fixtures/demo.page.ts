@@ -22,9 +22,9 @@ export class DemoPage {
     this.list1Items = this.list1Container.locator('[data-draggable-id]');
     this.list2Items = this.list2Container.locator('[data-draggable-id]');
     this.dragPreview = page.locator('.vdnd-drag-preview');
-    // List wrappers contain the headings with actual item counts
-    this.list1Wrapper = page.locator('.list-wrapper').nth(0);
-    this.list2Wrapper = page.locator('.list-wrapper').nth(1);
+    // List cards contain the headings and badges with actual item counts
+    this.list1Wrapper = page.locator('.list-card').nth(0);
+    this.list2Wrapper = page.locator('.list-card').nth(1);
     this.lockAxisSelect = page.locator('[data-testid="lock-axis-select"]');
   }
 
@@ -32,6 +32,8 @@ export class DemoPage {
     await this.page.goto('/');
     // Wait for items to be rendered
     await this.list1Items.first().waitFor({ state: 'visible' });
+    // Scroll lists into view (in case header/settings push them below viewport)
+    await this.list1Container.scrollIntoViewIfNeeded();
     // Ensure lists are scrolled to top (WebKit may preserve scroll across navigations)
     await this.scrollList('list1', 0);
     await this.scrollList('list2', 0);
@@ -39,15 +41,13 @@ export class DemoPage {
   }
 
   async getItemCount(list: 'list1' | 'list2'): Promise<number> {
-    // Get the actual item count from the heading, not from DOM elements
+    // Get the actual item count from the badge, not from DOM elements
     // This is more reliable with virtual scroll where only visible items are rendered
     const wrapper = list === 'list1' ? this.list1Wrapper : this.list2Wrapper;
-    const heading = wrapper.locator('h2');
-    const text = await heading.textContent();
-    // Parse "List X (N items)" to get N
-    const match = text?.match(/\((\d+) items?\)/);
-    if (match) {
-      return parseInt(match[1], 10);
+    const badge = wrapper.locator('.list-badge');
+    const text = await badge.textContent();
+    if (text) {
+      return parseInt(text.trim(), 10);
     }
     // Fallback to counting visible items
     const items = list === 'list1' ? this.list1Items : this.list2Items;

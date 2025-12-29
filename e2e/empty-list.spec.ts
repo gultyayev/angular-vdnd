@@ -13,7 +13,7 @@ test.describe('Empty List Edge Cases', () => {
     // Set item count to 2 (1 item per list)
     const itemCountInput = page.locator('input[type="number"]').first();
     await itemCountInput.fill('2');
-    await page.locator('button:has-text("Regenerate Items")').click();
+    await page.locator('button:has-text("Regenerate")').click();
     await page.waitForTimeout(100);
 
     const initialList1Count = await demoPage.getItemCount('list1');
@@ -34,7 +34,7 @@ test.describe('Empty List Edge Cases', () => {
     // Set item count to 2 (1 item per list)
     const itemCountInput = page.locator('input[type="number"]').first();
     await itemCountInput.fill('2');
-    await page.locator('button:has-text("Regenerate Items")').click();
+    await page.locator('button:has-text("Regenerate")').click();
     await page.waitForTimeout(100);
 
     // Drag the only item from list1 to list2
@@ -52,7 +52,7 @@ test.describe('Empty List Edge Cases', () => {
     // Set item count to 2 (1 item per list)
     const itemCountInput = page.locator('input[type="number"]').first();
     await itemCountInput.fill('2');
-    await page.locator('button:has-text("Regenerate Items")').click();
+    await page.locator('button:has-text("Regenerate")').click();
     await page.waitForTimeout(100);
 
     // First, empty list1 by moving its item to list2
@@ -74,7 +74,7 @@ test.describe('Empty List Edge Cases', () => {
     // Set item count to 4 (2 items per list)
     const itemCountInput = page.locator('input[type="number"]').first();
     await itemCountInput.fill('4');
-    await page.locator('button:has-text("Regenerate Items")').click();
+    await page.locator('button:has-text("Regenerate")').click();
     await page.waitForTimeout(100);
 
     const initialList1 = await demoPage.getItemCount('list1');
@@ -102,7 +102,7 @@ test.describe('Empty List Edge Cases', () => {
     // Set item count to 2 (1 item per list)
     const itemCountInput = page.locator('input[type="number"]').first();
     await itemCountInput.fill('2');
-    await page.locator('button:has-text("Regenerate Items")').click();
+    await page.locator('button:has-text("Regenerate")').click();
     await page.waitForTimeout(100);
 
     const list1Count = await demoPage.getItemCount('list1');
