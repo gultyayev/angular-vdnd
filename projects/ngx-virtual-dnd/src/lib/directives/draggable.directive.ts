@@ -185,14 +185,21 @@ export class DraggableDirective implements OnInit, OnDestroy {
       return;
     }
 
-    event.preventDefault();
+    const delay = this.dragDelay();
+
+    // For touch events with a delay configured, DON'T call preventDefault() on touchstart.
+    // This allows native scrolling to work if the user swipes before the delay fires.
+    // For mouse events or touch without delay, prevent default immediately to avoid
+    // text selection and other default behaviors.
+    if (!isTouch || delay === 0) {
+      event.preventDefault();
+    }
     event.stopPropagation();
 
     this.#isTracking = true;
     this.#startPosition = this.#getPosition(event);
 
     // Handle drag delay
-    const delay = this.dragDelay();
     if (delay > 0) {
       this.#delayReady = false;
       this.#delayTimerId = setTimeout(() => {
@@ -240,18 +247,26 @@ export class DraggableDirective implements OnInit, OnDestroy {
       }
 
       // If delay is configured and not yet ready, cancel the drag attempt
-      // (user moved before the delay was satisfied)
+      // (user moved before the delay was satisfied).
+      // DON'T call preventDefault() here - let native scrolling take over.
       if (!this.#delayReady) {
         this.#cancelDelayTimer();
         this.#cleanup();
         return;
       }
 
-      // Start the drag
+      // Start the drag - now we can prevent default
+      event.preventDefault();
       this.#startDrag(position);
+    } else if (this.isDragging()) {
+      // Already dragging - prevent default to stop scrolling
+      event.preventDefault();
     }
 
-    event.preventDefault();
+    // Only update drag if we're actually dragging
+    if (!this.isDragging()) {
+      return;
+    }
 
     // Throttle drag updates with requestAnimationFrame
     if (this.#rafId !== null) {
@@ -283,9 +298,10 @@ export class DraggableDirective implements OnInit, OnDestroy {
       return;
     }
 
-    event.preventDefault();
-
+    // Only prevent default if we were actually dragging
+    // Otherwise, allow native touch behavior (like scroll momentum) to complete
     if (this.isDragging()) {
+      event.preventDefault();
       this.#endDrag(false);
     }
 
