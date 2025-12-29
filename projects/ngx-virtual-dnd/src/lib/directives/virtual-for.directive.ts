@@ -118,11 +118,6 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
 
   // ========== Computed Values ==========
 
-  /** Total height of all items */
-  readonly #totalHeight = computed(() => {
-    return this.vdndVirtualForOf().length * this.vdndVirtualForItemHeight();
-  });
-
   /** First visible item index */
   readonly #firstVisibleIndex = computed(() => {
     const itemHeight = this.vdndVirtualForItemHeight();
@@ -289,7 +284,10 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   /**
    * Get an existing view from pool or create a new one.
    */
-  #getOrCreateView(key: unknown, context: VirtualForContext<T>): EmbeddedViewRef<VirtualForContext<T>> {
+  #getOrCreateView(
+    key: unknown,
+    context: VirtualForContext<T>,
+  ): EmbeddedViewRef<VirtualForContext<T>> {
     // Check if we have this view active already
     let view = this.#activeViews.get(key);
     if (view) {
@@ -318,7 +316,7 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
    */
   static ngTemplateContextGuard<T>(
     _dir: VirtualForDirective<T>,
-    _ctx: unknown
+    _ctx: unknown,
   ): _ctx is VirtualForContext<T> {
     return true;
   }

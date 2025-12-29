@@ -1,24 +1,13 @@
-import {
-  computed,
-  Directive,
-  effect,
-  ElementRef,
-  inject,
-  input,
-  OnDestroy,
-  OnInit,
-  output,
-} from '@angular/core';
+import { computed, Directive, effect, ElementRef, inject, input, OnDestroy, OnInit, output } from '@angular/core';
 import { DragStateService } from '../services/drag-state.service';
-import { AutoScrollService, AutoScrollConfig } from '../services/auto-scroll.service';
+import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
 import {
   DragEnterEvent,
-  DraggedItem,
   DragLeaveEvent,
   DragOverEvent,
   DragState,
   DropEvent,
-  END_OF_LIST,
+  END_OF_LIST
 } from '../models/drag-drop.models';
 import { VDND_GROUP_TOKEN } from './droppable-group.directive';
 
@@ -81,7 +70,7 @@ export class DroppableDirective implements OnInit, OnDestroy {
 
     throw new Error(
       `[vdndDroppable="${this.vdndDroppable()}"] requires a group. ` +
-        'Either set vdndDroppableGroup or wrap in a vdndGroup directive.'
+        'Either set vdndDroppableGroup or wrap in a vdndGroup directive.',
     );
   });
 
@@ -107,6 +96,7 @@ export class DroppableDirective implements OnInit, OnDestroy {
   dragOver = output<DragOverEvent>();
 
   /** Emits when an item is dropped on this droppable */
+  // eslint-disable-next-line @angular-eslint/no-output-native
   drop = output<DropEvent>();
 
   /** Whether this droppable is currently being targeted */
@@ -139,7 +129,7 @@ export class DroppableDirective implements OnInit, OnDestroy {
       this.#autoScroll.registerContainer(
         this.vdndDroppable(),
         this.#elementRef.nativeElement,
-        this.autoScrollConfig()
+        this.autoScrollConfig(),
       );
     }
   }
@@ -155,8 +145,10 @@ export class DroppableDirective implements OnInit, OnDestroy {
 
     // Check if overflow allows scrolling
     const hasScrollableOverflow =
-      overflowY === 'auto' || overflowY === 'scroll' ||
-      overflowX === 'auto' || overflowX === 'scroll';
+      overflowY === 'auto' ||
+      overflowY === 'scroll' ||
+      overflowX === 'auto' ||
+      overflowX === 'scroll';
 
     if (!hasScrollableOverflow) {
       return false;
@@ -314,7 +306,7 @@ export class DroppableDirective implements OnInit, OnDestroy {
   #getDestinationIndex(placeholderId: string): number {
     // Exclude placeholder elements from the count
     const draggables = this.#elementRef.nativeElement.querySelectorAll(
-      '[data-draggable-id]:not([data-draggable-id="placeholder"])'
+      '[data-draggable-id]:not([data-draggable-id="placeholder"])',
     );
 
     if (placeholderId === END_OF_LIST) {

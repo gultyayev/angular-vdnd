@@ -3,7 +3,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  contentChild,
   effect,
   ElementRef,
   inject,
@@ -94,30 +93,32 @@ export interface VisibleRangeChange {
     <div
       class="vdnd-virtual-scroll-content"
       #contentContainer
-      [style.min-height.px]="totalHeight()">
+      [style.min-height.px]="totalHeight()"
+    >
       <!-- Spacer for items above viewport -->
-      <div
-        class="vdnd-virtual-scroll-spacer-top"
-        [style.height.px]="topSpacerHeight()">
-      </div>
+      <div class="vdnd-virtual-scroll-spacer-top" [style.height.px]="topSpacerHeight()"></div>
 
       <!-- Rendered items -->
-      @for (item of renderedItems(); track item.isPlaceholder ? 'placeholder' : effectiveTrackByFn()(item.index, item.data)) {
+      @for (
+        item of renderedItems();
+        track item.isPlaceholder ? 'placeholder' : effectiveTrackByFn()(item.index, item.data)
+      ) {
         <ng-container
-          *ngTemplateOutlet="itemTemplate(); context: {
-            $implicit: item.data,
-            index: item.index,
-            isSticky: item.isSticky,
-            isPlaceholder: item.isPlaceholder
-          }">
+          *ngTemplateOutlet="
+            itemTemplate();
+            context: {
+              $implicit: item.data,
+              index: item.index,
+              isSticky: item.isSticky,
+              isPlaceholder: item.isPlaceholder,
+            }
+          "
+        >
         </ng-container>
       }
 
       <!-- Spacer for items below viewport -->
-      <div
-        class="vdnd-virtual-scroll-spacer-bottom"
-        [style.height.px]="bottomSpacerHeight()">
-      </div>
+      <div class="vdnd-virtual-scroll-spacer-bottom" [style.height.px]="bottomSpacerHeight()"></div>
     </div>
   `,
   styles: `
@@ -472,7 +473,7 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
 
         this.#previousDraggedId = currentDraggedId;
       },
-      { allowSignalWrites: true }
+      { allowSignalWrites: true },
     );
   }
 
@@ -483,7 +484,7 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
       this.#autoScrollService.registerContainer(
         id,
         this.#elementRef.nativeElement,
-        this.autoScrollConfig()
+        this.autoScrollConfig(),
       );
     }
   }
@@ -567,7 +568,7 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   scrollBy(delta: number): void {
     const newPosition = Math.max(
       0,
-      Math.min(this.getScrollTop() + delta, this.getScrollHeight() - this.effectiveHeight())
+      Math.min(this.getScrollTop() + delta, this.getScrollHeight() - this.effectiveHeight()),
     );
     this.scrollTo(newPosition);
   }

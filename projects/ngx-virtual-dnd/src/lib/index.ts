@@ -42,4 +42,3 @@ export {
   insertAt,
   removeAt,
 } from './utils/drop-helpers';
-export type { MoveItemOptions } from './utils/drop-helpers';

@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { DragPreviewComponent, DragPreviewContext } from './drag-preview.component';
 import { DragStateService } from '../services/drag-state.service';
-import { DraggedItem, CursorPosition, GrabOffset } from '../models/drag-drop.models';
+import { CursorPosition, DraggedItem, GrabOffset } from '../models/drag-drop.models';
 
 interface TestItemData {
   id: string;
@@ -12,9 +12,7 @@ interface TestItemData {
 
 // Test host for default/cloned element tests
 @Component({
-  template: `
-    <vdnd-drag-preview [cursorOffset]="cursorOffset" />
-  `,
+  template: ` <vdnd-drag-preview [cursorOffset]="cursorOffset" /> `,
   imports: [DragPreviewComponent],
 })
 class DefaultTestHostComponent {
@@ -36,7 +34,8 @@ class DefaultTestHostComponent {
   imports: [DragPreviewComponent],
 })
 class CustomTemplateTestHostComponent {
-  readonly customTemplate = viewChild.required<TemplateRef<DragPreviewContext<TestItemData>>>('customTemplate');
+  readonly customTemplate =
+    viewChild.required<TemplateRef<DragPreviewContext<TestItemData>>>('customTemplate');
   cursorOffset = { x: 8, y: 8 };
 }
 
@@ -63,7 +62,6 @@ describe('DragPreviewComponent', () => {
 
   describe('with default template', () => {
     let fixture: ComponentFixture<DefaultTestHostComponent>;
-    let component: DefaultTestHostComponent;
     let dragStateService: DragStateService;
 
     beforeEach(() => {
@@ -73,7 +71,6 @@ describe('DragPreviewComponent', () => {
       });
 
       fixture = TestBed.createComponent(DefaultTestHostComponent);
-      component = fixture.componentInstance;
       dragStateService = TestBed.inject(DragStateService);
       fixture.detectChanges();
       fixture.detectChanges();
@@ -280,9 +277,7 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
         fixture.detectChanges();
 
-        const cloneContainer = fixture.debugElement.query(
-          By.css('.vdnd-drag-preview-clone')
-        );
+        const cloneContainer = fixture.debugElement.query(By.css('.vdnd-drag-preview-clone'));
         expect(cloneContainer).not.toBeNull();
       });
     });
@@ -294,9 +289,7 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
         fixture.detectChanges();
 
-        const defaultPreview = fixture.debugElement.query(
-          By.css('.vdnd-drag-preview-default')
-        );
+        const defaultPreview = fixture.debugElement.query(By.css('.vdnd-drag-preview-default'));
         expect(defaultPreview).not.toBeNull();
         expect(defaultPreview.nativeElement.textContent.trim()).toContain('item-1');
       });
@@ -356,9 +349,7 @@ describe('DragPreviewComponent', () => {
       fixture.detectChanges();
       fixture.detectChanges();
 
-      const cloneContainer = fixture.debugElement.query(
-        By.css('.vdnd-drag-preview-clone')
-      );
+      const cloneContainer = fixture.debugElement.query(By.css('.vdnd-drag-preview-clone'));
       const customPreview = fixture.debugElement.query(By.css('.custom-preview'));
 
       expect(cloneContainer).toBeNull();

@@ -1,16 +1,16 @@
-import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { JsonPipe } from '@angular/common';
 import {
-  DragPreviewComponent,
   DraggableDirective,
+  DragPreviewComponent,
+  DragStateService,
+  DropEvent,
   DroppableDirective,
   DroppableGroupDirective,
+  moveItem,
+  PlaceholderComponent,
   VirtualScrollContainerComponent,
   VirtualSortableListComponent,
-  DropEvent,
-  DragStateService,
-  PlaceholderComponent,
-  moveItem,
 } from 'ngx-virtual-dnd';
 
 interface Item {
@@ -42,17 +42,15 @@ interface Item {
       <div class="controls">
         <label>
           Item count:
-          <input
-            type="number"
-            [value]="itemCount()"
-            (input)="updateItemCount($event)" />
+          <input type="number" [value]="itemCount()" (input)="updateItemCount($event)" />
         </label>
         <label>
           Lock axis:
           <select
             [value]="lockAxis() ?? ''"
             (change)="updateLockAxis($event)"
-            data-testid="lock-axis-select">
+            data-testid="lock-axis-select"
+          >
             <option value="">None</option>
             <option value="x">X (horizontal only)</option>
             <option value="y">Y (vertical only)</option>
@@ -63,7 +61,8 @@ interface Item {
             type="checkbox"
             [checked]="dragEnabled()"
             (change)="toggleDragEnabled($event)"
-            data-testid="drag-enabled-checkbox" />
+            data-testid="drag-enabled-checkbox"
+          />
           Drag enabled
         </label>
         <label>
@@ -74,14 +73,16 @@ interface Item {
             step="100"
             [value]="dragDelay()"
             (input)="updateDragDelay($event)"
-            data-testid="drag-delay-input" />
+            data-testid="drag-delay-input"
+          />
         </label>
         <label>
           <input
             type="checkbox"
             [checked]="showVisiblePlaceholder()"
             (change)="toggleVisiblePlaceholder($event)"
-            data-testid="visible-placeholder-checkbox" />
+            data-testid="visible-placeholder-checkbox"
+          />
           Visible placeholder
         </label>
         <label>
@@ -89,7 +90,8 @@ interface Item {
             type="checkbox"
             [checked]="useSimplifiedApi()"
             (change)="toggleSimplifiedApi($event)"
-            data-testid="simplified-api-checkbox" />
+            data-testid="simplified-api-checkbox"
+          />
           Use simplified API
         </label>
         <button (click)="regenerateItems()">Regenerate Items</button>
@@ -111,7 +113,8 @@ interface Item {
             @if (isPlaceholder) {
               <vdnd-placeholder
                 [height]="50"
-                [template]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined">
+                [template]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined"
+              >
               </vdnd-placeholder>
             } @else {
               <div
@@ -121,7 +124,8 @@ interface Item {
                 [vdndDraggableData]="item"
                 [lockAxis]="lockAxis()"
                 [disabled]="!dragEnabled()"
-                [dragDelay]="dragDelay()">
+                [dragDelay]="dragDelay()"
+              >
                 {{ item.name }}
               </div>
             }
@@ -140,7 +144,8 @@ interface Item {
               [itemIdFn]="getItemId"
               [itemTemplate]="simplifiedItemTpl"
               [placeholderTemplate]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined"
-              (drop)="onDropSimplified($event)">
+              (drop)="onDropSimplified($event)"
+            >
             </vdnd-sortable-list>
           </div>
 
@@ -157,7 +162,8 @@ interface Item {
               [itemIdFn]="getItemId"
               [itemTemplate]="simplifiedItemTpl"
               [placeholderTemplate]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined"
-              (drop)="onDropSimplified($event)">
+              (drop)="onDropSimplified($event)"
+            >
             </vdnd-sortable-list>
           </div>
         </div>
@@ -172,7 +178,8 @@ interface Item {
             @if (item.isPlaceholder) {
               <vdnd-placeholder
                 [height]="50"
-                [template]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined">
+                [template]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined"
+              >
               </vdnd-placeholder>
             } @else {
               <div
@@ -183,7 +190,8 @@ interface Item {
                 [vdndDraggableData]="item"
                 [lockAxis]="lockAxis()"
                 [disabled]="!dragEnabled()"
-                [dragDelay]="dragDelay()">
+                [dragDelay]="dragDelay()"
+              >
                 {{ item.name }}
               </div>
             }
@@ -196,7 +204,8 @@ interface Item {
               class="list"
               vdndDroppable="list-1"
               vdndDroppableGroup="demo"
-              (drop)="onDrop($event, 'list1')">
+              (drop)="onDrop($event, 'list1')"
+            >
               <vdnd-virtual-scroll
                 class="virtual-scroll-container"
                 [items]="list1WithPlaceholder()"
@@ -204,7 +213,8 @@ interface Item {
                 [stickyItemIds]="stickyIds()"
                 [itemIdFn]="getItemId"
                 [trackByFn]="trackById"
-                [itemTemplate]="itemTpl">
+                [itemTemplate]="itemTpl"
+              >
               </vdnd-virtual-scroll>
             </div>
           </div>
@@ -216,7 +226,8 @@ interface Item {
               class="list"
               vdndDroppable="list-2"
               vdndDroppableGroup="demo"
-              (drop)="onDrop($event, 'list2')">
+              (drop)="onDrop($event, 'list2')"
+            >
               <vdnd-virtual-scroll
                 class="virtual-scroll-container"
                 [items]="list2WithPlaceholder()"
@@ -224,7 +235,8 @@ interface Item {
                 [stickyItemIds]="stickyIds()"
                 [itemIdFn]="getItemId"
                 [trackByFn]="trackById"
-                [itemTemplate]="itemTpl">
+                [itemTemplate]="itemTpl"
+              >
               </vdnd-virtual-scroll>
             </div>
           </div>
@@ -330,7 +342,7 @@ interface Item {
   `,
 })
 export class DemoComponent {
-  private readonly dragState: DragStateService;
+  readonly #dragState = inject(DragStateService);
 
   /** Number of items to generate */
   readonly itemCount = signal(100);
@@ -358,7 +370,7 @@ export class DemoComponent {
 
   /** IDs of items that should always be rendered (dragged item needs to stay for reference) */
   readonly stickyIds = computed(() => {
-    const draggedItem = this.dragState.draggedItem();
+    const draggedItem = this.#dragState.draggedItem();
     return draggedItem ? [draggedItem.draggableId] : [];
   });
 
@@ -374,7 +386,7 @@ export class DemoComponent {
 
   /** Debug state for display */
   readonly debugState = computed(() => {
-    const state = this.dragState.state();
+    const state = this.#dragState.state();
     return {
       isDragging: state.isDragging,
       draggedItemId: state.draggedItem?.draggableId ?? null,
@@ -385,8 +397,7 @@ export class DemoComponent {
     };
   });
 
-  constructor(dragState: DragStateService) {
-    this.dragState = dragState;
+  constructor() {
     this.regenerateItems();
   }
 
@@ -467,9 +478,12 @@ export class DemoComponent {
   }
 
   /** Insert placeholder into list if this is the active droppable */
-  private insertPlaceholder(items: Item[], droppableId: string): (Item | { isPlaceholder: true; id: string })[] {
-    const activeDroppable = this.dragState.activeDroppableId();
-    const placeholderIndex = this.dragState.placeholderIndex();
+  private insertPlaceholder(
+    items: Item[],
+    droppableId: string,
+  ): (Item | { isPlaceholder: true; id: string })[] {
+    const activeDroppable = this.#dragState.activeDroppableId();
+    const placeholderIndex = this.#dragState.placeholderIndex();
 
     if (activeDroppable !== droppableId || placeholderIndex === null) {
       return items;
@@ -540,7 +554,10 @@ export class DemoComponent {
   }
 
   /** Track by function for items */
-  readonly trackById = (index: number, item: Item | { isPlaceholder: true; id: string }): string => {
+  readonly trackById = (
+    index: number,
+    item: Item | { isPlaceholder: true; id: string },
+  ): string => {
     return item.id;
   };
 

@@ -1,12 +1,9 @@
+import { ChangeDetectionStrategy, Component, input, output, TemplateRef } from '@angular/core';
 import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-  output,
-  TemplateRef,
-} from '@angular/core';
-import { VirtualScrollContainerComponent, VirtualScrollItemContext, VisibleRangeChange } from './virtual-scroll-container.component';
+  VirtualScrollContainerComponent,
+  VirtualScrollItemContext,
+  VisibleRangeChange,
+} from './virtual-scroll-container.component';
 import { DroppableDirective } from '../directives/droppable.directive';
 import { PlaceholderContext } from './placeholder.component';
 import { AutoScrollConfig } from '../services/auto-scroll.service';
@@ -71,7 +68,8 @@ import {
       (dragEnter)="dragEnter.emit($event)"
       (dragLeave)="dragLeave.emit($event)"
       (dragOver)="dragOver.emit($event)"
-      (drop)="drop.emit($event)">
+      (drop)="drop.emit($event)"
+    >
       <vdnd-virtual-scroll
         [items]="items()"
         [itemHeight]="itemHeight()"
@@ -87,7 +85,8 @@ import {
         [autoScrollEnabled]="autoScrollEnabled()"
         [autoScrollConfig]="autoScrollConfig()"
         (visibleRangeChange)="visibleRangeChange.emit($event)"
-        (scrollPositionChange)="scrollPositionChange.emit($event)">
+        (scrollPositionChange)="scrollPositionChange.emit($event)"
+      >
       </vdnd-virtual-scroll>
     </div>
   `,
@@ -153,6 +152,7 @@ export class VirtualSortableListComponent<T> {
   // ========== Outputs ==========
 
   /** Emits when an item is dropped on this list */
+  // eslint-disable-next-line @angular-eslint/no-output-native
   drop = output<DropEvent>();
 
   /** Emits when a dragged item enters this list */

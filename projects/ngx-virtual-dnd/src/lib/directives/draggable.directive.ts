@@ -82,7 +82,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
 
     throw new Error(
       `[vdndDraggable="${this.vdndDraggable()}"] requires a group. ` +
-        'Either set vdndDraggableGroup or wrap in a vdndGroup directive.'
+        'Either set vdndDraggableGroup or wrap in a vdndGroup directive.',
     );
   });
 
@@ -128,9 +128,6 @@ export class DraggableDirective implements OnInit, OnDestroy {
 
   /** Whether we're currently tracking a potential drag */
   #isTracking = false;
-
-  /** Whether touch events are being used */
-  #isTouch = false;
 
   /** Bound event handlers for cleanup */
   #boundPointerMove: ((e: MouseEvent | TouchEvent) => void) | null = null;
@@ -191,7 +188,6 @@ export class DraggableDirective implements OnInit, OnDestroy {
     event.preventDefault();
     event.stopPropagation();
 
-    this.#isTouch = isTouch;
     this.#isTracking = true;
     this.#startPosition = this.#getPosition(event);
 
@@ -236,7 +232,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
     if (!this.isDragging() && this.#startPosition) {
       const distance = Math.sqrt(
         Math.pow(position.x - this.#startPosition.x, 2) +
-          Math.pow(position.y - this.#startPosition.y, 2)
+          Math.pow(position.y - this.#startPosition.y, 2),
       );
 
       if (distance < this.dragThreshold()) {
@@ -348,7 +344,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
       position.x,
       position.y,
       element,
-      groupName
+      groupName,
     );
 
     const activeDroppableId = droppableElement
@@ -387,7 +383,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
         activeDroppableId,
         initialPlaceholderId,
         initialPlaceholderIndex,
-        sourceIndex
+        sourceIndex,
       );
 
       // Start auto-scroll monitoring with a callback to recalculate placeholder
@@ -407,10 +403,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
    * Calculate the source index of the dragged element BEFORE it's hidden.
    * This must be called before startDrag updates the state (which triggers display:none).
    */
-  #calculateSourceIndex(
-    element: HTMLElement,
-    droppableElement: HTMLElement | null
-  ): number {
+  #calculateSourceIndex(element: HTMLElement, droppableElement: HTMLElement | null): number {
     if (!droppableElement) {
       return 0;
     }
@@ -467,7 +460,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
       effectivePosition.x,
       effectivePosition.y,
       element,
-      groupName
+      groupName,
     );
 
     const activeDroppableId = droppableElement
@@ -518,7 +511,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
   #calculatePlaceholderIndex(
     droppableElement: HTMLElement,
     position: CursorPosition,
-    sourceIndexOverride?: number
+    sourceIndexOverride?: number,
   ): { index: number; placeholderId: string } {
     // Get container and measurements
     const virtualScroll = droppableElement.querySelector('vdnd-virtual-scroll');
@@ -531,7 +524,9 @@ export class DraggableDirective implements OnInit, OnDestroy {
     // Prefer configured item height from virtual scroll over actual element height
     // This prevents drift when actual element height differs from grid spacing
     const configuredHeight = virtualScroll?.getAttribute('data-item-height');
-    const itemHeight = configuredHeight ? parseInt(configuredHeight, 10) : (this.#dragState.draggedItem()?.height ?? 50);
+    const itemHeight = configuredHeight
+      ? parseInt(configuredHeight, 10)
+      : (this.#dragState.draggedItem()?.height ?? 50);
 
     // Calculate preview center position mathematically
     // The preview is positioned at: cursorPosition - grabOffset (see drag-preview.component.ts)
@@ -578,7 +573,9 @@ export class DraggableDirective implements OnInit, OnDestroy {
       const scrollHeight = (virtualScroll as HTMLElement).scrollHeight;
       // Prefer configured item height from virtual scroll over actual element height
       const configuredHeight = virtualScroll.getAttribute('data-item-height');
-      const itemHeight = configuredHeight ? parseInt(configuredHeight, 10) : (this.#dragState.draggedItem()?.height ?? 50);
+      const itemHeight = configuredHeight
+        ? parseInt(configuredHeight, 10)
+        : (this.#dragState.draggedItem()?.height ?? 50);
       // When same-list, scrollHeight reflects N-1 items (one is hidden)
       // Add 1 back to get true total
       const count = Math.floor(scrollHeight / itemHeight);
@@ -620,7 +617,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
   #getParentDroppableId(): string | null {
     const droppable = this.#positionCalculator.getDroppableParent(
       this.#elementRef.nativeElement,
-      this.#effectiveGroup()
+      this.#effectiveGroup(),
     );
 
     return droppable ? this.#positionCalculator.getDroppableId(droppable) : null;

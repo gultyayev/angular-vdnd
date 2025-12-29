@@ -7,7 +7,7 @@ pre-commit:
       group:
         piped: true
         jobs:
-          - run: npx eslint --fix {staged_files}
+          - run: npx eslint --flag v10_config_lookup_from_file --fix {staged_files}
           - run: npx prettier --write {staged_files}
     - name: scss
       glob: '*.scss'

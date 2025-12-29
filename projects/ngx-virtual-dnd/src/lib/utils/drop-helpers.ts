@@ -2,17 +2,6 @@ import { WritableSignal } from '@angular/core';
 import { DropEvent } from '../models/drag-drop.models';
 
 /**
- * Options for the moveItem utility function.
- */
-export interface MoveItemOptions<T> {
-  /**
-   * Function to identify an item. Used to find the item in the source list.
-   * Defaults to using the item's `id` property.
-   */
-  itemIdFn?: (item: T) => string;
-}
-
-/**
  * Moves an item between signal-based lists based on a drop event.
  * Handles both same-list reordering and cross-list moves.
  *
@@ -32,19 +21,14 @@ export interface MoveItemOptions<T> {
  *
  * @param event The drop event from the droppable directive
  * @param lists A map of droppable IDs to their corresponding WritableSignal arrays
- * @param options Optional configuration
  */
-export function moveItem<T>(
-  event: DropEvent,
-  lists: Record<string, WritableSignal<T[]>>,
-  options: MoveItemOptions<T> = {}
-): void {
+export function moveItem<T>(event: DropEvent, lists: Record<string, WritableSignal<T[]>>): void {
   const sourceList = lists[event.source.droppableId];
   const destList = lists[event.destination.droppableId];
 
   if (!sourceList || !destList) {
     console.warn(
-      `[moveItem] Could not find list for droppable "${event.source.droppableId}" or "${event.destination.droppableId}"`
+      `[moveItem] Could not find list for droppable "${event.source.droppableId}" or "${event.destination.droppableId}"`,
     );
     return;
   }
@@ -139,10 +123,7 @@ export function reorderItems<T>(event: DropEvent, list: WritableSignal<T[]>): vo
  * @param lists A map of droppable IDs to their corresponding arrays
  * @returns A new object with the same keys but updated arrays
  */
-export function applyMove<T>(
-  event: DropEvent,
-  lists: Record<string, T[]>
-): Record<string, T[]> {
+export function applyMove<T>(event: DropEvent, lists: Record<string, T[]>): Record<string, T[]> {
   const result = { ...lists };
   const sourceKey = event.source.droppableId;
   const destKey = event.destination.droppableId;
