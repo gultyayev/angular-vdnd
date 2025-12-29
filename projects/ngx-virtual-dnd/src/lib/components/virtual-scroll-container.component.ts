@@ -496,10 +496,9 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
         for (const entry of entries) {
           const height = entry.contentRect.height;
           // Only update if height changed significantly (> 1px) to avoid loops
+          // No ngZone.run() needed - signals work outside zone and effects react automatically
           if (Math.abs(height - this.#measuredHeight()) > 1) {
-            this.#ngZone.run(() => {
-              this.#measuredHeight.set(height);
-            });
+            this.#measuredHeight.set(height);
           }
         }
       });

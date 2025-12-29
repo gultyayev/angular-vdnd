@@ -1,4 +1,14 @@
-import { computed, Directive, ElementRef, inject, input, NgZone, OnDestroy, OnInit, output } from '@angular/core';
+import {
+  computed,
+  Directive,
+  ElementRef,
+  inject,
+  input,
+  NgZone,
+  OnDestroy,
+  OnInit,
+  output,
+} from '@angular/core';
 import { DragStateService } from '../services/drag-state.service';
 import { PositionCalculatorService } from '../services/position-calculator.service';
 import { AutoScrollService } from '../services/auto-scroll.service';
@@ -9,7 +19,7 @@ import {
   DragMoveEvent,
   DragStartEvent,
   END_OF_LIST,
-  GrabOffset
+  GrabOffset,
 } from '../models/drag-drop.models';
 import { VDND_GROUP_TOKEN } from './droppable-group.directive';
 
@@ -380,38 +390,37 @@ export class DraggableDirective implements OnInit, OnDestroy {
       initialPlaceholderId = indexResult.placeholderId;
     }
 
-    this.#ngZone.run(() => {
-      // Register with drag state service - this triggers isDragging computed to become true
-      // which will apply display:none via host binding
-      this.#dragState.startDrag(
-        {
-          draggableId: this.vdndDraggable(),
-          droppableId: this.#getParentDroppableId() ?? '',
-          element,
-          clonedElement,
-          height: rect.height,
-          width: rect.width,
-          data: this.vdndDraggableData(),
-        },
-        position,
-        grabOffset,
-        this.lockAxis(),
-        activeDroppableId,
-        initialPlaceholderId,
-        initialPlaceholderIndex,
-        sourceIndex,
-      );
-
-      // Start auto-scroll monitoring with a callback to recalculate placeholder
-      this.#autoScroll.startMonitoring(() => this.#recalculatePlaceholder());
-
-      // Emit drag start event
-      this.dragStart.emit({
+    // Register with drag state service - this triggers isDragging computed to become true
+    // which will apply display:none via host binding
+    // No ngZone.run() needed - signals work outside zone and effects react automatically
+    this.#dragState.startDrag(
+      {
         draggableId: this.vdndDraggable(),
         droppableId: this.#getParentDroppableId() ?? '',
+        element,
+        clonedElement,
+        height: rect.height,
+        width: rect.width,
         data: this.vdndDraggableData(),
-        position,
-      });
+      },
+      position,
+      grabOffset,
+      this.lockAxis(),
+      activeDroppableId,
+      initialPlaceholderId,
+      initialPlaceholderIndex,
+      sourceIndex,
+    );
+
+    // Start auto-scroll monitoring with a callback to recalculate placeholder
+    this.#autoScroll.startMonitoring(() => this.#recalculatePlaceholder());
+
+    // Emit drag start event
+    this.dragStart.emit({
+      draggableId: this.vdndDraggable(),
+      droppableId: this.#getParentDroppableId() ?? '',
+      data: this.vdndDraggableData(),
+      position,
     });
   }
 
@@ -496,22 +505,21 @@ export class DraggableDirective implements OnInit, OnDestroy {
     }
 
     // Update drag state with actual cursor position (for preview rendering)
-    this.#ngZone.run(() => {
-      this.#dragState.updateDragPosition({
-        cursorPosition: position,
-        activeDroppableId,
-        placeholderId,
-        placeholderIndex,
-      });
+    // No ngZone.run() needed - signals work outside zone and effects react automatically
+    this.#dragState.updateDragPosition({
+      cursorPosition: position,
+      activeDroppableId,
+      placeholderId,
+      placeholderIndex,
+    });
 
-      // Emit drag move event
-      this.dragMove.emit({
-        draggableId: this.vdndDraggable(),
-        sourceDroppableId: this.#getParentDroppableId() ?? '',
-        targetDroppableId: activeDroppableId,
-        placeholderId,
-        position,
-      });
+    // Emit drag move event
+    this.dragMove.emit({
+      draggableId: this.vdndDraggable(),
+      sourceDroppableId: this.#getParentDroppableId() ?? '',
+      targetDroppableId: activeDroppableId,
+      placeholderId,
+      position,
     });
   }
 
@@ -536,7 +544,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
     // Safari caches hit-testing results and only invalidates on user-initiated scroll
     void container.offsetHeight;
     const rect = container.getBoundingClientRect();
-    const scrollTop = container.scrollTop;
+    const currentScrollTop = container.scrollTop;
     // Prefer configured item height from virtual scroll over actual element height
     // This prevents drift when actual element height differs from grid spacing
     const configuredHeight = virtualScroll?.getAttribute('data-item-height');
@@ -552,7 +560,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
     const previewCenterY = position.y - (grabOffset?.y ?? 0) + itemHeight / 2;
 
     // Convert to visual index (which slot the preview center is in)
-    const relativeY = previewCenterY - rect.top + scrollTop;
+    const relativeY = previewCenterY - rect.top + currentScrollTop;
     const visualIndex = Math.floor(relativeY / itemHeight);
 
     // Check if same-list drag
@@ -606,25 +614,24 @@ export class DraggableDirective implements OnInit, OnDestroy {
    * End the drag operation.
    */
   #endDrag(cancelled: boolean): void {
-    this.#ngZone.run(() => {
-      // Stop auto-scroll monitoring
-      this.#autoScroll.stopMonitoring();
+    // No ngZone.run() needed - signals work outside zone and effects react automatically
+    // Stop auto-scroll monitoring
+    this.#autoScroll.stopMonitoring();
 
-      // Emit drag end event
-      this.dragEnd.emit({
-        draggableId: this.vdndDraggable(),
-        droppableId: this.#getParentDroppableId() ?? '',
-        cancelled,
-        data: this.vdndDraggableData(),
-      });
-
-      // Clear drag state - this triggers isDragging computed to become false
-      if (cancelled) {
-        this.#dragState.cancelDrag();
-      } else {
-        this.#dragState.endDrag();
-      }
+    // Emit drag end event
+    this.dragEnd.emit({
+      draggableId: this.vdndDraggable(),
+      droppableId: this.#getParentDroppableId() ?? '',
+      cancelled,
+      data: this.vdndDraggableData(),
     });
+
+    // Clear drag state - this triggers isDragging computed to become false
+    if (cancelled) {
+      this.#dragState.cancelDrag();
+    } else {
+      this.#dragState.endDrag();
+    }
   }
 
   /**
@@ -683,10 +690,9 @@ export class DraggableDirective implements OnInit, OnDestroy {
    */
   #onKeyDown(event: KeyboardEvent): void {
     if (event.key === 'Escape' && this.isDragging()) {
-      this.#ngZone.run(() => {
-        this.#endDrag(true);
-        this.#cleanup();
-      });
+      // No ngZone.run() needed - #endDrag uses signals which work outside zone
+      this.#endDrag(true);
+      this.#cleanup();
     }
   }
 }

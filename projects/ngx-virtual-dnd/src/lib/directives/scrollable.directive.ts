@@ -1,4 +1,13 @@
-import { Directive, ElementRef, inject, input, NgZone, OnDestroy, OnInit, signal } from '@angular/core';
+import {
+  Directive,
+  ElementRef,
+  inject,
+  input,
+  NgZone,
+  OnDestroy,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { VDND_SCROLL_CONTAINER, VdndScrollContainer } from '../tokens/scroll-container.token';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
 
@@ -61,6 +70,12 @@ export class ScrollableDirective implements VdndScrollContainer, OnInit, OnDestr
   /** Cleanup function for scroll listener */
   #scrollCleanup: (() => void) | null = null;
 
+  /** Pending RAF ID for scroll throttling */
+  #pendingScrollRaf: number | null = null;
+
+  /** Last scroll position committed to signal (for threshold check) */
+  #lastCommittedScrollTop = 0;
+
   /** ResizeObserver for container height detection */
   #resizeObserver: ResizeObserver | null = null;
 
@@ -105,8 +120,8 @@ export class ScrollableDirective implements VdndScrollContainer, OnInit, OnDestr
       0,
       Math.min(
         this.scrollTop() + delta,
-        this.nativeElement.scrollHeight - this.nativeElement.clientHeight
-      )
+        this.nativeElement.scrollHeight - this.nativeElement.clientHeight,
+      ),
     );
     this.scrollTo({ top: newPosition });
   }
@@ -127,10 +142,35 @@ export class ScrollableDirective implements VdndScrollContainer, OnInit, OnDestr
 
   // ========== Private Methods ==========
 
+  /** Minimum scroll delta (px) to trigger signal update */
+  readonly #scrollThreshold = 5;
+
   #setupScrollListener(): void {
+    // Throttled scroll handler: combines threshold check + RAF coalescing
+    // No ngZone.run() needed - signals work outside zone and effects react automatically
     const onScroll = () => {
-      this.#ngZone.run(() => {
-        this.#scrollTop.set(this.nativeElement.scrollTop);
+      // Skip if already have a pending update
+      if (this.#pendingScrollRaf !== null) {
+        return;
+      }
+
+      const currentScrollTop = this.nativeElement.scrollTop;
+
+      // Apply threshold check to avoid excessive updates
+      if (Math.abs(currentScrollTop - this.#lastCommittedScrollTop) < this.#scrollThreshold) {
+        return;
+      }
+
+      // Schedule update via RAF to coalesce multiple scroll events
+      this.#pendingScrollRaf = requestAnimationFrame(() => {
+        this.#pendingScrollRaf = null;
+        const finalScrollTop = this.nativeElement.scrollTop;
+
+        // Double-check threshold in case scroll reversed
+        if (Math.abs(finalScrollTop - this.#lastCommittedScrollTop) >= this.#scrollThreshold) {
+          this.#lastCommittedScrollTop = finalScrollTop;
+          this.#scrollTop.set(finalScrollTop);
+        }
       });
     };
 
@@ -139,23 +179,27 @@ export class ScrollableDirective implements VdndScrollContainer, OnInit, OnDestr
     });
 
     this.#scrollCleanup = () => {
+      if (this.#pendingScrollRaf !== null) {
+        cancelAnimationFrame(this.#pendingScrollRaf);
+        this.#pendingScrollRaf = null;
+      }
       this.nativeElement.removeEventListener('scroll', onScroll);
     };
 
     // Set initial scroll position
+    this.#lastCommittedScrollTop = this.nativeElement.scrollTop;
     this.#scrollTop.set(this.nativeElement.scrollTop);
   }
 
   #setupResizeObserver(): void {
+    // No ngZone.run() needed - signals work outside zone and effects react automatically
     this.#ngZone.runOutsideAngular(() => {
       this.#resizeObserver = new ResizeObserver((entries) => {
         for (const entry of entries) {
           const height = entry.contentRect.height;
           // Only update if height changed significantly (> 1px) to avoid loops
           if (Math.abs(height - this.#containerHeight()) > 1) {
-            this.#ngZone.run(() => {
-              this.#containerHeight.set(height);
-            });
+            this.#containerHeight.set(height);
           }
         }
       });
@@ -169,11 +213,7 @@ export class ScrollableDirective implements VdndScrollContainer, OnInit, OnDestr
   #registerAutoScroll(): void {
     if (this.autoScrollEnabled()) {
       const id = this.scrollContainerId() ?? this.#generatedScrollId;
-      this.#autoScrollService.registerContainer(
-        id,
-        this.nativeElement,
-        this.autoScrollConfig()
-      );
+      this.#autoScrollService.registerContainer(id, this.nativeElement, this.autoScrollConfig());
     }
   }
 

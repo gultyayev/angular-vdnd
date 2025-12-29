@@ -66,7 +66,7 @@ export class AutoScrollService {
   registerContainer(
     id: string,
     element: HTMLElement,
-    config: Partial<AutoScrollConfig> = {}
+    config: Partial<AutoScrollConfig> = {},
   ): void {
     this.#scrollableContainers.set(id, {
       element,
@@ -202,11 +202,7 @@ export class AutoScrollService {
   /**
    * Perform the actual scroll operation.
    */
-  #performScroll(
-    element: HTMLElement,
-    direction: { x: number; y: number },
-    speed: number
-  ): void {
+  #performScroll(element: HTMLElement, direction: { x: number; y: number }, speed: number): void {
     const scrollX = direction.x * speed;
     const scrollY = direction.y * speed;
 
@@ -227,23 +223,25 @@ export class AutoScrollService {
       return;
     }
 
-    element.scrollBy({
-      top: scrollY,
-      left: scrollX,
-      behavior: 'instant',
-    });
-
-    // Notify that scroll occurred so placeholder can be recalculated
-    // Delay to next frame - gives Safari time to update hit-testing cache
-    // Safari caches hit-testing results and only invalidates on user-initiated scroll,
-    // not programmatic scrollBy(). RAF delay allows Safari to catch up.
-    if (this.#onScrollCallback) {
-      requestAnimationFrame(() => {
-        this.#ngZone.run(() => {
-          this.#onScrollCallback?.();
-        });
-      });
+    // Use direct property assignment for guaranteed synchronous scroll
+    // scrollBy() with 'instant' behavior may have async issues in Safari
+    if (scrollY !== 0) {
+      element.scrollTop += scrollY;
     }
+    if (scrollX !== 0) {
+      element.scrollLeft += scrollX;
+    }
+
+    // Force layout flush immediately to ensure Safari's layout is updated
+    // before placeholder calculation. This invalidates any cached values.
+    void element.offsetHeight;
+
+    // Notify callback IMMEDIATELY in the same frame (no RAF delay)
+    // Delaying via RAF causes cumulative drift during continuous autoscroll
+    // because multiple scrolls happen before each delayed callback runs.
+    // Note: No ngZone.run() needed here - the callback (DraggableDirective.#recalculatePlaceholder)
+    // already enters the zone when updating drag state.
+    this.#onScrollCallback?.();
   }
 
   /**

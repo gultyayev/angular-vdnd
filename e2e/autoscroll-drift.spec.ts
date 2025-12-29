@@ -67,8 +67,8 @@ test.describe('Autoscroll Placeholder Drift', () => {
     expect(scrollTop).toBeGreaterThan(1200);
 
     // INDEX drift is the real bug - placeholder index should match cursor position
-    // Allow tolerance of 3 items for edge cases (cursor near edge, scroll timing)
-    expect(indexDrift).toBeLessThan(5);
+    // After Safari drift fix, allow tight tolerance of 3 items for edge cases
+    expect(indexDrift).toBeLessThan(3);
 
     await page.mouse.up();
   });
@@ -124,9 +124,8 @@ test.describe('Autoscroll Placeholder Drift', () => {
     // Verify we scrolled at least some amount (test validity check)
     expect(scrollTop).toBeGreaterThan(500);
 
-    // Index drift should be minimal - allow up to 8 items tolerance
-    // (accounts for grab offset, item height variations, and edge cases)
-    expect(indexDrift).toBeLessThan(10);
+    // Index drift should be minimal - after Safari drift fix, allow tight tolerance
+    expect(indexDrift).toBeLessThan(3);
 
     await page.mouse.up();
   });
@@ -176,7 +175,7 @@ test.describe('Autoscroll Placeholder Drift', () => {
     );
 
     // Same tolerance even after extended scroll - drift should not grow
-    expect(indexDrift).toBeLessThan(10);
+    expect(indexDrift).toBeLessThan(3);
 
     await page.mouse.up();
   });
@@ -228,8 +227,8 @@ test.describe('Autoscroll Placeholder Drift', () => {
       `Up - Placeholder: ${placeholderValue}, ActualIdx: ${actualPlaceholderIndex}, ExpectedIdx: ~${expectedIndex}, ScrollTop: ${scrollTop}, IndexDrift: ${indexDrift}`,
     );
 
-    // Index drift should be minimal
-    expect(indexDrift).toBeLessThan(10);
+    // Index drift should be minimal - after Safari drift fix, allow tight tolerance
+    expect(indexDrift).toBeLessThan(3);
 
     await page.mouse.up();
   });
@@ -455,13 +454,70 @@ test.describe('Autoscroll Placeholder Drift', () => {
       );
       const topDrift = Math.abs(expectedTopIndex - topState.placeholderIndex);
 
-      // After 2 cycles, drift should still be minimal (< 3 items)
+      // After 2 cycles, drift should still be minimal - after Safari drift fix
       if (cycle === 1) {
-        expect(topDrift).toBeLessThan(5);
+        expect(topDrift).toBeLessThan(3);
       }
     }
 
     await page.mouse.up();
+  });
+
+  test.describe('WebKit-specific drift tests', () => {
+    test.skip(({ browserName }) => browserName !== 'webkit', 'WebKit only');
+
+    test('Safari should not drift during rapid up-down autoscroll direction changes', async ({
+      page,
+    }) => {
+      // This test specifically catches Safari's hit-test caching issue
+      // Safari caches elementFromPoint results and only invalidates on user scroll
+      const sourceItem = demoPage.list1Items.first();
+      const containerBox = await demoPage.list1VirtualScroll.boundingBox();
+
+      if (!containerBox) {
+        throw new Error('Could not get container bounding box');
+      }
+
+      await sourceItem.hover();
+      await page.mouse.down();
+      await page.waitForTimeout(100);
+
+      const nearBottomY = containerBox.y + containerBox.height - 15;
+      const nearTopY = containerBox.y + 15;
+      const centerX = containerBox.x + containerBox.width / 2;
+
+      // Rapid direction changes - this is where Safari drift is most visible
+      for (let i = 0; i < 3; i++) {
+        // Quick move to bottom
+        await page.mouse.move(centerX, nearBottomY, { steps: 3 });
+        await page.waitForTimeout(800);
+
+        // Quick move to top
+        await page.mouse.move(centerX, nearTopY, { steps: 3 });
+        await page.waitForTimeout(800);
+      }
+
+      // Check final drift
+      const scrollTop = await demoPage.getScrollTop('list1');
+      const dragState = await page.evaluate(() => {
+        const stateEl = document.querySelector('h3 + pre');
+        return stateEl?.textContent;
+      });
+
+      const indexMatch = dragState?.match(/"placeholderIndex":\s*(\d+)/);
+      const actualIndex = indexMatch ? parseInt(indexMatch[1], 10) : -1;
+      const expectedIndex = Math.floor(scrollTop / 50);
+
+      const drift = Math.abs(expectedIndex - actualIndex);
+      console.log(
+        `Safari rapid direction change - drift: ${drift}, actual: ${actualIndex}, expected: ${expectedIndex}`,
+      );
+
+      // After fix, drift should be minimal even with rapid direction changes
+      expect(drift).toBeLessThan(3);
+
+      await page.mouse.up();
+    });
   });
 
   test('no gap should remain after drop at maximum scroll', async ({ page }) => {
