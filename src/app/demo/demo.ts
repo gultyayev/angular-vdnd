@@ -36,308 +36,948 @@ interface Item {
     PlaceholderComponent,
   ],
   template: `
-    <div class="demo-container">
-      <h1>Virtual Scroll + Drag & Drop Demo</h1>
+    <div class="demo-page">
+      <!-- Header -->
+      <header class="header">
+        <div class="header-content">
+          <div class="logo">
+            <svg
+              class="logo-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
+              <path d="M10 7h4M7 10v4M17 10v4M10 17h4" stroke-dasharray="2 2" />
+            </svg>
+            <span class="logo-text">ngx-virtual-dnd</span>
+          </div>
+          <p class="tagline">High-performance drag & drop with virtual scrolling</p>
+        </div>
+      </header>
 
-      <div class="controls">
-        <label>
-          Item count:
-          <input type="number" [value]="itemCount()" (input)="updateItemCount($event)" />
-        </label>
-        <label>
-          Lock axis:
-          <select
-            [value]="lockAxis() ?? ''"
-            (change)="updateLockAxis($event)"
-            data-testid="lock-axis-select"
+      <!-- Main Content -->
+      <main class="main">
+        <!-- Settings Panel -->
+        <section class="settings-panel">
+          <button
+            type="button"
+            class="settings-header"
+            (click)="toggleSettings()"
+            [attr.aria-expanded]="settingsExpanded()"
+            aria-controls="settings-content"
           >
-            <option value="">None</option>
-            <option value="x">X (horizontal only)</option>
-            <option value="y">Y (vertical only)</option>
-          </select>
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            [checked]="dragEnabled()"
-            (change)="toggleDragEnabled($event)"
-            data-testid="drag-enabled-checkbox"
-          />
-          Drag enabled
-        </label>
-        <label>
-          Drag delay (ms):
-          <input
-            type="number"
-            min="0"
-            step="100"
-            [value]="dragDelay()"
-            (input)="updateDragDelay($event)"
-            data-testid="drag-delay-input"
-          />
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            [checked]="showVisiblePlaceholder()"
-            (change)="toggleVisiblePlaceholder($event)"
-            data-testid="visible-placeholder-checkbox"
-          />
-          Visible placeholder
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            [checked]="useSimplifiedApi()"
-            (change)="toggleSimplifiedApi($event)"
-            data-testid="simplified-api-checkbox"
-          />
-          Use simplified API
-        </label>
-        <button (click)="regenerateItems()">Regenerate Items</button>
-      </div>
-
-      <!-- Custom placeholder template (optional - shows dashed border) -->
-      <ng-template #visiblePlaceholderTpl let-height>
-        <div class="visible-placeholder"></div>
-      </ng-template>
-
-      @if (useSimplifiedApi()) {
-        <!-- ============================================ -->
-        <!-- SIMPLIFIED API (New) -->
-        <!-- Uses VirtualSortableListComponent + DroppableGroupDirective + moveItem utility -->
-        <!-- ============================================ -->
-        <div class="lists-container" vdndGroup="demo">
-          <!-- Simplified item template - no placeholder handling needed! -->
-          <ng-template #simplifiedItemTpl let-item let-isPlaceholder="isPlaceholder">
-            @if (isPlaceholder) {
-              <vdnd-placeholder
-                [height]="50"
-                [template]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined"
+            <h2 class="settings-title">
+              <svg
+                class="icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
               >
-              </vdnd-placeholder>
-            } @else {
-              <div
-                class="item"
-                [style.background]="item.color"
-                vdndDraggable="{{ item.id }}"
-                [vdndDraggableData]="item"
-                [lockAxis]="lockAxis()"
-                [disabled]="!dragEnabled()"
-                [dragDelay]="dragDelay()"
-              >
-                {{ item.name }}
+                <circle cx="12" cy="12" r="3" />
+                <path
+                  d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"
+                />
+              </svg>
+              Settings
+            </h2>
+            <span class="settings-toggle" [class.collapsed]="!settingsExpanded()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </span>
+          </button>
+
+          @if (settingsExpanded()) {
+            <div class="settings-content">
+              <div class="settings-grid">
+                <!-- Data Settings -->
+                <div class="setting-group">
+                  <h3 class="setting-group-title">Data</h3>
+                  <div class="setting-item">
+                    <label class="setting-label" for="itemCount">Item count</label>
+                    <input
+                      id="itemCount"
+                      type="number"
+                      class="input"
+                      [value]="itemCount()"
+                      (input)="updateItemCount($event)"
+                    />
+                  </div>
+                  <button class="btn btn-secondary" (click)="regenerateItems()">
+                    <svg
+                      class="icon"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path d="M23 4v6h-6M1 20v-6h6" />
+                      <path
+                        d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+                      />
+                    </svg>
+                    Regenerate
+                  </button>
+                </div>
+
+                <!-- Drag Behavior -->
+                <div class="setting-group">
+                  <h3 class="setting-group-title">Drag Behavior</h3>
+                  <div class="setting-item">
+                    <label class="setting-label" for="lockAxis">Lock axis</label>
+                    <select
+                      id="lockAxis"
+                      class="select"
+                      [value]="lockAxis() ?? ''"
+                      (change)="updateLockAxis($event)"
+                      data-testid="lock-axis-select"
+                    >
+                      <option value="">Free movement</option>
+                      <option value="x">Horizontal only</option>
+                      <option value="y">Vertical only</option>
+                    </select>
+                  </div>
+                  <div class="setting-item">
+                    <label class="setting-label" for="dragDelay">Delay (ms)</label>
+                    <input
+                      id="dragDelay"
+                      type="number"
+                      class="input"
+                      min="0"
+                      step="50"
+                      [value]="dragDelay()"
+                      (input)="updateDragDelay($event)"
+                      data-testid="drag-delay-input"
+                    />
+                  </div>
+                </div>
+
+                <!-- Display Options -->
+                <div class="setting-group">
+                  <h3 class="setting-group-title">Display</h3>
+                  <label class="checkbox-label">
+                    <input
+                      type="checkbox"
+                      class="checkbox"
+                      [checked]="dragEnabled()"
+                      (change)="toggleDragEnabled($event)"
+                      data-testid="drag-enabled-checkbox"
+                    />
+                    <span class="checkbox-text">Enable dragging</span>
+                  </label>
+                  <label class="checkbox-label">
+                    <input
+                      type="checkbox"
+                      class="checkbox"
+                      [checked]="showVisiblePlaceholder()"
+                      (change)="toggleVisiblePlaceholder($event)"
+                      data-testid="visible-placeholder-checkbox"
+                    />
+                    <span class="checkbox-text">Show placeholder border</span>
+                  </label>
+                </div>
+
+                <!-- API Mode -->
+                <div class="setting-group">
+                  <h3 class="setting-group-title">API Mode</h3>
+                  <div class="toggle-group">
+                    <button
+                      class="toggle-btn"
+                      [class.active]="!useSimplifiedApi()"
+                      (click)="useSimplifiedApi.set(false)"
+                    >
+                      Verbose
+                    </button>
+                    <button
+                      class="toggle-btn"
+                      [class.active]="useSimplifiedApi()"
+                      (click)="useSimplifiedApi.set(true)"
+                      data-testid="simplified-api-checkbox"
+                    >
+                      Simplified
+                    </button>
+                  </div>
+                  <p class="setting-hint">
+                    @if (useSimplifiedApi()) {
+                      Using <code>VirtualSortableList</code> + <code>moveItem()</code>
+                    } @else {
+                      Using individual directives with manual placeholder
+                    }
+                  </p>
+                </div>
               </div>
-            }
-          </ng-template>
+            </div>
+          }
+        </section>
 
-          <!-- List 1 - Just 8 lines! -->
-          <div class="list-wrapper">
-            <h2>List 1 ({{ list1().length }} items) - Simplified</h2>
-            <vdnd-sortable-list
-              class="list"
-              droppableId="list-1"
-              group="demo"
-              [items]="list1()"
-              [itemHeight]="50"
-              [containerHeight]="400"
-              [itemIdFn]="getItemId"
-              [itemTemplate]="simplifiedItemTpl"
-              [placeholderTemplate]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined"
-              (drop)="onDropSimplified($event)"
-            >
-            </vdnd-sortable-list>
-          </div>
+        <!-- Custom placeholder template -->
+        <ng-template #visiblePlaceholderTpl let-height>
+          <div class="visible-placeholder"></div>
+        </ng-template>
 
-          <!-- List 2 - Just 8 lines! -->
-          <div class="list-wrapper">
-            <h2>List 2 ({{ list2().length }} items) - Simplified</h2>
-            <vdnd-sortable-list
-              class="list"
-              droppableId="list-2"
-              group="demo"
-              [items]="list2()"
-              [itemHeight]="50"
-              [containerHeight]="400"
-              [itemIdFn]="getItemId"
-              [itemTemplate]="simplifiedItemTpl"
-              [placeholderTemplate]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined"
-              (drop)="onDropSimplified($event)"
-            >
-            </vdnd-sortable-list>
-          </div>
-        </div>
-      } @else {
-        <!-- ============================================ -->
-        <!-- VERBOSE API (Original) -->
-        <!-- Uses VirtualScrollContainerComponent + DroppableDirective + manual placeholder -->
-        <!-- ============================================ -->
-        <div class="lists-container">
-          <!-- Shared item template with manual placeholder handling -->
-          <ng-template #itemTpl let-item let-index="index">
-            @if (item.isPlaceholder) {
-              <vdnd-placeholder
-                [height]="50"
-                [template]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined"
-              >
-              </vdnd-placeholder>
-            } @else {
-              <div
-                class="item"
-                [style.background]="item.color"
-                vdndDraggable="{{ item.id }}"
-                vdndDraggableGroup="demo"
-                [vdndDraggableData]="item"
-                [lockAxis]="lockAxis()"
-                [disabled]="!dragEnabled()"
-                [dragDelay]="dragDelay()"
-              >
-                {{ item.name }}
+        <!-- Lists Section -->
+        <section class="lists-section">
+          @if (useSimplifiedApi()) {
+            <!-- SIMPLIFIED API -->
+            <div class="lists-container" vdndGroup="demo">
+              <ng-template #simplifiedItemTpl let-item let-isPlaceholder="isPlaceholder">
+                @if (isPlaceholder) {
+                  <vdnd-placeholder
+                    [height]="50"
+                    [template]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined"
+                  />
+                } @else {
+                  <div
+                    class="item"
+                    [style.--item-color]="item.color"
+                    vdndDraggable="{{ item.id }}"
+                    [vdndDraggableData]="item"
+                    [lockAxis]="lockAxis()"
+                    [disabled]="!dragEnabled()"
+                    [dragDelay]="dragDelay()"
+                  >
+                    <span class="item-handle">
+                      <svg viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="9" cy="6" r="1.5" />
+                        <circle cx="15" cy="6" r="1.5" />
+                        <circle cx="9" cy="12" r="1.5" />
+                        <circle cx="15" cy="12" r="1.5" />
+                        <circle cx="9" cy="18" r="1.5" />
+                        <circle cx="15" cy="18" r="1.5" />
+                      </svg>
+                    </span>
+                    <span class="item-text">{{ item.name }}</span>
+                  </div>
+                }
+              </ng-template>
+
+              <div class="list-card">
+                <div class="list-header">
+                  <h3 class="list-title">List 1</h3>
+                  <span class="list-badge">{{ list1().length }}</span>
+                </div>
+                <vdnd-sortable-list
+                  class="list"
+                  droppableId="list-1"
+                  group="demo"
+                  [items]="list1()"
+                  [itemHeight]="50"
+                  [containerHeight]="400"
+                  [itemIdFn]="getItemId"
+                  [itemTemplate]="simplifiedItemTpl"
+                  [placeholderTemplate]="
+                    showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined
+                  "
+                  (drop)="onDropSimplified($event)"
+                />
               </div>
-            }
-          </ng-template>
 
-          <!-- List 1 -->
-          <div class="list-wrapper">
-            <h2>List 1 ({{ list1().length }} items)</h2>
-            <div
-              class="list"
-              vdndDroppable="list-1"
-              vdndDroppableGroup="demo"
-              (drop)="onDrop($event, 'list1')"
-            >
-              <vdnd-virtual-scroll
-                class="virtual-scroll-container"
-                [items]="list1WithPlaceholder()"
-                [itemHeight]="50"
-                [stickyItemIds]="stickyIds()"
-                [itemIdFn]="getItemId"
-                [trackByFn]="trackById"
-                [itemTemplate]="itemTpl"
-              >
-              </vdnd-virtual-scroll>
+              <div class="list-card">
+                <div class="list-header">
+                  <h3 class="list-title">List 2</h3>
+                  <span class="list-badge">{{ list2().length }}</span>
+                </div>
+                <vdnd-sortable-list
+                  class="list"
+                  droppableId="list-2"
+                  group="demo"
+                  [items]="list2()"
+                  [itemHeight]="50"
+                  [containerHeight]="400"
+                  [itemIdFn]="getItemId"
+                  [itemTemplate]="simplifiedItemTpl"
+                  [placeholderTemplate]="
+                    showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined
+                  "
+                  (drop)="onDropSimplified($event)"
+                />
+              </div>
             </div>
-          </div>
+          } @else {
+            <!-- VERBOSE API -->
+            <div class="lists-container">
+              <ng-template #itemTpl let-item let-index="index">
+                @if (item.isPlaceholder) {
+                  <vdnd-placeholder
+                    [height]="50"
+                    [template]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined"
+                  />
+                } @else {
+                  <div
+                    class="item"
+                    [style.--item-color]="item.color"
+                    vdndDraggable="{{ item.id }}"
+                    vdndDraggableGroup="demo"
+                    [vdndDraggableData]="item"
+                    [lockAxis]="lockAxis()"
+                    [disabled]="!dragEnabled()"
+                    [dragDelay]="dragDelay()"
+                  >
+                    <span class="item-handle">
+                      <svg viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="9" cy="6" r="1.5" />
+                        <circle cx="15" cy="6" r="1.5" />
+                        <circle cx="9" cy="12" r="1.5" />
+                        <circle cx="15" cy="12" r="1.5" />
+                        <circle cx="9" cy="18" r="1.5" />
+                        <circle cx="15" cy="18" r="1.5" />
+                      </svg>
+                    </span>
+                    <span class="item-text">{{ item.name }}</span>
+                  </div>
+                }
+              </ng-template>
 
-          <!-- List 2 -->
-          <div class="list-wrapper">
-            <h2>List 2 ({{ list2().length }} items)</h2>
-            <div
-              class="list"
-              vdndDroppable="list-2"
-              vdndDroppableGroup="demo"
-              (drop)="onDrop($event, 'list2')"
-            >
-              <vdnd-virtual-scroll
-                class="virtual-scroll-container"
-                [items]="list2WithPlaceholder()"
-                [itemHeight]="50"
-                [stickyItemIds]="stickyIds()"
-                [itemIdFn]="getItemId"
-                [trackByFn]="trackById"
-                [itemTemplate]="itemTpl"
-              >
-              </vdnd-virtual-scroll>
+              <div class="list-card">
+                <div class="list-header">
+                  <h3 class="list-title">List 1</h3>
+                  <span class="list-badge">{{ list1().length }}</span>
+                </div>
+                <div
+                  class="list"
+                  vdndDroppable="list-1"
+                  vdndDroppableGroup="demo"
+                  (drop)="onDrop($event, 'list1')"
+                >
+                  <vdnd-virtual-scroll
+                    class="virtual-scroll-container"
+                    [items]="list1WithPlaceholder()"
+                    [itemHeight]="50"
+                    [stickyItemIds]="stickyIds()"
+                    [itemIdFn]="getItemId"
+                    [trackByFn]="trackById"
+                    [itemTemplate]="itemTpl"
+                  />
+                </div>
+              </div>
+
+              <div class="list-card">
+                <div class="list-header">
+                  <h3 class="list-title">List 2</h3>
+                  <span class="list-badge">{{ list2().length }}</span>
+                </div>
+                <div
+                  class="list"
+                  vdndDroppable="list-2"
+                  vdndDroppableGroup="demo"
+                  (drop)="onDrop($event, 'list2')"
+                >
+                  <vdnd-virtual-scroll
+                    class="virtual-scroll-container"
+                    [items]="list2WithPlaceholder()"
+                    [itemHeight]="50"
+                    [stickyItemIds]="stickyIds()"
+                    [itemIdFn]="getItemId"
+                    [trackByFn]="trackById"
+                    [itemTemplate]="itemTpl"
+                  />
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      }
+          }
+        </section>
 
-      <!-- Drag Preview (auto-clones the original element by default) -->
-      <vdnd-drag-preview></vdnd-drag-preview>
+        <!-- Debug Panel -->
+        <section class="debug-panel" [class.expanded]="debugExpanded()">
+          <button
+            type="button"
+            class="debug-header"
+            (click)="toggleDebug()"
+            [attr.aria-expanded]="debugExpanded()"
+            aria-controls="debug-content"
+          >
+            <h3 class="debug-title">
+              <svg
+                class="icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M12 19V5M5 12l7-7 7 7" />
+              </svg>
+              Debug State
+            </h3>
+            <span class="debug-toggle" [class.collapsed]="!debugExpanded()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </span>
+          </button>
+          @if (debugExpanded()) {
+            <pre class="debug-content">{{ debugState() | json }}</pre>
+          }
+        </section>
+      </main>
 
-      <div class="debug-panel">
-        <h3>Drag State</h3>
-        <pre>{{ debugState() | json }}</pre>
-      </div>
+      <!-- Drag Preview -->
+      <vdnd-drag-preview />
     </div>
   `,
   styles: `
-    .demo-container {
-      padding: 20px;
-      font-family: sans-serif;
+    /* ========================================
+       Design System - CSS Variables
+       ======================================== */
+    :host {
+      /* Colors */
+      --color-bg: #f8fafc;
+      --color-surface: #ffffff;
+      --color-border: #e2e8f0;
+      --color-border-hover: #cbd5e1;
+      --color-text: #1e293b;
+      --color-text-muted: #64748b;
+      --color-text-subtle: #94a3b8;
+      --color-primary: #6366f1;
+      --color-primary-hover: #4f46e5;
+      --color-primary-light: #eef2ff;
+      --color-success: #10b981;
+      --color-success-light: #d1fae5;
+
+      /* Spacing */
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 16px;
+      --space-lg: 24px;
+      --space-xl: 32px;
+      --space-2xl: 48px;
+
+      /* Typography */
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+      --text-xs: 0.75rem;
+      --text-sm: 0.875rem;
+      --text-base: 1rem;
+      --text-lg: 1.125rem;
+      --text-xl: 1.25rem;
+      --text-2xl: 1.5rem;
+
+      /* Effects */
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      --radius-sm: 6px;
+      --radius: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
+      --transition: 150ms ease;
+
+      display: block;
+      font-family: var(--font-sans);
+      color: var(--color-text);
+      background: var(--color-bg);
+      min-height: 100vh;
     }
 
-    .controls {
-      margin-bottom: 20px;
+    /* ========================================
+       Layout
+       ======================================== */
+    .demo-page {
+      min-height: 100vh;
       display: flex;
-      gap: 20px;
+      flex-direction: column;
+    }
+
+    .main {
+      flex: 1;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: var(--space-lg);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
+    }
+
+    /* ========================================
+       Header
+       ======================================== */
+    .header {
+      background: linear-gradient(135deg, var(--color-primary) 0%, #8b5cf6 100%);
+      color: white;
+      padding: var(--space-xl) var(--space-lg);
+    }
+
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .logo {
+      display: flex;
       align-items: center;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-sm);
     }
 
-    .controls input {
-      width: 100px;
-      padding: 4px;
+    .logo-icon {
+      width: 32px;
+      height: 32px;
     }
 
-    .controls button {
-      padding: 8px 16px;
+    .logo-text {
+      font-size: var(--text-2xl);
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+
+    .tagline {
+      margin: 0;
+      font-size: var(--text-base);
+      opacity: 0.9;
+    }
+
+    /* ========================================
+       Settings Panel
+       ======================================== */
+    .settings-panel {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .settings-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: var(--space-md) var(--space-lg);
+      background: none;
+      border: none;
+      cursor: pointer;
+      user-select: none;
+      transition: background var(--transition);
+      font: inherit;
+      color: inherit;
+      text-align: left;
+
+      &:hover {
+        background: var(--color-bg);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: -2px;
+      }
+    }
+
+    .settings-title {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin: 0;
+      font-size: var(--text-base);
+      font-weight: 600;
+    }
+
+    .settings-toggle {
+      width: 24px;
+      height: 24px;
+      color: var(--color-text-muted);
+      transition: transform var(--transition);
+
+      &.collapsed {
+        transform: rotate(-90deg);
+      }
+
+      svg {
+        width: 100%;
+        height: 100%;
+      }
+    }
+
+    .settings-content {
+      padding: 0 var(--space-lg) var(--space-lg);
+      border-top: 1px solid var(--color-border);
+    }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--space-lg);
+      padding-top: var(--space-md);
+    }
+
+    .setting-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .setting-group-title {
+      font-size: var(--text-xs);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-text-muted);
+      margin: 0 0 var(--space-xs) 0;
+    }
+
+    .setting-item {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .setting-label {
+      font-size: var(--text-sm);
+      color: var(--color-text-muted);
+    }
+
+    .setting-hint {
+      font-size: var(--text-xs);
+      color: var(--color-text-subtle);
+      margin: var(--space-xs) 0 0;
+
+      code {
+        background: var(--color-bg);
+        padding: 2px 6px;
+        border-radius: var(--radius-sm);
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+      }
+    }
+
+    /* ========================================
+       Form Controls
+       ======================================== */
+    .input,
+    .select {
+      height: 36px;
+      padding: 0 var(--space-sm);
+      font-size: var(--text-sm);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      background: var(--color-surface);
+      transition:
+        border-color var(--transition),
+        box-shadow var(--transition);
+
+      &:hover {
+        border-color: var(--color-border-hover);
+      }
+
+      &:focus {
+        outline: none;
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 3px var(--color-primary-light);
+      }
+    }
+
+    .input {
+      width: 100%;
+    }
+
+    .select {
+      width: 100%;
       cursor: pointer;
     }
 
-    .controls select {
-      padding: 4px 8px;
-    }
-
-    .lists-container {
+    .checkbox-label {
       display: flex;
-      gap: 40px;
+      align-items: center;
+      gap: var(--space-sm);
+      cursor: pointer;
+      padding: var(--space-xs) 0;
     }
 
-    .list-wrapper {
+    .checkbox {
+      width: 18px;
+      height: 18px;
+      border-radius: var(--radius-sm);
+      accent-color: var(--color-primary);
+      cursor: pointer;
+    }
+
+    .checkbox-text {
+      font-size: var(--text-sm);
+      color: var(--color-text);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xs);
+      height: 36px;
+      padding: 0 var(--space-md);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: all var(--transition);
+
+      .icon {
+        width: 16px;
+        height: 16px;
+      }
+    }
+
+    .btn-secondary {
+      background: var(--color-bg);
+      color: var(--color-text);
+      border: 1px solid var(--color-border);
+
+      &:hover {
+        background: var(--color-border);
+      }
+    }
+
+    .toggle-group {
+      display: flex;
+      background: var(--color-bg);
+      border-radius: var(--radius);
+      padding: 3px;
+    }
+
+    .toggle-btn {
+      flex: 1;
+      height: 32px;
+      font-size: var(--text-sm);
+      font-weight: 500;
+      border: none;
+      border-radius: calc(var(--radius) - 2px);
+      background: transparent;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      transition: all var(--transition);
+
+      &:hover:not(.active) {
+        color: var(--color-text);
+      }
+
+      &.active {
+        background: var(--color-surface);
+        color: var(--color-text);
+        box-shadow: var(--shadow-sm);
+      }
+    }
+
+    .icon {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    /* ========================================
+       Lists Section
+       ======================================== */
+    .lists-section {
       flex: 1;
     }
 
-    .list {
-      border: 2px solid #ccc;
-      border-radius: 8px;
+    .lists-container {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-lg);
+    }
+
+    .list-card {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
       overflow: hidden;
+    }
+
+    .list-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-md) var(--space-lg);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .list-title {
+      margin: 0;
+      font-size: var(--text-base);
+      font-weight: 600;
+    }
+
+    .list-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 28px;
+      height: 28px;
+      padding: 0 var(--space-sm);
+      font-size: var(--text-sm);
+      font-weight: 600;
+      color: var(--color-primary);
+      background: var(--color-primary-light);
+      border-radius: 999px;
+    }
+
+    .list {
+      border-radius: 0;
+      overflow: hidden;
+      transition: background var(--transition);
+
+      &.vdnd-droppable-active {
+        background: var(--color-success-light);
+      }
     }
 
     .virtual-scroll-container {
       height: 400px;
     }
 
-    .list.vdnd-droppable-active {
-      border-color: #4caf50;
-      background-color: rgba(76, 175, 80, 0.1);
-    }
-
+    /* ========================================
+       List Items
+       ======================================== */
     .item {
       height: 50px;
-      box-sizing: border-box;
       display: flex;
       align-items: center;
-      padding: 0 16px;
-      border-bottom: 1px solid #eee;
+      gap: var(--space-sm);
+      padding: 0 var(--space-md);
+      background: linear-gradient(
+        135deg,
+        var(--item-color) 0%,
+        color-mix(in srgb, var(--item-color) 80%, white) 100%
+      );
+      border-bottom: 1px solid rgb(0 0 0 / 0.06);
       cursor: grab;
       user-select: none;
+      transition:
+        filter var(--transition),
+        transform var(--transition);
+
+      &:hover {
+        filter: brightness(0.97);
+      }
+
+      &:active {
+        cursor: grabbing;
+      }
+
+      &.vdnd-draggable-disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
     }
 
-    .item:hover {
-      filter: brightness(0.95);
+    .item-handle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      color: rgb(0 0 0 / 0.3);
+      flex-shrink: 0;
+
+      svg {
+        width: 100%;
+        height: 100%;
+      }
+    }
+
+    .item-text {
+      font-size: var(--text-sm);
+      font-weight: 500;
+      color: rgb(0 0 0 / 0.8);
     }
 
     .visible-placeholder {
       width: 100%;
       height: 100%;
-      border: 2px dashed #999;
-      border-radius: 4px;
-      background-color: rgba(0, 0, 0, 0.05);
+      border: 2px dashed var(--color-primary);
+      border-radius: var(--radius);
+      background: var(--color-primary-light);
       box-sizing: border-box;
     }
 
+    /* ========================================
+       Debug Panel
+       ======================================== */
     .debug-panel {
-      margin-top: 20px;
-      padding: 16px;
-      background: #f5f5f5;
-      border-radius: 8px;
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      overflow: hidden;
     }
 
-    .debug-panel pre {
+    .debug-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: var(--space-md) var(--space-lg);
+      background: none;
+      border: none;
+      cursor: pointer;
+      user-select: none;
+      transition: background var(--transition);
+      font: inherit;
+      color: inherit;
+      text-align: left;
+
+      &:hover {
+        background: var(--color-bg);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: -2px;
+      }
+    }
+
+    .debug-title {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
       margin: 0;
-      font-size: 12px;
-      white-space: pre-wrap;
+      font-size: var(--text-sm);
+      font-weight: 600;
+      color: var(--color-text-muted);
+    }
+
+    .debug-toggle {
+      width: 20px;
+      height: 20px;
+      color: var(--color-text-subtle);
+      transition: transform var(--transition);
+
+      &.collapsed {
+        transform: rotate(-90deg);
+      }
+
+      svg {
+        width: 100%;
+        height: 100%;
+      }
+    }
+
+    .debug-content {
+      margin: 0;
+      padding: var(--space-md) var(--space-lg);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      line-height: 1.6;
+      color: var(--color-text-muted);
+      background: var(--color-bg);
+      border-top: 1px solid var(--color-border);
+      overflow-x: auto;
+    }
+
+    /* ========================================
+       Responsive
+       ======================================== */
+    @media (max-width: 768px) {
+      .lists-container {
+        grid-template-columns: 1fr;
+      }
+
+      .settings-grid {
+        grid-template-columns: 1fr;
+      }
     }
   `,
 })
@@ -361,6 +1001,12 @@ export class DemoComponent {
 
   /** Whether to use the simplified API (VirtualSortableListComponent + moveItem) */
   readonly useSimplifiedApi = signal(false);
+
+  /** Whether settings panel is expanded */
+  readonly settingsExpanded = signal(true);
+
+  /** Whether debug panel is expanded */
+  readonly debugExpanded = signal(true);
 
   /** List 1 items */
   readonly list1 = signal<Item[]>([]);
@@ -401,10 +1047,20 @@ export class DemoComponent {
     this.regenerateItems();
   }
 
+  /** Toggle settings panel */
+  toggleSettings(): void {
+    this.settingsExpanded.update((v) => !v);
+  }
+
+  /** Toggle debug panel */
+  toggleDebug(): void {
+    this.debugExpanded.update((v) => !v);
+  }
+
   /** Generate a random color */
   private randomColor(): string {
     const hue = Math.floor(Math.random() * 360);
-    return `hsl(${hue}, 70%, 80%)`;
+    return `hsl(${hue}, 70%, 85%)`;
   }
 
   /** Generate items for both lists */
@@ -416,7 +1072,7 @@ export class DemoComponent {
     for (let i = 0; i < half; i++) {
       items1.push({
         id: `list1-${i}`,
-        name: `List 1 - Item ${i + 1}`,
+        name: `Item ${i + 1}`,
         color: this.randomColor(),
       });
     }
@@ -425,7 +1081,7 @@ export class DemoComponent {
     for (let i = 0; i < count - half; i++) {
       items2.push({
         id: `list2-${i}`,
-        name: `List 2 - Item ${i + 1}`,
+        name: `Item ${i + 1}`,
         color: this.randomColor(),
       });
     }
@@ -469,12 +1125,6 @@ export class DemoComponent {
   toggleVisiblePlaceholder(event: Event): void {
     const checkbox = event.target as HTMLInputElement;
     this.showVisiblePlaceholder.set(checkbox.checked);
-  }
-
-  /** Toggle simplified API setting */
-  toggleSimplifiedApi(event: Event): void {
-    const checkbox = event.target as HTMLInputElement;
-    this.useSimplifiedApi.set(checkbox.checked);
   }
 
   /** Insert placeholder into list if this is the active droppable */
