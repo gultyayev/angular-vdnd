@@ -5,6 +5,7 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "build:lib": "ng build ngx-virtual-dnd",
     "watch": "ng build --watch --configuration development",
     "lint": "ng lint",
     "test": "jest",
