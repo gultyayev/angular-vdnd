@@ -1,6 +1,30 @@
 {
   "name": "ngx-virtual-dnd",
-  "version": "0.0.1",
+  "version": "1.0.0",
+  "description": "A performant drag-and-drop library for Angular that works seamlessly with virtual scrolling",
+  "keywords": [
+    "angular",
+    "drag-and-drop",
+    "dnd",
+    "virtual-scroll",
+    "virtual-scrolling",
+    "sortable",
+    "reorder",
+    "signals"
+  ],
+  "author": {
+    "name": "Sergey Gultyayev",
+    "email": "gultyayev.sergey@gmail.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gultyayev/angular-vdnd.git"
+  },
+  "homepage": "https://github.com/gultyayev/angular-vdnd#readme",
+  "bugs": {
+    "url": "https://github.com/gultyayev/angular-vdnd/issues"
+  },
   "peerDependencies": {
     "@angular/common": "^21.0.0",
     "@angular/core": "^21.0.0"
