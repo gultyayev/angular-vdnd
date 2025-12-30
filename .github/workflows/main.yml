@@ -2,7 +2,11 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ master ]  # Change to 'main' if your default branch is main
+    branches: [master] # Change to 'main' if your default branch is main
+    paths:
+      - 'src/**'
+      - 'projects/**'
+      - package-lock.json
 
 permissions:
   contents: read
@@ -23,14 +27,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24'  # Or your preferred version
+          node-version: '24' # Or your preferred version
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
       - name: Build Angular Library
-        run: npx ng build ngx-virtual-dnd  # Replace with your library project name from angular.json
+        run: npx ng build ngx-virtual-dnd # Replace with your library project name from angular.json
 
       - name: Build Angular App
         run: |
@@ -45,7 +49,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist/dnd/browser  # Replace with your app's output path (check angular.json > projects > my-app-name > architect > build > options > outputPath)
+          path: dist/dnd/browser # Replace with your app's output path (check angular.json > projects > my-app-name > architect > build > options > outputPath)
 
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
