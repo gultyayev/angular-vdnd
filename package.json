@@ -13,7 +13,9 @@
     "e2e:ui": "playwright test --ui",
     "e2e:headed": "playwright test --headed",
     "storybook": "ng run dnd:storybook",
-    "build-storybook": "ng run dnd:build-storybook"
+    "build-storybook": "ng run dnd:build-storybook",
+    "release": "node scripts/release.js",
+    "release:dry-run": "node scripts/release.js --dry-run"
   },
   "prettier": {
     "printWidth": 100,
@@ -47,6 +49,8 @@
     "@angular/cli": "^21.0.3",
     "@angular/compiler-cli": "^21.0.0",
     "@angular/platform-browser-dynamic": "^21.0.0",
+    "@commitlint/cli": "^20.2.0",
+    "@commitlint/config-conventional": "^20.2.0",
     "@compodoc/compodoc": "^1.1.32",
     "@epam/eslint-config-angular": "^2.1.0",
     "@playwright/test": "^1.57.0",
@@ -56,6 +60,7 @@
     "@storybook/angular": "^10.1.10",
     "@types/jest": "^30.0.0",
     "angular-eslint": "21.1.0",
+    "commit-and-tag-version": "^12.6.1",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-storybook": "^10.1.10",

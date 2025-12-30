@@ -28,3 +28,8 @@ pre-push:
   jobs:
     - name: test
       run: npm test
+
+commit-msg:
+  commands:
+    commitlint:
+      run: npx commitlint --edit {1}

@@ -1,0 +1,15 @@
+{
+  "types": [
+    { "type": "feat", "section": "Features" },
+    { "type": "fix", "section": "Bug Fixes" },
+    { "type": "perf", "section": "Performance" },
+    { "type": "refactor", "section": "Refactoring", "hidden": true },
+    { "type": "docs", "section": "Documentation", "hidden": true },
+    { "type": "chore", "hidden": true },
+    { "type": "test", "hidden": true },
+    { "type": "ci", "hidden": true }
+  ],
+  "packageFiles": [{ "filename": "projects/ngx-virtual-dnd/package.json", "type": "json" }],
+  "bumpFiles": [{ "filename": "projects/ngx-virtual-dnd/package.json", "type": "json" }],
+  "tagPrefix": "v"
+}
