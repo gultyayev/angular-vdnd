@@ -8,6 +8,7 @@ import {
   OnDestroy,
   OnInit,
   output,
+  signal,
 } from '@angular/core';
 import { DragStateService } from '../services/drag-state.service';
 import { PositionCalculatorService } from '../services/position-calculator.service';
@@ -51,6 +52,7 @@ import { VDND_GROUP_TOKEN } from './droppable-group.directive';
     '[class.vdnd-draggable]': 'true',
     '[class.vdnd-draggable-dragging]': 'isDragging()',
     '[class.vdnd-draggable-disabled]': 'disabled()',
+    '[class.vdnd-drag-pending]': 'isPending()',
     '[style.display]': 'isDragging() ? "none" : null',
     '[attr.aria-grabbed]': 'isDragging()',
     '[attr.aria-dropeffect]': '"move"',
@@ -127,6 +129,13 @@ export class DraggableDirective implements OnInit, OnDestroy {
   /** Emits when drag ends */
   dragEnd = output<DragEndEvent>();
 
+  /** Emits when ready-to-drag state changes (after delay passes) */
+  dragReadyChange = output<boolean>();
+
+  /** Whether this element is in the "ready to drag" state (delay has passed) */
+  #isPending = signal(false);
+  readonly isPending = this.#isPending.asReadonly();
+
   /** Whether this element is currently being dragged (based on global drag state) */
   readonly isDragging = computed(() => {
     const draggedItem = this.#dragState.draggedItem();
@@ -152,6 +161,16 @@ export class DraggableDirective implements OnInit, OnDestroy {
 
   /** Whether the delay has been satisfied (user held long enough) */
   #delayReady = false;
+
+  /**
+   * Update the pending state and emit the change event.
+   */
+  #setPending(pending: boolean): void {
+    if (this.#isPending() !== pending) {
+      this.#isPending.set(pending);
+      this.dragReadyChange.emit(pending);
+    }
+  }
 
   ngOnInit(): void {
     // Set up event listeners
@@ -214,6 +233,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
       this.#delayReady = false;
       this.#delayTimerId = setTimeout(() => {
         this.#delayReady = true;
+        this.#setPending(true); // Emit ready state when delay passes
         this.#delayTimerId = null;
       }, delay);
     } else {
@@ -348,6 +368,9 @@ export class DraggableDirective implements OnInit, OnDestroy {
    * Start the drag operation.
    */
   #startDrag(position: CursorPosition): void {
+    // Clear pending state - drag is now active
+    this.#setPending(false);
+
     const element = this.#elementRef.nativeElement;
     const rect = element.getBoundingClientRect();
 
@@ -663,6 +686,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
   #cleanup(): void {
     this.#isTracking = false;
     this.#startPosition = null;
+    this.#setPending(false); // Clear pending state on cleanup
     this.#cancelDelayTimer();
 
     if (this.#rafId !== null) {

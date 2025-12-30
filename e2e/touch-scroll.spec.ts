@@ -152,4 +152,97 @@ test.describe('Touch Scroll with Drag Delay', () => {
     // Drag preview should NOT be visible (drag was cancelled)
     await expect(demoPage.dragPreview).not.toBeVisible();
   });
+
+  test('should apply vdnd-drag-pending class when delay passes', async ({ page }) => {
+    // Set drag delay to 200ms
+    const dragDelayInput = page.locator('[data-testid="drag-delay-input"]');
+    await dragDelayInput.fill('200');
+    await page.waitForTimeout(100);
+
+    // Get first item
+    const firstItem = demoPage.list1Items.first();
+    const box = await firstItem.boundingBox();
+    expect(box).not.toBeNull();
+
+    const startX = box!.x + box!.width / 2;
+    const startY = box!.y + box!.height / 2;
+
+    // Item should not have pending class initially
+    await expect(firstItem).not.toHaveClass(/vdnd-drag-pending/);
+
+    // Use CDP for touch events
+    const client = await page.context().newCDPSession(page);
+
+    // Touch start
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: startX, y: startY }],
+    });
+
+    // Wait longer than delay (250ms > 200ms)
+    await page.waitForTimeout(250);
+
+    // Item should have pending class
+    await expect(firstItem).toHaveClass(/vdnd-drag-pending/);
+
+    // Clean up - end touch without moving (should clear pending)
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: [],
+    });
+
+    // Pending class should be removed
+    await page.waitForTimeout(100);
+    await expect(firstItem).not.toHaveClass(/vdnd-drag-pending/);
+  });
+
+  test('should remove pending class when drag starts', async ({ page }) => {
+    // Set drag delay to 200ms
+    const dragDelayInput = page.locator('[data-testid="drag-delay-input"]');
+    await dragDelayInput.fill('200');
+    await page.waitForTimeout(100);
+
+    // Get first item
+    const firstItem = demoPage.list1Items.first();
+    const box = await firstItem.boundingBox();
+    expect(box).not.toBeNull();
+
+    const startX = box!.x + box!.width / 2;
+    const startY = box!.y + box!.height / 2;
+
+    const client = await page.context().newCDPSession(page);
+
+    // Touch start
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: startX, y: startY }],
+    });
+
+    // Wait for delay
+    await page.waitForTimeout(250);
+
+    // Should have pending class
+    await expect(firstItem).toHaveClass(/vdnd-drag-pending/);
+
+    // Move to start drag
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x: startX, y: startY + 100 }],
+    });
+
+    // Wait for drag to start
+    await page.waitForTimeout(100);
+
+    // Pending class should be removed when dragging
+    await expect(firstItem).not.toHaveClass(/vdnd-drag-pending/);
+
+    // Drag preview should be visible
+    await expect(demoPage.dragPreview).toBeVisible();
+
+    // Clean up
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: [],
+    });
+  });
 });

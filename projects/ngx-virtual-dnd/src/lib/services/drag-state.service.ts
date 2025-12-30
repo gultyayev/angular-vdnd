@@ -1,4 +1,4 @@
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, effect, Injectable, signal } from '@angular/core';
 import {
   CursorPosition,
   DraggedItem,
@@ -63,6 +63,31 @@ export class DragStateService {
   /** Axis to lock movement to */
   readonly lockAxis = computed(() => this.#state().lockAxis);
 
+  constructor() {
+    // Inject cursor styles once (for consistent grabbing cursor during drag)
+    if (typeof document !== 'undefined') {
+      const styleId = 'vdnd-cursor-styles';
+      if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+          body.vdnd-dragging,
+          body.vdnd-dragging * {
+            cursor: grabbing !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
+
+    // Effect to toggle body class during drag
+    effect(() => {
+      if (typeof document === 'undefined') return;
+      const isDragging = this.isDragging();
+      document.body.classList.toggle('vdnd-dragging', isDragging);
+    });
+  }
+
   /**
    * Start a drag operation.
    */
@@ -74,7 +99,7 @@ export class DragStateService {
     activeDroppableId?: string | null,
     placeholderId?: string | null,
     placeholderIndex?: number | null,
-    sourceIndex?: number | null
+    sourceIndex?: number | null,
   ): void {
     // Reset cancellation flag at start of new drag
     this.#wasCancelled.set(false);

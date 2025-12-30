@@ -156,6 +156,16 @@ interface Item {
                       data-testid="drag-delay-input"
                     />
                   </div>
+                  <label class="checkbox-label">
+                    <input
+                      type="checkbox"
+                      class="checkbox"
+                      [checked]="useDragHandle()"
+                      (change)="toggleDragHandle($event)"
+                      data-testid="drag-handle-checkbox"
+                    />
+                    <span class="checkbox-text">Use drag handle</span>
+                  </label>
                 </div>
 
                 <!-- Display Options -->
@@ -235,12 +245,14 @@ interface Item {
                 } @else {
                   <div
                     class="item"
+                    [class.use-handle]="useDragHandle()"
                     [style.--item-color]="item.color"
                     vdndDraggable="{{ item.id }}"
                     [vdndDraggableData]="item"
                     [lockAxis]="lockAxis()"
                     [disabled]="!dragEnabled()"
                     [dragDelay]="dragDelay()"
+                    [dragHandle]="useDragHandle() ? '.item-handle' : undefined"
                   >
                     <span class="item-handle">
                       <svg viewBox="0 0 24 24" fill="currentColor">
@@ -311,6 +323,7 @@ interface Item {
                 } @else {
                   <div
                     class="item"
+                    [class.use-handle]="useDragHandle()"
                     [style.--item-color]="item.color"
                     vdndDraggable="{{ item.id }}"
                     vdndDraggableGroup="demo"
@@ -318,6 +331,7 @@ interface Item {
                     [lockAxis]="lockAxis()"
                     [disabled]="!dragEnabled()"
                     [dragDelay]="dragDelay()"
+                    [dragHandle]="useDragHandle() ? '.item-handle' : undefined"
                   >
                     <span class="item-handle">
                       <svg viewBox="0 0 24 24" fill="currentColor">
@@ -862,6 +876,39 @@ interface Item {
         cursor: not-allowed;
         opacity: 0.6;
       }
+
+      /* Ready-to-drag state (delay has passed) */
+      &.vdnd-drag-pending {
+        transform: scale(1.02);
+        box-shadow: 0 4px 12px rgb(0 0 0 / 0.15);
+        z-index: 1;
+
+        .item-handle {
+          color: var(--color-primary);
+          transform: scale(1.1);
+        }
+      }
+
+      /* Handle-only drag mode */
+      &.use-handle {
+        cursor: default;
+
+        .item-handle {
+          cursor: grab;
+          transition:
+            color var(--transition),
+            transform var(--transition);
+
+          &:hover {
+            color: var(--color-primary);
+            transform: scale(1.1);
+          }
+
+          &:active {
+            cursor: grabbing;
+          }
+        }
+      }
     }
 
     .item-handle {
@@ -996,6 +1043,9 @@ export class DemoComponent {
   /** Delay in milliseconds before drag starts */
   readonly dragDelay = signal(0);
 
+  /** Whether to use drag handle (only handle initiates drag) */
+  readonly useDragHandle = signal(false);
+
   /** Whether to show a visible placeholder (with border) instead of transparent */
   readonly showVisiblePlaceholder = signal(false);
 
@@ -1125,6 +1175,12 @@ export class DemoComponent {
   toggleVisiblePlaceholder(event: Event): void {
     const checkbox = event.target as HTMLInputElement;
     this.showVisiblePlaceholder.set(checkbox.checked);
+  }
+
+  /** Toggle drag handle setting */
+  toggleDragHandle(event: Event): void {
+    const checkbox = event.target as HTMLInputElement;
+    this.useDragHandle.set(checkbox.checked);
   }
 
   /** Insert placeholder into list if this is the active droppable */
