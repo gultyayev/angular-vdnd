@@ -98,9 +98,14 @@ function main() {
 
   // Step 6: Bump version and generate changelog
   console.log('\n=== Bumping version and generating changelog ===');
-  const versionCmd = releaseType
+  let versionCmd = releaseType
     ? `npx commit-and-tag-version --release-as ${releaseType}`
     : 'npx commit-and-tag-version';
+
+  if (dryRun) {
+    versionCmd += ' --dry-run';
+  }
+
   run(versionCmd);
 
   if (dryRun) {
