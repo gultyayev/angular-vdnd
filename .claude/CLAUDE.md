@@ -138,9 +138,55 @@ Without rebuilding, changes to library files will NOT appear in the demo app.
 
 ## Testing
 
-- **Unit tests:** Jest with zoneless environment (`npm test`)
-- **E2E tests:** Playwright (`npm run e2e`) - **ALWAYS run after code changes**
+- **Unit tests:** Jest with zoneless environment
+- **E2E tests:** Playwright - **ALWAYS run after code changes**
 - Use Page Object Model pattern for E2E tests
+
+### Token-Efficient Test Commands
+
+**Default commands (minimal output):**
+
+```bash
+# Unit tests - silent mode (shows PASS/FAIL per file, not per test)
+npm test -- --silent
+
+# E2E tests - dot reporter, stop on first failure, single browser
+npx playwright test --reporter=dot --max-failures=1 --project=chromium
+
+# E2E all browsers (when needed)
+npx playwright test --reporter=dot --max-failures=1
+
+# Single test file
+npm test -- --silent path/to/file.spec.ts
+npx playwright test e2e/file.spec.ts --reporter=dot --project=chromium
+```
+
+**Verbose commands (only when debugging):**
+
+```bash
+# Unit tests with full output
+npm test -- --verbose
+
+# E2E tests with list output (shows each test name)
+npx playwright test --reporter=list
+```
+
+**Coverage (only when explicitly requested):**
+
+```bash
+npm test -- --coverage
+```
+
+**Note:** Some tests contain `console.log` debug statements. These appear in output regardless of reporter settings.
+
+### Output Philosophy
+
+- **Passing tests produce minimal output** - dots or nothing
+- **Only failures show details** - stack traces, context
+- **No verbose summaries** - skip "X tests passed" unless all pass
+- **Stack traces are concise** - not full verbose traces
+- **Stop early on failure** - use `--max-failures=1` for faster feedback
+
 - Prefer data attributes (`[data-testid]`, `[data-draggable-id]`) over CSS selectors
 
 ### Testing Workflow
@@ -150,7 +196,7 @@ Without rebuilding, changes to library files will NOT appear in the demo app.
 E2E tests run headless by default and provide reliable, reproducible results.
 
 1. Write E2E tests FIRST to reproduce bugs before fixing
-2. Run `npm run e2e` to verify fixes work
+2. Run `npx playwright test --reporter=dot --max-failures=1` to verify fixes
 3. Only use Chrome MCP for visual debugging when E2E tests are insufficient
 
 ### Chrome MCP for Visual Debugging (Secondary)
@@ -265,14 +311,12 @@ Use `npm run release:dry-run` to test without pushing/publishing.
 
 ## Quick Reference
 
-| Command                    | Description                          |
-| -------------------------- | ------------------------------------ |
-| `npm start`                | Dev server (port 4200)               |
-| `npm test`                 | Run unit tests (Jest)                |
-| `npm run e2e`              | Run E2E tests (Playwright)           |
-| `npm run lint`             | Run ESLint                           |
-| `npm run storybook`        | Start Storybook (port 6006)          |
-| `npm run build`            | Production build                     |
-| `ng build ngx-virtual-dnd` | Build library (required after edits) |
-| `npm run release`          | Release new version                  |
-| `npm run release:dry-run`  | Test release without publishing      |
+| Command                                                                  | Description                          |
+| ------------------------------------------------------------------------ | ------------------------------------ |
+| `npm start`                                                              | Dev server (port 4200)               |
+| `npm test -- --silent`                                                   | Unit tests (minimal output)          |
+| `npx playwright test --reporter=dot --max-failures=1 --project=chromium` | E2E tests (default)                  |
+| `npx playwright test --reporter=dot --max-failures=1`                    | E2E all browsers                     |
+| `npm run lint`                                                           | Run ESLint                           |
+| `ng build ngx-virtual-dnd`                                               | Build library (required after edits) |
+| `npm run release`                                                        | Release new version                  |
