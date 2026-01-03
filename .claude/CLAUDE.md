@@ -43,6 +43,31 @@ Angular monorepo containing a drag-and-drop library optimized for virtual scroll
 - Use `effect()` for reacting to state changes
 - Use `update()` or `set()` on signals (not `mutate`)
 
+### Effects - Critical Rules
+
+**NEVER use `allowSignalWrites: true`** - This option is DEPRECATED as of Angular 19. Signal writes are allowed by default in effects.
+
+```typescript
+// ✅ CORRECT - No allowSignalWrites needed
+effect(() => {
+  this.mySignal.set(newValue); // Signal writes are allowed by default
+});
+
+// ❌ WRONG - Never include this deprecated option
+effect(
+  () => {
+    this.mySignal.set(newValue);
+  },
+  { allowSignalWrites: true },
+); // DEPRECATED - DO NOT USE
+```
+
+**When creating effects:**
+
+- Use `effect()` without any options for simple cases
+- Use `effect(() => {}, { injector })` only when creating effects outside constructor
+- NEVER include `allowSignalWrites` - it's deprecated and triggers warnings
+
 ## Templates
 
 - Use native control flow (`@if`, `@for`, `@switch`)

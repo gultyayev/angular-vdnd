@@ -444,37 +444,34 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
     // Preserve scroll position when drag ends at bottom of list
     // During drag, totalHeight is reduced by 1 item (dragged item is hidden)
     // When drag ends, totalHeight increases - we need to adjust scroll if we were at bottom
-    effect(
-      () => {
-        const currentDraggedId = this.draggedItemId();
-        const element = this.#elementRef.nativeElement;
+    effect(() => {
+      const currentDraggedId = this.draggedItemId();
+      const element = this.#elementRef.nativeElement;
 
-        // Detect drag end (was dragging, now not)
-        if (this.#previousDraggedId !== null && currentDraggedId === null) {
-          const currentScrollTop = element.scrollTop;
-          const itemHeight = this.itemHeight();
-          const height = this.effectiveHeight();
-          const totalItems = this.items().length;
+      // Detect drag end (was dragging, now not)
+      if (this.#previousDraggedId !== null && currentDraggedId === null) {
+        const currentScrollTop = element.scrollTop;
+        const itemHeight = this.itemHeight();
+        const height = this.effectiveHeight();
+        const totalItems = this.items().length;
 
-          // Calculate if we were at/near bottom (within 10px tolerance)
-          // During drag, max scroll was (totalItems - 1) * itemHeight - height
-          const dragReducedMaxScroll = (totalItems - 1) * itemHeight - height;
-          const wasAtBottom = currentScrollTop >= dragReducedMaxScroll - 10;
+        // Calculate if we were at/near bottom (within 10px tolerance)
+        // During drag, max scroll was (totalItems - 1) * itemHeight - height
+        const dragReducedMaxScroll = (totalItems - 1) * itemHeight - height;
+        const wasAtBottom = currentScrollTop >= dragReducedMaxScroll - 10;
 
-          if (wasAtBottom && dragReducedMaxScroll > 0) {
-            // Adjust scroll to new bottom position after totalHeight increases
-            queueMicrotask(() => {
-              const newMaxScroll = Math.max(0, totalItems * itemHeight - height);
-              element.scrollTop = newMaxScroll;
-              this.#scrollTop.set(newMaxScroll);
-            });
-          }
+        if (wasAtBottom && dragReducedMaxScroll > 0) {
+          // Adjust scroll to new bottom position after totalHeight increases
+          queueMicrotask(() => {
+            const newMaxScroll = Math.max(0, totalItems * itemHeight - height);
+            element.scrollTop = newMaxScroll;
+            this.#scrollTop.set(newMaxScroll);
+          });
         }
+      }
 
-        this.#previousDraggedId = currentDraggedId;
-      },
-      { allowSignalWrites: true },
-    );
+      this.#previousDraggedId = currentDraggedId;
+    });
   }
 
   ngOnInit(): void {
