@@ -83,7 +83,7 @@ export function moveItem<T>(event: DropEvent, lists: Record<string, WritableSign
  */
 export function reorderItems<T>(event: DropEvent, list: WritableSignal<T[]>): void {
   const sourceIndex = event.source.index;
-  let destIndex = event.destination.index;
+  const destIndex = event.destination.index;
 
   // No-op if same position
   if (sourceIndex === destIndex) {
@@ -94,11 +94,8 @@ export function reorderItems<T>(event: DropEvent, list: WritableSignal<T[]>): vo
     const newItems = [...items];
     const [removed] = newItems.splice(sourceIndex, 1);
 
-    // Adjust destination index if moving down (since we removed an item before it)
-    if (sourceIndex < destIndex) {
-      destIndex--;
-    }
-
+    // Note: destination.index from DropEvent is already adjusted for same-list
+    // reordering by DroppableDirective.#handleDrop(), so we use it directly.
     newItems.splice(destIndex, 0, removed);
     return newItems;
   });
@@ -128,7 +125,7 @@ export function applyMove<T>(event: DropEvent, lists: Record<string, T[]>): Reco
   const sourceKey = event.source.droppableId;
   const destKey = event.destination.droppableId;
   const sourceIndex = event.source.index;
-  let destIndex = event.destination.index;
+  const destIndex = event.destination.index;
 
   const sourceItems = [...(lists[sourceKey] ?? [])];
   const item = sourceItems[sourceIndex];
@@ -138,11 +135,10 @@ export function applyMove<T>(event: DropEvent, lists: Record<string, T[]>): Reco
   }
 
   // Same list reorder
+  // Note: destination.index from DropEvent is already adjusted for same-list
+  // reordering by DroppableDirective.#handleDrop(), so we use it directly.
   if (sourceKey === destKey) {
     const [removed] = sourceItems.splice(sourceIndex, 1);
-    if (sourceIndex < destIndex) {
-      destIndex--;
-    }
     sourceItems.splice(destIndex, 0, removed);
     result[sourceKey] = sourceItems;
     return result;

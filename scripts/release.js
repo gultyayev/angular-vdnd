@@ -18,7 +18,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, copyFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const DIST_PATH = 'dist/ngx-virtual-dnd';
@@ -95,6 +95,12 @@ function main() {
     console.error(`Error: Build output not found at ${distPath}`);
     process.exit(1);
   }
+
+  // Copy README and LICENSE to dist
+  console.log('\n=== Copying assets to dist ===');
+  copyFileSync('README.md', resolve(distPath, 'README.md'));
+  copyFileSync('LICENSE', resolve(distPath, 'LICENSE'));
+  console.log('Copied README.md and LICENSE to dist');
 
   // Step 6: Bump version and generate changelog
   console.log('\n=== Bumping version and generating changelog ===');

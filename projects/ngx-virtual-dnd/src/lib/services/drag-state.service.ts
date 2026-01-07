@@ -63,6 +63,12 @@ export class DragStateService {
   /** Axis to lock movement to */
   readonly lockAxis = computed(() => this.#state().lockAxis);
 
+  /** Whether this is a keyboard-initiated drag */
+  readonly isKeyboardDrag = computed(() => this.#state().isKeyboardDrag);
+
+  /** Target index during keyboard navigation */
+  readonly keyboardTargetIndex = computed(() => this.#state().keyboardTargetIndex);
+
   constructor() {
     // Inject cursor styles once (for consistent grabbing cursor during drag)
     if (typeof document !== 'undefined') {
@@ -100,6 +106,7 @@ export class DragStateService {
     placeholderId?: string | null,
     placeholderIndex?: number | null,
     sourceIndex?: number | null,
+    isKeyboardDrag?: boolean,
   ): void {
     // Reset cancellation flag at start of new drag
     this.#wasCancelled.set(false);
@@ -115,6 +122,8 @@ export class DragStateService {
       grabOffset: grabOffset ?? null,
       initialPosition: initialPosition ?? null,
       lockAxis: lockAxis ?? null,
+      isKeyboardDrag: isKeyboardDrag ?? false,
+      keyboardTargetIndex: isKeyboardDrag ? (sourceIndex ?? 0) : null,
     });
   }
 
@@ -196,5 +205,63 @@ export class DragStateService {
    */
   getStateSnapshot(): DragState {
     return this.#state();
+  }
+
+  /**
+   * Update the keyboard target index (for keyboard drag navigation).
+   * Also updates placeholder position to match, applying same-list adjustment.
+   */
+  setKeyboardTargetIndex(targetIndex: number): void {
+    if (!this.#state().isDragging || !this.#state().isKeyboardDrag) {
+      return;
+    }
+
+    this.#state.update((state) => {
+      // Same-list adjustment: if target is at or after source, add 1
+      // This accounts for the hidden item shifting everything up visually
+      const sourceDroppableId = state.draggedItem?.droppableId;
+      const activeDroppableId = state.activeDroppableId;
+      const isSameList = sourceDroppableId === activeDroppableId;
+      const sourceIndex = state.sourceIndex ?? -1;
+
+      let placeholderIndex = targetIndex;
+      if (isSameList && sourceIndex >= 0 && targetIndex >= sourceIndex) {
+        placeholderIndex = targetIndex + 1;
+      }
+
+      return {
+        ...state,
+        keyboardTargetIndex: targetIndex,
+        placeholderIndex,
+      };
+    });
+  }
+
+  /**
+   * Update the active droppable during keyboard navigation (for cross-list moves).
+   */
+  setKeyboardActiveDroppable(droppableId: string | null, targetIndex: number): void {
+    if (!this.#state().isDragging || !this.#state().isKeyboardDrag) {
+      return;
+    }
+
+    this.#state.update((state) => {
+      // Same-list adjustment: if moving back to source list and target is at or after source, add 1
+      const sourceDroppableId = state.draggedItem?.droppableId;
+      const isSameList = sourceDroppableId === droppableId;
+      const sourceIndex = state.sourceIndex ?? -1;
+
+      let placeholderIndex = targetIndex;
+      if (isSameList && sourceIndex >= 0 && targetIndex >= sourceIndex) {
+        placeholderIndex = targetIndex + 1;
+      }
+
+      return {
+        ...state,
+        activeDroppableId: droppableId,
+        keyboardTargetIndex: targetIndex,
+        placeholderIndex,
+      };
+    });
   }
 }

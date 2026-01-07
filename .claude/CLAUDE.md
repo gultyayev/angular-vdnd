@@ -68,6 +68,16 @@ effect(
 - Use `effect(() => {}, { injector })` only when creating effects outside constructor
 - NEVER include `allowSignalWrites` - it's deprecated and triggers warnings
 
+## Timing and Rendering
+
+- **Prefer `afterNextRender()`** when waiting for Angular to complete a render cycle (e.g., after state changes that affect DOM bindings)
+- Use `requestAnimationFrame` only for:
+  - Performance throttling (coalescing frequent events like pointer moves or scroll)
+  - Animation loops (autoscroll, smooth transitions)
+- Use `setTimeout` only for intentional user-facing delays (e.g., drag activation delay)
+- **Avoid double RAF patterns** - use `afterNextRender()` instead when waiting for Angular DOM updates
+- **Never use `queueMicrotask`** to wait for Angular rendering - microtasks run before Angular's change detection completes
+
 ## Templates
 
 - Use native control flow (`@if`, `@for`, `@switch`)
@@ -150,6 +160,68 @@ this.#onScrollCallback?.(); // Immediate, no RAF
 
 4. **Angular signals don't need `ngZone.run()`.** Signals work outside zone.js. Wrapping signal updates in `ngZone.run()` is unnecessary overhead.
 
+### Keyboard Drag Accessibility - Implementation Notes
+
+**Challenge:** The dragged item is hidden with `display: none` during drag operations. This creates two issues:
+
+1. **Hidden elements cannot receive keyboard events.** Host bindings like `(keydown.arrowup)` on the hidden element will never fire.
+
+2. **Hidden elements cannot be focused.** Even with `tabindex="0"`, elements with `display: none` cannot receive or maintain focus.
+
+#### Solution: Document-Level Keyboard Listeners
+
+When starting a keyboard drag:
+
+1. Attach a keyboard event listener to `document` that handles navigation keys (Arrow keys, Space, Enter, Escape, Tab)
+2. Store a reference to the listener for cleanup
+3. Remove the listener when drag ends (drop, cancel, or disabled)
+
+```typescript
+// In DraggableDirective:
+#keyboardDragListener: ((event: KeyboardEvent) => void) | null = null;
+
+#startKeyboardDrag(): void {
+  // Create and attach document listener
+  this.#keyboardDragListener = (event: KeyboardEvent) => {
+    this.#onKeyboardDragKeyDown(event);
+  };
+  document.addEventListener('keydown', this.#keyboardDragListener);
+}
+
+#cleanupKeyboardDrag(): void {
+  if (this.#keyboardDragListener) {
+    document.removeEventListener('keydown', this.#keyboardDragListener);
+    this.#keyboardDragListener = null;
+  }
+}
+```
+
+#### Event Propagation Issue
+
+When the user presses Space to start the drag, the host binding fires first, then the event propagates to the newly-added document listener. This causes the drag to immediately complete.
+
+**Fix:** Call `event.stopPropagation()` in the host binding handler:
+
+```typescript
+onKeyboardActivate(event: Event): void {
+  if (this.#keyboardDrag.isActive()) {
+    // Already dragging - this will be handled by document listener
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation(); // Prevent event from reaching document listener
+  this.#startKeyboardDrag();
+}
+```
+
+#### Focus Management
+
+Since the dragged element cannot maintain focus (due to `display: none`), the document-level listener captures keyboard events during drag. When the drag ends, focus is restored to the dropped item using `afterNextRender()` to ensure Angular has finished updating the DOM. If the element isn't found (e.g., virtual scroll removed it), focus falls back to the droppable container.
+
+#### Screen Reader Announcements
+
+The library does NOT provide built-in screen reader announcements due to i18n complexity. Consumers should implement their own announcements using the position data provided in drag events (`sourceIndex`, `targetIndex`, `destinationIndex`). See README.md for an example implementation.
+
 ### Library Development Workflow
 
 The demo app imports from `dist/ngx-virtual-dnd` (see `tsconfig.json` paths), NOT from source files.
@@ -175,16 +247,22 @@ Without rebuilding, changes to library files will NOT appear in the demo app.
 # Unit tests - silent mode (shows PASS/FAIL per file, not per test)
 npm test -- --silent
 
-# E2E tests - dot reporter, stop on first failure, single browser
+# E2E tests - Chromium only (for fast iteration during development)
 npx playwright test --reporter=dot --max-failures=1 --project=chromium
 
-# E2E all browsers (when needed)
+# E2E tests - ALL BROWSERS (required before considering work "done")
 npx playwright test --reporter=dot --max-failures=1
 
 # Single test file
 npm test -- --silent path/to/file.spec.ts
 npx playwright test e2e/file.spec.ts --reporter=dot --project=chromium
 ```
+
+**E2E Workflow:**
+
+1. Use `--project=chromium` for fast iteration while developing/debugging
+2. Before marking a task complete, run without `--project` to verify all browsers pass
+3. Cross-browser issues (especially WebKit/Safari) can be subtle - always verify
 
 **Verbose commands (only when debugging):**
 
@@ -213,6 +291,38 @@ npm test -- --coverage
 - **Stop early on failure** - use `--max-failures=1` for faster feedback
 
 - Prefer data attributes (`[data-testid]`, `[data-draggable-id]`) over CSS selectors
+
+### E2E Test Timing
+
+**Keyboard drag tests must wait for drag to start:**
+When testing keyboard drag (Space keypress), always wait for `dragPreview` to be visible before checking placeholder:
+
+```typescript
+await page.keyboard.press('Space');
+await expect(demoPage.dragPreview).toBeVisible(); // Wait for drag to start
+await expect(placeholder).toBeVisible(); // Then check placeholder
+```
+
+**Use retrying assertions for async state:**
+When checking state that depends on Angular rendering or autoscroll, use Playwright's retrying assertions:
+
+```typescript
+// Bad - fixed wait is unreliable
+await page.waitForTimeout(2000);
+expect(scrollTop).toBeGreaterThan(500);
+
+// Good - retrying assertion
+await expect(async () => {
+  const scrollTop = await demoPage.getScrollTop('list1');
+  expect(scrollTop).toBeGreaterThan(500);
+}).toPass({ timeout: 3000 });
+```
+
+**Browser differences:**
+
+- Firefox may need longer timeouts for autoscroll detection
+- Position mouse closer to edge (10px vs 20px) for autoscroll triggers in Firefox
+- WebKit may cache hit-testing results (force layout flush with `void element.offsetHeight`)
 
 ### Testing Workflow
 
@@ -336,12 +446,12 @@ Use `npm run release:dry-run` to test without pushing/publishing.
 
 ## Quick Reference
 
-| Command                                                                  | Description                          |
-| ------------------------------------------------------------------------ | ------------------------------------ |
-| `npm start`                                                              | Dev server (port 4200)               |
-| `npm test -- --silent`                                                   | Unit tests (minimal output)          |
-| `npx playwright test --reporter=dot --max-failures=1 --project=chromium` | E2E tests (default)                  |
-| `npx playwright test --reporter=dot --max-failures=1`                    | E2E all browsers                     |
-| `npm run lint`                                                           | Run ESLint                           |
-| `ng build ngx-virtual-dnd`                                               | Build library (required after edits) |
-| `npm run release`                                                        | Release new version                  |
+| Command                                                                  | Description                             |
+| ------------------------------------------------------------------------ | --------------------------------------- |
+| `npm start`                                                              | Dev server (port 4200)                  |
+| `npm test -- --silent`                                                   | Unit tests (minimal output)             |
+| `npx playwright test --reporter=dot --max-failures=1 --project=chromium` | E2E Chromium only (fast iteration)      |
+| `npx playwright test --reporter=dot --max-failures=1`                    | E2E all browsers (required before done) |
+| `npm run lint`                                                           | Run ESLint                              |
+| `ng build ngx-virtual-dnd`                                               | Build library (required after edits)    |
+| `npm run release`                                                        | Release new version                     |

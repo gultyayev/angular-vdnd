@@ -7,7 +7,7 @@ export default defineConfig({
   // Retry failed tests - WebKit has some timing-sensitive tests
   retries: 2,
   workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
+  reporter: [['html', { open: 'never' }]],
   use: {
     baseURL: 'http://localhost:4200',
     trace: 'on-first-retry',

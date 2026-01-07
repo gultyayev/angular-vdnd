@@ -27,6 +27,10 @@ test.describe('Placeholder Behavior During Drag', () => {
     const placeholders = await demoPage.list2Container.locator('vdnd-placeholder').count();
     expect(placeholders).toBe(1);
 
+    // Verify no ghost elements exist (empty .item divs without text)
+    const ghostCount = await demoPage.countGhostElements('list2');
+    expect(ghostCount, 'Ghost elements should not exist during drag').toBe(0);
+
     // Also verify the dragged item has display: none (no double space)
     const draggedItemId = await sourceItem.getAttribute('data-draggable-id');
     const originalElement = page.locator(`[data-draggable-id="${draggedItemId}"]`);
@@ -57,6 +61,12 @@ test.describe('Placeholder Behavior During Drag', () => {
     // List1 should have no placeholders
     const list1Placeholders = await demoPage.list1Container.locator('vdnd-placeholder').count();
     expect(list1Placeholders).toBe(0);
+
+    // Verify no ghost elements exist in either list
+    const ghostCountList1 = await demoPage.countGhostElements('list1');
+    const ghostCountList2 = await demoPage.countGhostElements('list2');
+    expect(ghostCountList1, 'List 1 should have no ghost elements').toBe(0);
+    expect(ghostCountList2, 'List 2 should have no ghost elements').toBe(0);
 
     // Original element should be hidden
     const draggedItemId = await sourceItem.getAttribute('data-draggable-id');

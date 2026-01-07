@@ -36,7 +36,7 @@ export class PositionCalculatorService {
     x: number,
     y: number,
     draggedElement: HTMLElement,
-    groupName: string
+    groupName: string,
   ): HTMLElement | null {
     // Temporarily hide the dragged element to "see through" it
     const originalPointerEvents = draggedElement.style.pointerEvents;
@@ -161,7 +161,7 @@ export class PositionCalculatorService {
     cursorY: number,
     containerTop: number,
     itemHeight: number,
-    totalItems: number
+    totalItems: number,
   ): number {
     // Calculate the position relative to the container's content
     const relativeY = cursorY - containerTop + scrollTop;
@@ -184,7 +184,7 @@ export class PositionCalculatorService {
   getNearEdge(
     position: { x: number; y: number },
     containerRect: DOMRect,
-    threshold: number
+    threshold: number,
   ): { top: boolean; bottom: boolean; left: boolean; right: boolean } {
     return {
       top: position.y - containerRect.top <= threshold,
@@ -204,5 +204,98 @@ export class PositionCalculatorService {
       position.y >= containerRect.top &&
       position.y <= containerRect.bottom
     );
+  }
+
+  /**
+   * Find an adjacent droppable in the specified direction (left or right).
+   * Used for cross-list keyboard navigation.
+   *
+   * @param currentDroppableId - The ID of the current droppable
+   * @param direction - 'left' or 'right'
+   * @param groupName - The drag-and-drop group name
+   * @returns Object with droppable info, or null if none found
+   */
+  findAdjacentDroppable(
+    currentDroppableId: string,
+    direction: 'left' | 'right',
+    groupName: string,
+  ): { element: HTMLElement; id: string; itemCount: number } | null {
+    // Find all droppables in the same group
+    const allDroppables = document.querySelectorAll(
+      `[${this.#DROPPABLE_GROUP_ATTR}="${groupName}"]`,
+    );
+
+    if (allDroppables.length <= 1) {
+      return null;
+    }
+
+    // Get bounding rects and IDs, sorted by X position
+    const droppableInfos: { element: HTMLElement; id: string; rect: DOMRect }[] = [];
+
+    allDroppables.forEach((el) => {
+      const htmlEl = el as HTMLElement;
+      const id = htmlEl.getAttribute(this.#DROPPABLE_ID_ATTR);
+      if (id) {
+        droppableInfos.push({
+          element: htmlEl,
+          id,
+          rect: htmlEl.getBoundingClientRect(),
+        });
+      }
+    });
+
+    // Sort by X position (left to right)
+    droppableInfos.sort((a, b) => a.rect.left - b.rect.left);
+
+    // Find current droppable index
+    const currentIndex = droppableInfos.findIndex((d) => d.id === currentDroppableId);
+    if (currentIndex === -1) {
+      return null;
+    }
+
+    // Get the adjacent droppable
+    const targetIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= droppableInfos.length) {
+      return null;
+    }
+
+    const target = droppableInfos[targetIndex];
+
+    // Get item count from the target droppable
+    const itemCount = this.#getDroppableItemCount(target.element);
+
+    return {
+      element: target.element,
+      id: target.id,
+      itemCount,
+    };
+  }
+
+  /**
+   * Get the total item count in a droppable.
+   * Uses virtual scroll data attribute if available, otherwise counts DOM elements.
+   */
+  #getDroppableItemCount(droppableElement: HTMLElement): number {
+    const virtualScroll = droppableElement.querySelector('vdnd-virtual-scroll');
+    if (virtualScroll) {
+      const scrollHeight = (virtualScroll as HTMLElement).scrollHeight;
+      const configuredHeight = virtualScroll.getAttribute('data-item-height');
+
+      if (!configuredHeight) {
+        if (typeof ngDevMode === 'undefined' || ngDevMode) {
+          console.error(
+            '[ngx-virtual-dnd] vdnd-virtual-scroll requires data-item-height attribute ' +
+              'for keyboard navigation. Cross-list keyboard drag will not work correctly.',
+          );
+        }
+        // Short-circuit: return 0 to prevent navigation to this droppable
+        return 0;
+      }
+
+      const itemHeight = parseInt(configuredHeight, 10);
+      return Math.floor(scrollHeight / itemHeight);
+    }
+    // Fallback for non-virtual scroll: DOM count is valid
+    return droppableElement.querySelectorAll(`[${this.#DRAGGABLE_ID_ATTR}]`).length;
   }
 }

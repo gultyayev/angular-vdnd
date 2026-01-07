@@ -11,6 +11,7 @@ export { PositionCalculatorService } from './services/position-calculator.servic
 export { AutoScrollService } from './services/auto-scroll.service';
 export type { AutoScrollConfig } from './services/auto-scroll.service';
 export { ElementCloneService } from './services/element-clone.service';
+export { KeyboardDragService } from './services/keyboard-drag.service';
 
 // Components
 export { VirtualScrollContainerComponent } from './components/virtual-scroll-container.component';

@@ -314,8 +314,8 @@ interface Item {
           } @else {
             <!-- VERBOSE API -->
             <div class="lists-container">
-              <ng-template #itemTpl let-item let-index="index">
-                @if (item.isPlaceholder) {
+              <ng-template #itemTpl let-item let-index="index" let-isPlaceholder="isPlaceholder">
+                @if (isPlaceholder || item.isPlaceholder) {
                   <vdnd-placeholder
                     [height]="50"
                     [template]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined"
@@ -361,6 +361,7 @@ interface Item {
                 >
                   <vdnd-virtual-scroll
                     class="virtual-scroll-container"
+                    droppableId="list-1"
                     [items]="list1WithPlaceholder()"
                     [itemHeight]="50"
                     [stickyItemIds]="stickyIds()"
@@ -384,6 +385,7 @@ interface Item {
                 >
                   <vdnd-virtual-scroll
                     class="virtual-scroll-container"
+                    droppableId="list-2"
                     [items]="list2WithPlaceholder()"
                     [itemHeight]="50"
                     [stickyItemIds]="stickyIds()"
