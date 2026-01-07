@@ -14,5 +14,6 @@ export default {
   ...createCjsPreset(),
   setupFilesAfterEnv: ['<rootDir>/setup-jest.ts'],
   testPathIgnorePatterns: ['<rootDir>/e2e/'],
+  reporters: [['jest-simple-dot-reporter', { color: true }]],
   // transformIgnorePatterns,
 } satisfies Config;
