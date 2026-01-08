@@ -1,4 +1,5 @@
 import {
+  afterNextRender,
   AfterViewInit,
   ChangeDetectionStrategy,
   Component,
@@ -6,6 +7,7 @@ import {
   effect,
   ElementRef,
   inject,
+  Injector,
   input,
   NgZone,
   OnDestroy,
@@ -17,7 +19,7 @@ import {
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { DragStateService } from '../services/drag-state.service';
-import { AutoScrollService, AutoScrollConfig } from '../services/auto-scroll.service';
+import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
 import { PlaceholderContext } from './placeholder.component';
 
 /**
@@ -141,6 +143,7 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   readonly #elementRef = inject(ElementRef<HTMLElement>);
   readonly #autoScrollService = inject(AutoScrollService);
   readonly #ngZone = inject(NgZone);
+  readonly #injector = inject(Injector);
 
   /** ResizeObserver for automatic height detection */
   #resizeObserver: ResizeObserver | null = null;
@@ -419,13 +422,31 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
 
   /**
    * Determines if a placeholder should be automatically inserted.
+   * Skips auto-insertion if items already contain a manual placeholder.
    */
   readonly #shouldInsertPlaceholder = computed(() => {
     if (!this.autoPlaceholder()) return false;
     if (!this.droppableId()) return false;
 
     const activeDroppable = this.#dragState.activeDroppableId();
-    return activeDroppable === this.droppableId();
+    if (activeDroppable !== this.droppableId()) return false;
+
+    // Check if items already contain a manual placeholder
+    // Skip auto-insertion to prevent double placeholders
+    const items = this.items();
+    const hasManualPlaceholder = items.some(
+      (item) =>
+        item &&
+        typeof item === 'object' &&
+        'isPlaceholder' in item &&
+        (item as Record<string, unknown>)['isPlaceholder'] === true,
+    );
+
+    if (hasManualPlaceholder) {
+      return false;
+    }
+
+    return true;
   });
 
   /** Generated ID for auto-scroll registration */
@@ -439,6 +460,44 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
     effect(() => {
       const range = this.#renderRange();
       this.visibleRangeChange.emit(range);
+    });
+
+    // Keyboard drag autoscroll: scroll to keep target index visible
+    effect(() => {
+      // Only apply when this droppable is active during keyboard drag
+      if (!this.#dragState.isKeyboardDrag()) return;
+      const activeDroppable = this.#dragState.activeDroppableId();
+      if (activeDroppable !== this.droppableId()) return;
+
+      const targetIndex = this.#dragState.keyboardTargetIndex();
+      if (targetIndex === null) return;
+
+      const itemHeight = this.itemHeight();
+      const height = this.effectiveHeight();
+      if (height <= 0) return;
+
+      const element = this.#elementRef.nativeElement;
+      const currentScrollTop = element.scrollTop;
+
+      // Calculate target item position
+      const targetTop = targetIndex * itemHeight;
+      const targetBottom = targetTop + itemHeight;
+
+      // Calculate visible range
+      const viewportTop = currentScrollTop;
+      const viewportBottom = currentScrollTop + height;
+
+      // Check if target is fully visible
+      if (targetTop < viewportTop) {
+        // Target is above viewport - scroll up
+        element.scrollTop = targetTop;
+        this.#scrollTop.set(targetTop);
+      } else if (targetBottom > viewportBottom) {
+        // Target is below viewport - scroll down
+        const newScrollTop = targetBottom - height;
+        element.scrollTop = newScrollTop;
+        this.#scrollTop.set(newScrollTop);
+      }
     });
 
     // Preserve scroll position when drag ends at bottom of list
@@ -462,11 +521,14 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
 
         if (wasAtBottom && dragReducedMaxScroll > 0) {
           // Adjust scroll to new bottom position after totalHeight increases
-          queueMicrotask(() => {
-            const newMaxScroll = Math.max(0, totalItems * itemHeight - height);
-            element.scrollTop = newMaxScroll;
-            this.#scrollTop.set(newMaxScroll);
-          });
+          afterNextRender(
+            () => {
+              const newMaxScroll = Math.max(0, totalItems * itemHeight - height);
+              element.scrollTop = newMaxScroll;
+              this.#scrollTop.set(newMaxScroll);
+            },
+            { injector: this.#injector },
+          );
         }
       }
 

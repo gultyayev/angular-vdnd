@@ -82,9 +82,10 @@ test.describe('Keyboard Navigation', () => {
     await expect(sourceItem).not.toHaveAttribute('aria-grabbed', 'true');
   });
 
-  test('should have aria-dropeffect attribute on draggable items', async () => {
-    const firstItem = demoPage.list1Items.first();
-    await expect(firstItem).toHaveAttribute('aria-dropeffect', 'move');
+  test('should have aria-dropeffect attribute on droppable containers', async () => {
+    // aria-dropeffect belongs on drop targets (droppables), not on draggable items
+    await expect(demoPage.list1Container).toHaveAttribute('aria-dropeffect', 'move');
+    await expect(demoPage.list2Container).toHaveAttribute('aria-dropeffect', 'move');
   });
 
   test('should prevent default on Space key when focused on draggable', async ({ page }) => {
@@ -92,12 +93,16 @@ test.describe('Keyboard Navigation', () => {
     const firstItem = demoPage.list1Items.first();
     await firstItem.focus();
 
-    // Pressing Space should be handled (prevents default scroll)
-    // We can't directly test preventDefault, but we can verify the item is still focused
+    // Pressing Space should start keyboard drag (prevents default scroll)
     await page.keyboard.press('Space');
 
-    // Item should still be focused (Space didn't cause focus to move)
-    await expect(firstItem).toBeFocused();
+    // Keyboard drag should have started - drag preview should be visible
+    // Note: The original element is hidden with display:none during drag,
+    // so focus cannot remain on it. See CLAUDE.md "Keyboard Drag Accessibility".
+    await expect(demoPage.dragPreview).toBeVisible();
+
+    // Cancel the drag to clean up
+    await page.keyboard.press('Escape');
   });
 
   test('should have tabindex -1 when disabled', async ({ page }) => {

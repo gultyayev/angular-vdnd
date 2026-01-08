@@ -3,6 +3,5 @@
   "dest": "../../dist/ngx-virtual-dnd",
   "lib": {
     "entryFile": "src/public-api.ts"
-  },
-  "assets": ["LICENSE", "README.md"]
+  }
 }

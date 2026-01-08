@@ -61,6 +61,10 @@ export interface DragState {
   initialPosition: CursorPosition | null;
   /** Axis to lock movement to ('x' = horizontal only, 'y' = vertical only) */
   lockAxis: 'x' | 'y' | null;
+  /** Whether this is a keyboard-initiated drag */
+  isKeyboardDrag: boolean;
+  /** Target index during keyboard navigation */
+  keyboardTargetIndex: number | null;
 }
 
 /**
@@ -75,6 +79,8 @@ export interface DragStartEvent {
   data?: unknown;
   /** Position where the drag started */
   position: CursorPosition;
+  /** 0-indexed position in the source list (for screen reader announcements) */
+  sourceIndex: number;
 }
 
 /**
@@ -91,6 +97,8 @@ export interface DragMoveEvent {
   placeholderId: string | null;
   /** Current cursor position */
   position: CursorPosition;
+  /** Current 0-indexed placeholder position (for screen reader announcements) */
+  targetIndex: number | null;
 }
 
 /**
@@ -177,6 +185,10 @@ export interface DragEndEvent {
   cancelled: boolean;
   /** Optional user-provided data associated with the item */
   data?: unknown;
+  /** Original 0-indexed position in source list (for cancel announcements) */
+  sourceIndex: number;
+  /** Final 0-indexed position (null if cancelled) */
+  destinationIndex: number | null;
 }
 
 /**
@@ -194,6 +206,8 @@ export const INITIAL_DRAG_STATE: DragState = {
   grabOffset: null,
   initialPosition: null,
   lockAxis: null,
+  isKeyboardDrag: false,
+  keyboardTargetIndex: null,
 };
 
 /**

@@ -94,13 +94,8 @@ test.describe('Drop Position Accuracy', () => {
     expect(finalList2Count).toBe(initialList2Count);
   });
 
-  // Skip on WebKit due to known timing differences with cross-list drop position calculations
-  // The test passes on Chromium and occasionally on WebKit, but is not reliable
-  test('should maintain item order after multiple drags', async ({ browserName }, testInfo) => {
-    testInfo.skip(
-      browserName === 'webkit',
-      'WebKit has known timing issues with cross-list drop accuracy',
-    );
+  // Previously skipped on WebKit, testing fix
+  test('should maintain item order after multiple drags', async ({ browserName }) => {
     // Get original order of first 3 items in list1
     const item0 = await demoPage.getItemText('list1', 0);
     const item1 = await demoPage.getItemText('list1', 1);

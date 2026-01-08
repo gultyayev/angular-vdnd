@@ -15,7 +15,8 @@ import { DragStartEvent, DragMoveEvent, DragEndEvent } from '../models/drag-drop
     <div
       vdndDroppable="test-list"
       vdndDroppableGroup="test-group"
-      style="height: 400px; overflow: auto;">
+      style="height: 400px; overflow: auto;"
+    >
       <div
         vdndDraggable="test-item"
         vdndDraggableGroup="test-group"
@@ -28,7 +29,8 @@ import { DragStartEvent, DragMoveEvent, DragEndEvent } from '../models/drag-drop
         style="height: 50px; width: 200px;"
         (dragStart)="onDragStart($event)"
         (dragMove)="onDragMove($event)"
-        (dragEnd)="onDragEnd($event)">
+        (dragEnd)="onDragEnd($event)"
+      >
         <span class="handle">Handle</span>
         <span class="content">Content</span>
         <button>Button</button>
@@ -114,8 +116,8 @@ describe('DraggableDirective', () => {
       expect(draggableNative.getAttribute('tabindex')).toBe('0');
     });
 
-    it('should have aria-dropeffect attribute', () => {
-      expect(draggableNative.getAttribute('aria-dropeffect')).toBe('move');
+    it('should have aria-grabbed false initially', () => {
+      expect(draggableNative.getAttribute('aria-grabbed')).toBe('false');
     });
 
     it('should not have vdnd-draggable-dragging class initially', () => {

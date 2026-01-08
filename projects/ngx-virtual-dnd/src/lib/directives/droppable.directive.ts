@@ -1,4 +1,14 @@
-import { computed, Directive, effect, ElementRef, inject, input, OnDestroy, OnInit, output } from '@angular/core';
+import {
+  computed,
+  Directive,
+  effect,
+  ElementRef,
+  inject,
+  input,
+  OnDestroy,
+  OnInit,
+  output,
+} from '@angular/core';
 import { DragStateService } from '../services/drag-state.service';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
 import {
@@ -7,7 +17,7 @@ import {
   DragOverEvent,
   DragState,
   DropEvent,
-  END_OF_LIST
+  END_OF_LIST,
 } from '../models/drag-drop.models';
 import { VDND_GROUP_TOKEN } from './droppable-group.directive';
 
@@ -37,6 +47,7 @@ import { VDND_GROUP_TOKEN } from './droppable-group.directive';
   host: {
     '[attr.data-droppable-id]': 'vdndDroppable()',
     '[attr.data-droppable-group]': 'effectiveGroup()',
+    '[attr.aria-dropeffect]': '"move"',
     '[class.vdnd-droppable]': 'true',
     '[class.vdnd-droppable-active]': 'isActive()',
     '[class.vdnd-droppable-disabled]': 'disabled()',
@@ -246,8 +257,11 @@ export class DroppableDirective implements OnInit, OnDestroy {
     const sourceDroppableId = state.sourceDroppableId ?? '';
     const placeholderId = state.placeholderId ?? END_OF_LIST;
 
-    // Calculate source index
-    const sourceIndex = this.#getItemIndex(state.draggedItem.draggableId, sourceDroppableId);
+    // Use the stored source index from drag state
+    // This is critical for virtual scrolling where the original element may no longer
+    // be in the DOM after autoscroll (it gets virtualized out of view)
+    const sourceIndex =
+      state.sourceIndex ?? this.#getItemIndex(state.draggedItem.draggableId, sourceDroppableId);
 
     // Use the pre-calculated placeholderIndex if available (more reliable)
     // Fall back to DOM-based calculation if not

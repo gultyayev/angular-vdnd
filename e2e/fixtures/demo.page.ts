@@ -12,6 +12,8 @@ export class DemoPage {
   readonly list1Wrapper: Locator;
   readonly list2Wrapper: Locator;
   readonly lockAxisSelect: Locator;
+  readonly keyboardInstructions: Locator;
+  readonly placeholder: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -26,6 +28,8 @@ export class DemoPage {
     this.list1Wrapper = page.locator('.list-card').nth(0);
     this.list2Wrapper = page.locator('.list-card').nth(1);
     this.lockAxisSelect = page.locator('[data-testid="lock-axis-select"]');
+    this.keyboardInstructions = page.locator('#vdnd-keyboard-instructions');
+    this.placeholder = page.locator('.vdnd-placeholder');
   }
 
   async goto(): Promise<void> {
@@ -38,6 +42,14 @@ export class DemoPage {
     await this.scrollList('list1', 0);
     await this.scrollList('list2', 0);
     await this.page.waitForTimeout(50);
+  }
+
+  async enableSimplifiedApi(): Promise<void> {
+    await this.page.locator('[data-testid="simplified-api-checkbox"]').click();
+    // Wait for the list to re-render with new API
+    await this.list1Items.first().waitFor({ state: 'visible' });
+    // Additional wait for Angular to fully stabilize after checkbox toggle
+    await this.page.waitForTimeout(100);
   }
 
   async getItemCount(list: 'list1' | 'list2'): Promise<number> {
@@ -120,5 +132,98 @@ export class DemoPage {
 
   async setLockAxis(axis: 'x' | 'y' | null): Promise<void> {
     await this.lockAxisSelect.selectOption(axis ?? '');
+  }
+
+  // Keyboard drag helper methods
+
+  async startKeyboardDrag(list: 'list1' | 'list2', itemIndex: number): Promise<void> {
+    const items = list === 'list1' ? this.list1Items : this.list2Items;
+    await items.nth(itemIndex).focus();
+    await this.page.keyboard.press('Space');
+  }
+
+  async keyboardMoveDown(steps: number = 1): Promise<void> {
+    for (let i = 0; i < steps; i++) {
+      await this.page.keyboard.press('ArrowDown');
+    }
+  }
+
+  async keyboardMoveUp(steps: number = 1): Promise<void> {
+    for (let i = 0; i < steps; i++) {
+      await this.page.keyboard.press('ArrowUp');
+    }
+  }
+
+  async keyboardMoveToList(direction: 'left' | 'right'): Promise<void> {
+    const key = direction === 'left' ? 'ArrowLeft' : 'ArrowRight';
+    await this.page.keyboard.press(key);
+  }
+
+  async keyboardDrop(): Promise<void> {
+    await this.page.keyboard.press('Space');
+  }
+
+  async keyboardCancel(): Promise<void> {
+    await this.page.keyboard.press('Escape');
+  }
+
+  async focusFirstDraggable(list: 'list1' | 'list2'): Promise<void> {
+    const items = list === 'list1' ? this.list1Items : this.list2Items;
+    await items.first().focus();
+  }
+
+  /**
+   * Count ghost elements - empty .item divs without text content.
+   * These indicate broken placeholder rendering.
+   */
+  async countGhostElements(list: 'list1' | 'list2'): Promise<number> {
+    const container = list === 'list1' ? this.list1VirtualScroll : this.list2VirtualScroll;
+    // Get all visible .item elements (excluding hidden dragged items)
+    const items = container.locator('.item:not([style*="display: none"])');
+    const count = await items.count();
+    let ghostCount = 0;
+
+    for (let i = 0; i < count; i++) {
+      const itemText = items.nth(i).locator('.item-text');
+      const text = (await itemText.textContent())?.trim() ?? '';
+      if (text === '') {
+        ghostCount++;
+      }
+    }
+
+    return ghostCount;
+  }
+
+  /**
+   * Get all rendered items with their content for inspection.
+   */
+  async getRenderedItemsWithContent(
+    list: 'list1' | 'list2',
+  ): Promise<{ text: string; tagName: string; isPlaceholder: boolean }[]> {
+    const container = list === 'list1' ? this.list1VirtualScroll : this.list2VirtualScroll;
+    const elements = container.locator('.item:not([style*="display: none"]), vdnd-placeholder');
+    const count = await elements.count();
+    const result: { text: string; tagName: string; isPlaceholder: boolean }[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const el = elements.nth(i);
+      const tagName = await el.evaluate((e) => e.tagName.toLowerCase());
+      const isPlaceholder = tagName === 'vdnd-placeholder';
+      const text = isPlaceholder
+        ? ''
+        : ((await el.locator('.item-text').textContent())?.trim() ?? '');
+
+      result.push({ text, tagName, isPlaceholder });
+    }
+
+    return result;
+  }
+
+  /**
+   * Get total visible element count during drag (items + placeholders, excludes hidden).
+   */
+  async getVisibleElementCount(list: 'list1' | 'list2'): Promise<number> {
+    const container = list === 'list1' ? this.list1VirtualScroll : this.list2VirtualScroll;
+    return container.locator('.item:not([style*="display: none"]), vdnd-placeholder').count();
   }
 }
