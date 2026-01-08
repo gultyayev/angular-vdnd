@@ -1,6 +1,6 @@
 {
   "name": "ngx-virtual-dnd",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A performant drag-and-drop library for Angular that works seamlessly with virtual scrolling",
   "keywords": [
     "angular",
