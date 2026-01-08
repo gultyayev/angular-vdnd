@@ -92,35 +92,30 @@ export interface VisibleRangeChange {
     '(scroll)': 'onScroll($event)',
   },
   template: `
-    <div
-      class="vdnd-virtual-scroll-content"
-      #contentContainer
-      [style.min-height.px]="totalHeight()"
-    >
-      <!-- Spacer for items above viewport -->
-      <div class="vdnd-virtual-scroll-spacer-top" [style.height.px]="topSpacerHeight()"></div>
+    <div class="vdnd-virtual-scroll-content" #contentContainer>
+      <!-- Single spacer maintains scroll height -->
+      <div class="vdnd-virtual-scroll-spacer" [style.height.px]="totalHeight()"></div>
 
-      <!-- Rendered items -->
-      @for (
-        item of renderedItems();
-        track item.isPlaceholder ? 'placeholder' : effectiveTrackByFn()(item.index, item.data)
-      ) {
-        <ng-container
-          *ngTemplateOutlet="
-            itemTemplate();
-            context: {
-              $implicit: item.data,
-              index: item.index,
-              isSticky: item.isSticky,
-              isPlaceholder: item.isPlaceholder,
-            }
-          "
-        >
-        </ng-container>
-      }
-
-      <!-- Spacer for items below viewport -->
-      <div class="vdnd-virtual-scroll-spacer-bottom" [style.height.px]="bottomSpacerHeight()"></div>
+      <!-- Content wrapper positioned via GPU-accelerated transform -->
+      <div class="vdnd-virtual-scroll-content-wrapper" [style.transform]="contentTransform()">
+        @for (
+          item of renderedItems();
+          track item.isPlaceholder ? 'placeholder' : effectiveTrackByFn()(item.index, item.data)
+        ) {
+          <ng-container
+            *ngTemplateOutlet="
+              itemTemplate();
+              context: {
+                $implicit: item.data,
+                index: item.index,
+                isSticky: item.isSticky,
+                isPlaceholder: item.isPlaceholder,
+              }
+            "
+          >
+          </ng-container>
+        }
+      </div>
     </div>
   `,
   styles: `
@@ -135,6 +130,25 @@ export interface VisibleRangeChange {
     .vdnd-virtual-scroll-content {
       position: relative;
       width: 100%;
+    }
+
+    .vdnd-virtual-scroll-spacer {
+      /* Invisible spacer that maintains scroll height */
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1px;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .vdnd-virtual-scroll-content-wrapper {
+      /* GPU-accelerated positioning */
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      will-change: transform;
     }
   `,
 })
@@ -304,24 +318,14 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
     return { start, end };
   });
 
-  /** Height of the top spacer (unrendered items above) */
-  protected readonly topSpacerHeight = computed(() => {
+  /** Transform offset for content wrapper (position of first rendered item) */
+  protected readonly contentTransform = computed(() => {
     const { start } = this.#renderRange();
     const draggedIndex = this.#draggedItemIndex();
     // If dragged item is in the unrendered top section, subtract 1 (it's position:absolute)
     const adjustment = draggedIndex >= 0 && draggedIndex < start ? 1 : 0;
-    return Math.max(0, start - adjustment) * this.itemHeight();
-  });
-
-  /** Height of the bottom spacer (unrendered items below) */
-  protected readonly bottomSpacerHeight = computed(() => {
-    const total = this.items().length;
-    const { end } = this.#renderRange();
-    const draggedIndex = this.#draggedItemIndex();
-    const unrenderedBelow = Math.max(0, total - end - 1);
-    // If dragged item is in the unrendered bottom section, subtract 1 (it's position:absolute)
-    const adjustment = draggedIndex > end ? 1 : 0;
-    return Math.max(0, unrenderedBelow - adjustment) * this.itemHeight();
+    const offset = Math.max(0, start - adjustment) * this.itemHeight();
+    return `translateY(${offset}px)`;
   });
 
   /** The ID of the currently dragged item (if any) */

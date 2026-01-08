@@ -30,7 +30,8 @@ interface TestItem {
         class="item"
         [attr.data-index]="index"
         [attr.data-sticky]="isSticky"
-        [style.height.px]="50">
+        [style.height.px]="50"
+      >
         {{ item.name }}
       </div>
     </ng-template>
@@ -47,7 +48,8 @@ interface TestItem {
       [scrollContainerId]="scrollContainerId()"
       [autoScrollEnabled]="autoScrollEnabled()"
       (visibleRangeChange)="onVisibleRangeChange($event)"
-      (scrollPositionChange)="onScrollPositionChange($event)">
+      (scrollPositionChange)="onScrollPositionChange($event)"
+    >
     </vdnd-virtual-scroll>
   `,
   imports: [VirtualScrollContainerComponent],
@@ -116,7 +118,7 @@ describe('VirtualScrollContainerComponent', () => {
     fixture.detectChanges(); // Double detection to settle
 
     const virtualScrollDebug = fixture.debugElement.query(
-      By.directive(VirtualScrollContainerComponent)
+      By.directive(VirtualScrollContainerComponent),
     );
     virtualScrollComponent = virtualScrollDebug.componentInstance;
     virtualScrollEl = virtualScrollDebug.nativeElement;
@@ -175,7 +177,7 @@ describe('VirtualScrollContainerComponent', () => {
 
       const items = fixture.debugElement.queryAll(By.css('.item'));
       const indices = items.map((item) =>
-        parseInt(item.nativeElement.getAttribute('data-index'), 10)
+        parseInt(item.nativeElement.getAttribute('data-index'), 10),
       );
 
       // Should include items around index 40
@@ -221,7 +223,7 @@ describe('VirtualScrollContainerComponent', () => {
       // Item 0 should still be rendered
       const items = fixture.debugElement.queryAll(By.css('.item'));
       const indices = items.map((item) =>
-        parseInt(item.nativeElement.getAttribute('data-index'), 10)
+        parseInt(item.nativeElement.getAttribute('data-index'), 10),
       );
 
       expect(indices).toContain(0);
@@ -263,35 +265,49 @@ describe('VirtualScrollContainerComponent', () => {
     });
   });
 
-  describe('spacer heights', () => {
-    it('should have top spacer at 0 initially', () => {
-      const topSpacer = fixture.debugElement.query(
-        By.css('.vdnd-virtual-scroll-spacer-top')
-      );
-      expect(topSpacer.nativeElement.style.height).toBe('0px');
+  describe('content transform', () => {
+    it('should have transform at 0 initially', () => {
+      const wrapper = fixture.debugElement.query(By.css('.vdnd-virtual-scroll-content-wrapper'));
+      expect(wrapper.nativeElement.style.transform).toBe('translateY(0px)');
     });
 
-    it('should update top spacer when scrolled', () => {
+    it('should update transform when scrolled', () => {
       virtualScrollEl.scrollTop = 1000;
       virtualScrollEl.dispatchEvent(new Event('scroll'));
       fixture.detectChanges();
       fixture.detectChanges();
 
-      const topSpacer = fixture.debugElement.query(
-        By.css('.vdnd-virtual-scroll-spacer-top')
-      );
-      // Should be close to scroll position minus overscan
-      const height = parseInt(topSpacer.nativeElement.style.height, 10);
-      expect(height).toBeGreaterThan(0);
+      const wrapper = fixture.debugElement.query(By.css('.vdnd-virtual-scroll-content-wrapper'));
+      const transform = wrapper.nativeElement.style.transform;
+      const match = transform.match(/translateY\((\d+)px\)/);
+      expect(match).toBeTruthy();
+      const offset = parseInt(match![1], 10);
+      expect(offset).toBeGreaterThan(0);
     });
 
-    it('should have bottom spacer for remaining items', () => {
-      const bottomSpacer = fixture.debugElement.query(
-        By.css('.vdnd-virtual-scroll-spacer-bottom')
-      );
-      const height = parseInt(bottomSpacer.nativeElement.style.height, 10);
-      // Should account for items not rendered below
-      expect(height).toBeGreaterThan(0);
+    it('should have single spacer with total height', () => {
+      const spacer = fixture.debugElement.query(By.css('.vdnd-virtual-scroll-spacer'));
+      expect(spacer.nativeElement.style.height).toBe('5000px'); // 100 items * 50px
+    });
+
+    it('should reduce spacer height when dragging', () => {
+      const item: DraggedItem = {
+        draggableId: 'item-5',
+        droppableId: 'list',
+        element: document.createElement('div'),
+        height: 50,
+        width: 200,
+      };
+
+      dragStateService.startDrag(item);
+      fixture.detectChanges();
+      fixture.detectChanges();
+
+      const spacer = fixture.debugElement.query(By.css('.vdnd-virtual-scroll-spacer'));
+      // Should be 99 items * 50px = 4950px during drag
+      expect(spacer.nativeElement.style.height).toBe('4950px');
+
+      dragStateService.endDrag();
     });
   });
 
@@ -411,7 +427,7 @@ describe('VirtualScrollContainerComponent', () => {
       expect(registerSpy).toHaveBeenCalledWith(
         'new-test-scroll',
         expect.any(HTMLElement),
-        expect.any(Object)
+        expect.any(Object),
       );
 
       newFixture.destroy();

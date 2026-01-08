@@ -9,7 +9,7 @@ import {
   OnDestroy,
   OnInit,
   TemplateRef,
-  ViewContainerRef
+  ViewContainerRef,
 } from '@angular/core';
 import { DragStateService } from '../services/drag-state.service';
 import { VDND_SCROLL_CONTAINER } from '../tokens/scroll-container.token';
@@ -96,6 +96,12 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   /** Currently active views keyed by their track-by value */
   readonly #activeViews = new Map<unknown, EmbeddedViewRef<VirtualForContext<T>>>();
 
+  /** Single spacer element for scroll height */
+  #spacer: HTMLDivElement | null = null;
+
+  /** Content wrapper for transform-based positioning */
+  #wrapper: HTMLDivElement | null = null;
+
   // ========== Inputs ==========
 
   /** The array of items to iterate over */
@@ -174,35 +180,47 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.#viewPool.forEach((view) => view.destroy());
     this.#activeViews.forEach((view) => view.destroy());
+
+    // Clean up spacer and wrapper elements
+    this.#spacer?.remove();
+    this.#wrapper?.remove();
   }
 
   /**
-   * Update spacer elements.
+   * Set up spacer and wrapper elements for transform-based positioning.
    */
   #updateSpacers(): void {
-    // Create top spacer
-    const topSpacer = document.createElement('div');
-    topSpacer.className = 'vdnd-virtual-for-spacer-top';
-    topSpacer.style.height = '0px';
+    // Create single spacer that maintains total scroll height
+    const spacer = document.createElement('div');
+    spacer.className = 'vdnd-virtual-for-spacer';
+    spacer.style.cssText =
+      'position: absolute; top: 0; left: 0; width: 1px; visibility: hidden; pointer-events: none;';
 
-    // Create bottom spacer
-    const bottomSpacer = document.createElement('div');
-    bottomSpacer.className = 'vdnd-virtual-for-spacer-bottom';
-    bottomSpacer.style.height = '0px';
+    // Create content wrapper for GPU-accelerated transform positioning
+    const wrapper = document.createElement('div');
+    wrapper.className = 'vdnd-virtual-for-content-wrapper';
+    wrapper.style.cssText =
+      'position: absolute; top: 0; left: 0; right: 0; will-change: transform;';
 
-    // Insert spacers
+    // Insert elements before the directive's anchor comment
     const comment = this.#elementRef.nativeElement;
-    comment.parentNode?.insertBefore(topSpacer, comment);
-    comment.parentNode?.appendChild(bottomSpacer);
+    comment.parentNode?.insertBefore(spacer, comment);
+    comment.parentNode?.insertBefore(wrapper, comment);
 
-    // Update spacer heights reactively
+    this.#spacer = spacer;
+    this.#wrapper = wrapper;
+
+    // Update spacer height and wrapper transform reactively
     effect(() => {
-      const { start, end } = this.#renderRange();
+      const { start } = this.#renderRange();
       const itemHeight = this.vdndVirtualForItemHeight();
       const total = this.vdndVirtualForOf().length;
 
-      topSpacer.style.height = `${start * itemHeight}px`;
-      bottomSpacer.style.height = `${Math.max(0, total - end - 1) * itemHeight}px`;
+      // Single spacer with full content height
+      spacer.style.height = `${total * itemHeight}px`;
+
+      // Transform positions the visible content at the correct offset
+      wrapper.style.transform = `translateY(${start * itemHeight}px)`;
     });
   }
 
@@ -215,17 +233,19 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
     const trackByFn = this.vdndVirtualForTrackBy();
     const placeholderIndex = this.#placeholderIndex();
 
-    // Collect keys that should be active
-    const activeKeys = new Set<unknown>();
-
     // Clear view container but keep views in pool
-    this.#activeViews.forEach((view, key) => {
+    this.#activeViews.forEach((view) => {
       this.#viewPool.push(view);
-      this.#activeViews.delete(key);
     });
+    this.#activeViews.clear();
     this.#viewContainer.clear();
 
-    let viewIndex = 0;
+    // Clear wrapper content
+    if (this.#wrapper) {
+      this.#wrapper.innerHTML = '';
+    }
+
+    const viewsToRender: EmbeddedViewRef<VirtualForContext<T>>[] = [];
 
     // Render items in range with placeholder
     for (let i = start; i <= end && i < items.length; i++) {
@@ -240,8 +260,7 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
           isPlaceholder: true,
         };
         const placeholderView = this.#getOrCreateView('__placeholder__', placeholderContext);
-        this.#viewContainer.insert(placeholderView, viewIndex++);
-        activeKeys.add('__placeholder__');
+        viewsToRender.push(placeholderView);
       }
 
       const item = items[i];
@@ -256,8 +275,7 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
       };
 
       const view = this.#getOrCreateView(key, context);
-      this.#viewContainer.insert(view, viewIndex++);
-      activeKeys.add(key);
+      viewsToRender.push(view);
     }
 
     // Insert placeholder at end if needed
@@ -271,8 +289,20 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
         isPlaceholder: true,
       };
       const placeholderView = this.#getOrCreateView('__placeholder__', placeholderContext);
-      this.#viewContainer.insert(placeholderView, viewIndex++);
+      viewsToRender.push(placeholderView);
     }
+
+    // Insert views into ViewContainerRef (for change detection) and move root nodes to wrapper
+    viewsToRender.forEach((view, index) => {
+      this.#viewContainer.insert(view, index);
+
+      // Move view's root nodes into the wrapper for transform-based positioning
+      if (this.#wrapper) {
+        view.rootNodes.forEach((node) => {
+          this.#wrapper!.appendChild(node);
+        });
+      }
+    });
 
     // Destroy unused views in pool (keep some for reuse)
     while (this.#viewPool.length > 10) {
