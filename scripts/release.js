@@ -10,15 +10,17 @@
  * 1. Verify clean git working directory on master
  * 2. Run linting
  * 3. Run unit tests
- * 4. Run e2e tests
- * 5. Build the library
+ * 4. Build the library (needed for e2e tests)
+ * 5. Run e2e tests
  * 6. Run commit-and-tag-version (bumps version, updates changelog, commits, tags)
- * 7. Push commit and tag to origin
- * 8. Publish to npm from dist/ngx-virtual-dnd
+ * 7. Rebuild the library (with new version)
+ * 8. Push commit and tag to origin
+ * 9. npm login (tokens are short-lived)
+ * 10. Publish to npm from dist/ngx-virtual-dnd
  */
 
 import { execSync } from 'node:child_process';
-import { existsSync, copyFileSync } from 'node:fs';
+import { copyFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const DIST_PATH = 'dist/ngx-virtual-dnd';
@@ -81,12 +83,8 @@ function main() {
   console.log('\n=== Running unit tests ===');
   run('npm test');
 
-  // Step 4: Run e2e tests
-  console.log('\n=== Running e2e tests ===');
-  run('npm run e2e');
-
-  // Step 5: Build the library
-  console.log('\n=== Building library ===');
+  // Step 4: Build the library (needed for e2e tests)
+  console.log('\n=== Building library (for e2e tests) ===');
   run('npm run build:lib');
 
   // Verify build output exists
@@ -96,11 +94,9 @@ function main() {
     process.exit(1);
   }
 
-  // Copy README and LICENSE to dist
-  console.log('\n=== Copying assets to dist ===');
-  copyFileSync('README.md', resolve(distPath, 'README.md'));
-  copyFileSync('LICENSE', resolve(distPath, 'LICENSE'));
-  console.log('Copied README.md and LICENSE to dist');
+  // Step 5: Run e2e tests
+  console.log('\n=== Running e2e tests ===');
+  run('npm run e2e');
 
   // Step 6: Bump version and generate changelog
   console.log('\n=== Bumping version and generating changelog ===');
@@ -116,16 +112,30 @@ function main() {
 
   if (dryRun) {
     console.log('\n*** DRY RUN COMPLETE ***');
-    console.log('Skipped: git push and npm publish');
+    console.log('Skipped: library rebuild, git push, and npm publish');
     console.log('\nTo complete the release, run without --dry-run');
     return;
   }
 
-  // Step 7: Push to origin
+  // Step 7: Rebuild the library (with new version from commit-and-tag-version)
+  console.log('\n=== Rebuilding library (with new version) ===');
+  run('npm run build:lib');
+
+  // Copy README and LICENSE to dist
+  console.log('\n=== Copying assets to dist ===');
+  copyFileSync('README.md', resolve(distPath, 'README.md'));
+  copyFileSync('LICENSE', resolve(distPath, 'LICENSE'));
+  console.log('Copied README.md and LICENSE to dist');
+
+  // Step 8: Push to origin
   console.log('\n=== Pushing to origin ===');
   run('git push --follow-tags origin master');
 
-  // Step 8: Publish to npm
+  // Step 9: npm login (tokens are short-lived)
+  console.log('\n=== Logging in to npm ===');
+  run('npm login');
+
+  // Step 10: Publish to npm
   console.log('\n=== Publishing to npm ===');
   run('npm publish --access public', { cwd: distPath });
 
