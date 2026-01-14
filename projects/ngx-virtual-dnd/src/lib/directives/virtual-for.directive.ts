@@ -5,6 +5,7 @@ import {
   ElementRef,
   EmbeddedViewRef,
   inject,
+  Injector,
   input,
   OnDestroy,
   OnInit,
@@ -89,6 +90,7 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   readonly #elementRef = inject(ElementRef<Comment>);
   readonly #dragState = inject(DragStateService);
   readonly #scrollContainer = inject(VDND_SCROLL_CONTAINER);
+  readonly #injector = inject(Injector);
 
   /** Pool of views for reuse */
   readonly #viewPool: EmbeddedViewRef<VirtualForContext<T>>[] = [];
@@ -211,17 +213,21 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
     this.#wrapper = wrapper;
 
     // Update spacer height and wrapper transform reactively
-    effect(() => {
-      const { start } = this.#renderRange();
-      const itemHeight = this.vdndVirtualForItemHeight();
-      const total = this.vdndVirtualForOf().length;
+    // Must pass injector since we're outside constructor
+    effect(
+      () => {
+        const { start } = this.#renderRange();
+        const itemHeight = this.vdndVirtualForItemHeight();
+        const total = this.vdndVirtualForOf().length;
 
-      // Single spacer with full content height
-      spacer.style.height = `${total * itemHeight}px`;
+        // Single spacer with full content height
+        spacer.style.height = `${total * itemHeight}px`;
 
-      // Transform positions the visible content at the correct offset
-      wrapper.style.transform = `translateY(${start * itemHeight}px)`;
-    });
+        // Transform positions the visible content at the correct offset
+        wrapper.style.transform = `translateY(${start * itemHeight}px)`;
+      },
+      { injector: this.#injector },
+    );
   }
 
   /**

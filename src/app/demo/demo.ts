@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { JsonPipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import {
   DraggableDirective,
   DragPreviewComponent,
@@ -27,6 +28,7 @@ interface Item {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     JsonPipe,
+    RouterLink,
     DragPreviewComponent,
     DraggableDirective,
     DroppableDirective,
@@ -57,6 +59,7 @@ interface Item {
             <span class="logo-text">ngx-virtual-dnd</span>
           </div>
           <p class="tagline">High-performance drag & drop with virtual scrolling</p>
+          <a routerLink="/page-scroll" class="demo-link"> View Page-Level Scroll Demo → </a>
         </div>
       </header>
 
@@ -547,6 +550,22 @@ interface Item {
       margin: 0;
       font-size: var(--text-base);
       opacity: 0.9;
+    }
+
+    .demo-link {
+      display: inline-block;
+      margin-top: var(--space-3);
+      padding: var(--space-2) var(--space-4);
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: var(--radius-md);
+      color: white;
+      text-decoration: none;
+      font-size: var(--text-sm);
+      transition: background 0.2s;
+    }
+
+    .demo-link:hover {
+      background: rgba(255, 255, 255, 0.25);
     }
 
     /* ========================================
