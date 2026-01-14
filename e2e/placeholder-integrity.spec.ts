@@ -73,7 +73,7 @@ test.describe('Placeholder Rendering Integrity', () => {
   });
 
   test.describe('Placeholder Element Validation', () => {
-    test('placeholder should render as vdnd-placeholder element, not as empty .item', async ({
+    test('placeholder should render as vdnd-drag-placeholder element, not as empty .item', async ({
       page,
     }) => {
       const sourceItem = demoPage.list2Items.first();
@@ -84,8 +84,10 @@ test.describe('Placeholder Rendering Integrity', () => {
       await page.mouse.move(sourceBox!.x + sourceBox!.width / 2, sourceBox!.y + 75, { steps: 5 });
       await page.waitForTimeout(100);
 
-      // Count proper placeholders
-      const properPlaceholders = await demoPage.list2Container.locator('vdnd-placeholder').count();
+      // Count visible placeholders
+      const properPlaceholders = await demoPage.list2Container
+        .locator('.vdnd-drag-placeholder-visible')
+        .count();
       expect(properPlaceholders, 'Should have exactly one proper placeholder').toBe(1);
 
       // Ensure no broken placeholder elements (items without text)
@@ -139,8 +141,10 @@ test.describe('Placeholder Rendering Integrity', () => {
       await page.mouse.move(sourceBox!.x + sourceBox!.width / 2, sourceBox!.y + 75, { steps: 5 });
       await page.waitForTimeout(100);
 
-      // Count placeholders - should be exactly 1
-      const placeholderCount = await demoPage.list2Container.locator('vdnd-placeholder').count();
+      // Count visible placeholders - should be exactly 1
+      const placeholderCount = await demoPage.list2Container
+        .locator('.vdnd-drag-placeholder-visible')
+        .count();
       expect(placeholderCount, 'Should have exactly one placeholder').toBe(1);
 
       // Count ghost elements - should be 0
@@ -160,8 +164,10 @@ test.describe('Placeholder Rendering Integrity', () => {
       await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 100, { steps: 10 });
       await page.waitForTimeout(100);
 
-      // Check for any duplicate placeholder situations
-      const placeholderCount = await demoPage.list2Container.locator('vdnd-placeholder').count();
+      // Check for any duplicate visible placeholder situations
+      const placeholderCount = await demoPage.list2Container
+        .locator('.vdnd-drag-placeholder-visible')
+        .count();
       expect(placeholderCount, 'Should have exactly one placeholder').toBe(1);
 
       // Also check that we don't have placeholder-like elements
@@ -185,7 +191,9 @@ test.describe('Placeholder Rendering Integrity', () => {
       await page.mouse.move(sourceBox!.x + sourceBox!.width / 2, sourceBox!.y + 75, { steps: 5 });
       await page.waitForTimeout(100);
 
-      const verbosePlaceholders = await demoPage.list2Container.locator('vdnd-placeholder').count();
+      const verbosePlaceholders = await demoPage.list2Container
+        .locator('.vdnd-drag-placeholder-visible')
+        .count();
       const verboseGhosts = await demoPage.countGhostElements('list2');
 
       await page.mouse.up();
@@ -212,7 +220,7 @@ test.describe('Placeholder Rendering Integrity', () => {
       await page.waitForTimeout(100);
 
       const simplifiedPlaceholders = await demoPage.list2Container
-        .locator('vdnd-placeholder')
+        .locator('.vdnd-drag-placeholder-visible')
         .count();
       const simplifiedGhosts = await demoPage.countGhostElements('list2');
 

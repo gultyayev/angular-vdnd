@@ -16,6 +16,10 @@ These rules prevent common mistakes that cause hard-to-debug issues:
 
 5. **Never throw errors in drag/drop operations:** Use early returns and graceful degradation instead.
 
+6. **TDD for bug fix tests:** When adding tests that verify bug fixes: (1) Write the test first, (2) Run it - it MUST fail (proving the bug exists), (3) Implement the fix, (4) Run again - it should pass. Never skip step 2.
+
+7. **Run ESLint on changed files:** Before considering a task done, run `npm run lint` or `npx eslint --flag v10_config_lookup_from_file <changed-files>` to catch formatting and style issues.
+
 ## Project Structure
 
 - **Main app** (`/src`) - Demo application showcasing the library
@@ -243,6 +247,23 @@ await expect(async () => {
 
 - Firefox: longer timeouts, position mouse closer to edge (10px vs 20px) for autoscroll
 - WebKit: may cache hit-testing (force layout flush with `void element.offsetHeight`)
+
+**Viewport boundary gotcha:**
+
+`document.elementFromPoint(x, y)` returns **null** for coordinates outside the viewport. When UI changes (adding header elements, resizing) push content down, target elements may be below the viewport even if their `boundingBox()` is valid.
+
+```typescript
+// WRONG - boundingBox() returns document coordinates, but elementFromPoint uses viewport
+const box = await element.boundingBox();
+const targetY = box.y + someOffset; // May be > viewport height!
+document.elementFromPoint(x, targetY); // Returns null!
+
+// FIX - Ensure element is in viewport first
+await element.scrollIntoViewIfNeeded();
+const box = await element.boundingBox(); // Now viewport-relative and valid
+```
+
+**Debug tip:** Log `window.innerHeight` and target Y coordinate when hit-testing fails.
 
 ### Chrome MCP (Visual Debugging Only)
 

@@ -245,6 +245,10 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
     await demoPage.scrollList('list2', scrollAmount);
     await page.waitForTimeout(100);
 
+    // Ensure list2 is fully in viewport (header may push it down)
+    await demoPage.list2VirtualScroll.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(50);
+
     // Get container bounds
     const sourceItem = demoPage.list1Items.first();
     const sourceBox = await sourceItem.boundingBox();

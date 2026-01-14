@@ -5,7 +5,6 @@ import {
   VisibleRangeChange,
 } from './virtual-scroll-container.component';
 import { DroppableDirective } from '../directives/droppable.directive';
-import { PlaceholderContext } from './placeholder.component';
 import { AutoScrollConfig } from '../services/auto-scroll.service';
 import {
   DragEnterEvent,
@@ -77,9 +76,7 @@ import {
         [trackByFn]="trackByFn()"
         [itemTemplate]="itemTemplate()"
         [droppableId]="droppableId()"
-        [autoPlaceholder]="true"
         [autoStickyDraggedItem]="true"
-        [placeholderTemplate]="placeholderTemplate()"
         [containerHeight]="containerHeight()"
         [overscan]="overscan()"
         [autoScrollEnabled]="autoScrollEnabled()"
@@ -130,9 +127,6 @@ export class VirtualSortableListComponent<T> {
 
   /** Whether this sortable list is disabled */
   disabled = input<boolean>(false);
-
-  /** Custom template for the placeholder */
-  placeholderTemplate = input<TemplateRef<PlaceholderContext>>();
 
   /**
    * Height of the container in pixels.

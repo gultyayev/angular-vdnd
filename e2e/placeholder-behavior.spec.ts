@@ -23,8 +23,10 @@ test.describe('Placeholder Behavior During Drag', () => {
     // Wait for drag state to stabilize
     await page.waitForTimeout(100);
 
-    // Count placeholders in the DOM - there should be exactly 1
-    const placeholders = await demoPage.list2Container.locator('vdnd-placeholder').count();
+    // Count visible placeholders in the DOM - there should be exactly 1
+    const placeholders = await demoPage.list2Container
+      .locator('.vdnd-drag-placeholder-visible')
+      .count();
     expect(placeholders).toBe(1);
 
     // Verify no ghost elements exist (empty .item divs without text)
@@ -54,12 +56,16 @@ test.describe('Placeholder Behavior During Drag', () => {
     // Wait for drag state to stabilize
     await page.waitForTimeout(100);
 
-    // Count placeholders in list2 - there should be exactly 1
-    const list2Placeholders = await demoPage.list2Container.locator('vdnd-placeholder').count();
+    // Count visible placeholders in list2 - there should be exactly 1
+    const list2Placeholders = await demoPage.list2Container
+      .locator('.vdnd-drag-placeholder-visible')
+      .count();
     expect(list2Placeholders).toBe(1);
 
-    // List1 should have no placeholders
-    const list1Placeholders = await demoPage.list1Container.locator('vdnd-placeholder').count();
+    // List1 should have no visible placeholders
+    const list1Placeholders = await demoPage.list1Container
+      .locator('.vdnd-drag-placeholder-visible')
+      .count();
     expect(list1Placeholders).toBe(0);
 
     // Verify no ghost elements exist in either list

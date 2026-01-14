@@ -1,0 +1,42 @@
+import { InjectionToken } from '@angular/core';
+
+/**
+ * Interface for a virtual viewport that provides wrapper-based positioning.
+ * Components implementing this interface provide a content wrapper with
+ * GPU-accelerated transform positioning for efficient virtual scrolling.
+ */
+export interface VdndVirtualViewport {
+  /** Current scroll position */
+  scrollTop(): number;
+
+  /** Height of the viewport container */
+  containerHeight(): number;
+
+  /** Height of each item in pixels */
+  itemHeight(): number;
+
+  /** Total number of items */
+  totalItems(): number;
+
+  /** Offset for content below headers (page-level scroll scenarios) */
+  contentOffset(): number;
+
+  /** The native element of the viewport */
+  readonly nativeElement: HTMLElement;
+
+  /**
+   * Called by VirtualForDirective to inform the viewport of the actual
+   * first rendered item index (accounting for overscan). The viewport
+   * uses this to position the content wrapper correctly.
+   */
+  setRenderStartIndex(index: number): void;
+}
+
+/**
+ * Injection token for virtual viewport.
+ * VirtualForDirective optionally injects this to detect if it's inside
+ * a viewport component that handles wrapper-based positioning.
+ */
+export const VDND_VIRTUAL_VIEWPORT = new InjectionToken<VdndVirtualViewport>(
+  'VDND_VIRTUAL_VIEWPORT',
+);

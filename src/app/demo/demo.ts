@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { JsonPipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import {
   DraggableDirective,
   DragPreviewComponent,
@@ -8,7 +9,6 @@ import {
   DroppableDirective,
   DroppableGroupDirective,
   moveItem,
-  PlaceholderComponent,
   VirtualScrollContainerComponent,
   VirtualSortableListComponent,
 } from 'ngx-virtual-dnd';
@@ -27,13 +27,13 @@ interface Item {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     JsonPipe,
+    RouterLink,
     DragPreviewComponent,
     DraggableDirective,
     DroppableDirective,
     DroppableGroupDirective,
     VirtualScrollContainerComponent,
     VirtualSortableListComponent,
-    PlaceholderComponent,
   ],
   template: `
     <div class="demo-page">
@@ -57,6 +57,7 @@ interface Item {
             <span class="logo-text">ngx-virtual-dnd</span>
           </div>
           <p class="tagline">High-performance drag & drop with virtual scrolling</p>
+          <a routerLink="/page-scroll" class="demo-link"> View Page-Level Scroll Demo → </a>
         </div>
       </header>
 
@@ -181,16 +182,6 @@ interface Item {
                     />
                     <span class="checkbox-text">Enable dragging</span>
                   </label>
-                  <label class="checkbox-label">
-                    <input
-                      type="checkbox"
-                      class="checkbox"
-                      [checked]="showVisiblePlaceholder()"
-                      (change)="toggleVisiblePlaceholder($event)"
-                      data-testid="visible-placeholder-checkbox"
-                    />
-                    <span class="checkbox-text">Show placeholder border</span>
-                  </label>
                 </div>
 
                 <!-- API Mode -->
@@ -226,47 +217,35 @@ interface Item {
           }
         </section>
 
-        <!-- Custom placeholder template -->
-        <ng-template #visiblePlaceholderTpl let-height>
-          <div class="visible-placeholder"></div>
-        </ng-template>
-
         <!-- Lists Section -->
         <section class="lists-section">
           @if (useSimplifiedApi()) {
             <!-- SIMPLIFIED API -->
             <div class="lists-container" vdndGroup="demo">
-              <ng-template #simplifiedItemTpl let-item let-isPlaceholder="isPlaceholder">
-                @if (isPlaceholder) {
-                  <vdnd-placeholder
-                    [height]="50"
-                    [template]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined"
-                  />
-                } @else {
-                  <div
-                    class="item"
-                    [class.use-handle]="useDragHandle()"
-                    [style.--item-color]="item.color"
-                    vdndDraggable="{{ item.id }}"
-                    [vdndDraggableData]="item"
-                    [lockAxis]="lockAxis()"
-                    [disabled]="!dragEnabled()"
-                    [dragDelay]="dragDelay()"
-                    [dragHandle]="useDragHandle() ? '.item-handle' : undefined"
-                  >
-                    <span class="item-handle">
-                      <svg viewBox="0 0 24 24" fill="currentColor">
-                        <circle cx="9" cy="6" r="1.5" />
-                        <circle cx="15" cy="6" r="1.5" />
-                        <circle cx="9" cy="12" r="1.5" />
-                        <circle cx="15" cy="12" r="1.5" />
-                        <circle cx="9" cy="18" r="1.5" />
-                        <circle cx="15" cy="18" r="1.5" />
-                      </svg>
-                    </span>
-                    <span class="item-text">{{ item.name }}</span>
-                  </div>
-                }
+              <ng-template #simplifiedItemTpl let-item>
+                <div
+                  class="item"
+                  [class.use-handle]="useDragHandle()"
+                  [style.--item-color]="item.color"
+                  vdndDraggable="{{ item.id }}"
+                  [vdndDraggableData]="item"
+                  [lockAxis]="lockAxis()"
+                  [disabled]="!dragEnabled()"
+                  [dragDelay]="dragDelay()"
+                  [dragHandle]="useDragHandle() ? '.item-handle' : undefined"
+                >
+                  <span class="item-handle">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <circle cx="9" cy="6" r="1.5" />
+                      <circle cx="15" cy="6" r="1.5" />
+                      <circle cx="9" cy="12" r="1.5" />
+                      <circle cx="15" cy="12" r="1.5" />
+                      <circle cx="9" cy="18" r="1.5" />
+                      <circle cx="15" cy="18" r="1.5" />
+                    </svg>
+                  </span>
+                  <span class="item-text">{{ item.name }}</span>
+                </div>
               </ng-template>
 
               <div class="list-card">
@@ -283,9 +262,6 @@ interface Item {
                   [containerHeight]="400"
                   [itemIdFn]="getItemId"
                   [itemTemplate]="simplifiedItemTpl"
-                  [placeholderTemplate]="
-                    showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined
-                  "
                   (drop)="onDropSimplified($event)"
                 />
               </div>
@@ -304,9 +280,6 @@ interface Item {
                   [containerHeight]="400"
                   [itemIdFn]="getItemId"
                   [itemTemplate]="simplifiedItemTpl"
-                  [placeholderTemplate]="
-                    showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined
-                  "
                   (drop)="onDropSimplified($event)"
                 />
               </div>
@@ -314,38 +287,31 @@ interface Item {
           } @else {
             <!-- VERBOSE API -->
             <div class="lists-container">
-              <ng-template #itemTpl let-item let-index="index" let-isPlaceholder="isPlaceholder">
-                @if (isPlaceholder || item.isPlaceholder) {
-                  <vdnd-placeholder
-                    [height]="50"
-                    [template]="showVisiblePlaceholder() ? visiblePlaceholderTpl : undefined"
-                  />
-                } @else {
-                  <div
-                    class="item"
-                    [class.use-handle]="useDragHandle()"
-                    [style.--item-color]="item.color"
-                    vdndDraggable="{{ item.id }}"
-                    vdndDraggableGroup="demo"
-                    [vdndDraggableData]="item"
-                    [lockAxis]="lockAxis()"
-                    [disabled]="!dragEnabled()"
-                    [dragDelay]="dragDelay()"
-                    [dragHandle]="useDragHandle() ? '.item-handle' : undefined"
-                  >
-                    <span class="item-handle">
-                      <svg viewBox="0 0 24 24" fill="currentColor">
-                        <circle cx="9" cy="6" r="1.5" />
-                        <circle cx="15" cy="6" r="1.5" />
-                        <circle cx="9" cy="12" r="1.5" />
-                        <circle cx="15" cy="12" r="1.5" />
-                        <circle cx="9" cy="18" r="1.5" />
-                        <circle cx="15" cy="18" r="1.5" />
-                      </svg>
-                    </span>
-                    <span class="item-text">{{ item.name }}</span>
-                  </div>
-                }
+              <ng-template #itemTpl let-item let-index="index">
+                <div
+                  class="item"
+                  [class.use-handle]="useDragHandle()"
+                  [style.--item-color]="item.color"
+                  vdndDraggable="{{ item.id }}"
+                  vdndDraggableGroup="demo"
+                  [vdndDraggableData]="item"
+                  [lockAxis]="lockAxis()"
+                  [disabled]="!dragEnabled()"
+                  [dragDelay]="dragDelay()"
+                  [dragHandle]="useDragHandle() ? '.item-handle' : undefined"
+                >
+                  <span class="item-handle">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <circle cx="9" cy="6" r="1.5" />
+                      <circle cx="15" cy="6" r="1.5" />
+                      <circle cx="9" cy="12" r="1.5" />
+                      <circle cx="15" cy="12" r="1.5" />
+                      <circle cx="9" cy="18" r="1.5" />
+                      <circle cx="15" cy="18" r="1.5" />
+                    </svg>
+                  </span>
+                  <span class="item-text">{{ item.name }}</span>
+                </div>
               </ng-template>
 
               <div class="list-card">
@@ -362,7 +328,7 @@ interface Item {
                   <vdnd-virtual-scroll
                     class="virtual-scroll-container"
                     droppableId="list-1"
-                    [items]="list1WithPlaceholder()"
+                    [items]="list1()"
                     [itemHeight]="50"
                     [stickyItemIds]="stickyIds()"
                     [itemIdFn]="getItemId"
@@ -386,7 +352,7 @@ interface Item {
                   <vdnd-virtual-scroll
                     class="virtual-scroll-container"
                     droppableId="list-2"
-                    [items]="list2WithPlaceholder()"
+                    [items]="list2()"
                     [itemHeight]="50"
                     [stickyItemIds]="stickyIds()"
                     [itemIdFn]="getItemId"
@@ -547,6 +513,22 @@ interface Item {
       margin: 0;
       font-size: var(--text-base);
       opacity: 0.9;
+    }
+
+    .demo-link {
+      display: inline-block;
+      margin-top: var(--space-md);
+      padding: var(--space-sm) var(--space-md);
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: var(--radius);
+      color: white;
+      text-decoration: none;
+      font-size: var(--text-sm);
+      transition: background 0.2s;
+    }
+
+    .demo-link:hover {
+      background: rgba(255, 255, 255, 0.25);
     }
 
     /* ========================================
@@ -934,15 +916,6 @@ interface Item {
       color: rgb(0 0 0 / 0.8);
     }
 
-    .visible-placeholder {
-      width: 100%;
-      height: 100%;
-      border: 2px dashed var(--color-primary);
-      border-radius: var(--radius);
-      background: var(--color-primary-light);
-      box-sizing: border-box;
-    }
-
     /* ========================================
        Debug Panel
        ======================================== */
@@ -1048,9 +1021,6 @@ export class DemoComponent {
   /** Whether to use drag handle (only handle initiates drag) */
   readonly useDragHandle = signal(false);
 
-  /** Whether to show a visible placeholder (with border) instead of transparent */
-  readonly showVisiblePlaceholder = signal(false);
-
   /** Whether to use the simplified API (VirtualSortableListComponent + moveItem) */
   readonly useSimplifiedApi = signal(false);
 
@@ -1070,16 +1040,6 @@ export class DemoComponent {
   readonly stickyIds = computed(() => {
     const draggedItem = this.#dragState.draggedItem();
     return draggedItem ? [draggedItem.draggableId] : [];
-  });
-
-  /** List 1 with placeholder inserted */
-  readonly list1WithPlaceholder = computed(() => {
-    return this.insertPlaceholder(this.list1(), 'list-1');
-  });
-
-  /** List 2 with placeholder inserted */
-  readonly list2WithPlaceholder = computed(() => {
-    return this.insertPlaceholder(this.list2(), 'list-2');
   });
 
   /** Debug state for display */
@@ -1173,48 +1133,10 @@ export class DemoComponent {
     }
   }
 
-  /** Toggle visible placeholder setting */
-  toggleVisiblePlaceholder(event: Event): void {
-    const checkbox = event.target as HTMLInputElement;
-    this.showVisiblePlaceholder.set(checkbox.checked);
-  }
-
   /** Toggle drag handle setting */
   toggleDragHandle(event: Event): void {
     const checkbox = event.target as HTMLInputElement;
     this.useDragHandle.set(checkbox.checked);
-  }
-
-  /** Insert placeholder into list if this is the active droppable */
-  private insertPlaceholder(
-    items: Item[],
-    droppableId: string,
-  ): (Item | { isPlaceholder: true; id: string })[] {
-    const activeDroppable = this.#dragState.activeDroppableId();
-    const placeholderIndex = this.#dragState.placeholderIndex();
-
-    if (activeDroppable !== droppableId || placeholderIndex === null) {
-      return items;
-    }
-
-    const result: (Item | { isPlaceholder: true; id: string })[] = [];
-
-    // Use index-based insertion for stable positioning
-    const insertAt = Math.max(0, Math.min(placeholderIndex, items.length));
-
-    for (let i = 0; i < items.length; i++) {
-      if (i === insertAt) {
-        result.push({ isPlaceholder: true, id: 'placeholder' });
-      }
-      result.push(items[i]);
-    }
-
-    // If inserting at end
-    if (insertAt >= items.length) {
-      result.push({ isPlaceholder: true, id: 'placeholder' });
-    }
-
-    return result;
   }
 
   /** Handle drop events (verbose API) */
@@ -1262,15 +1184,12 @@ export class DemoComponent {
   }
 
   /** Track by function for items */
-  readonly trackById = (
-    index: number,
-    item: Item | { isPlaceholder: true; id: string },
-  ): string => {
+  readonly trackById = (_index: number, item: Item): string => {
     return item.id;
   };
 
   /** Get item ID */
-  readonly getItemId = (item: Item | { isPlaceholder: true; id: string }): string => {
+  readonly getItemId = (item: Item): string => {
     return item.id;
   };
 }

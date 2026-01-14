@@ -54,6 +54,7 @@ import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.ser
   providers: [{ provide: VDND_SCROLL_CONTAINER, useExisting: ScrollableDirective }],
   host: {
     class: 'vdnd-scrollable',
+    '[style.overflow-anchor]': '"none"',
   },
 })
 export class ScrollableDirective implements VdndScrollContainer, OnInit, OnDestroy {
