@@ -295,7 +295,7 @@ When modifying public API (exports in `public-api.ts`):
 
 **Locations:**
 
-1. `README.md` (`/projects/ngx-virtual-dnd/README.md`)
+1. `README.md` (`/README.md`)
 2. JSDoc comments on public exports
 
 **Note:** CHANGELOG.md is auto-generated - do NOT manually edit.
