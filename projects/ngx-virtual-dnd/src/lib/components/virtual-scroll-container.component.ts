@@ -4,6 +4,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   effect,
   ElementRef,
   inject,
@@ -17,7 +18,9 @@ import {
   TemplateRef,
   viewChild,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
+import { fromEvent } from 'rxjs';
 import { DragStateService } from '../services/drag-state.service';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
 import { PlaceholderContext } from './placeholder.component';
@@ -89,7 +92,6 @@ export interface VisibleRangeChange {
     '[style.overflow]': '"auto"',
     '[style.position]': '"relative"',
     '[attr.data-item-height]': 'itemHeight()',
-    '(scroll)': 'onScroll($event)',
   },
   template: `
     <div class="vdnd-virtual-scroll-content" #contentContainer>
@@ -158,6 +160,7 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   readonly #autoScrollService = inject(AutoScrollService);
   readonly #ngZone = inject(NgZone);
   readonly #injector = inject(Injector);
+  readonly #destroyRef = inject(DestroyRef);
 
   /** ResizeObserver for automatic height detection */
   #resizeObserver: ResizeObserver | null = null;
@@ -333,27 +336,32 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
     return this.#dragState.draggedItem()?.draggableId ?? null;
   });
 
+  /** Map of item IDs to their indices - rebuilt only when items() changes (O(n) once, then O(1) lookups) */
+  readonly #itemIndexMap = computed(() => {
+    const items = this.items();
+    const idFn = this.itemIdFn();
+    const map = new Map<string, number>();
+    for (let i = 0; i < items.length; i++) {
+      map.set(idFn(items[i]), i);
+    }
+    return map;
+  });
+
   /** The index of the currently dragged item in the items array (-1 if not found or not dragging) */
   readonly #draggedItemIndex = computed(() => {
     const draggedId = this.draggedItemId();
     if (!draggedId) return -1;
-
-    const items = this.items();
-    const idFn = this.itemIdFn();
-
-    for (let i = 0; i < items.length; i++) {
-      if (idFn(items[i]) === draggedId) {
-        return i;
-      }
-    }
-    return -1;
+    return this.#itemIndexMap().get(draggedId) ?? -1;
   });
+
+  /** Memoized Set of sticky IDs - rebuilt only when effectiveStickyIds() changes */
+  readonly #stickyIdsSet = computed(() => new Set(this.effectiveStickyIds()));
 
   /** Items to render, including sticky items and auto-placeholder */
   protected readonly renderedItems = computed(() => {
     const items = this.items();
     const { start, end } = this.#renderRange();
-    const stickyIds = new Set(this.effectiveStickyIds());
+    const stickyIds = this.#stickyIdsSet();
     const idFn = this.itemIdFn();
     const draggedId = this.draggedItemId();
 
@@ -566,6 +574,21 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
         }
       });
       this.#resizeObserver.observe(this.#elementRef.nativeElement);
+
+      // Set up scroll listener outside Angular zone using RxJS fromEvent
+      // This avoids template event binding which would mark the component dirty 60x/sec
+      fromEvent(this.#elementRef.nativeElement, 'scroll', { passive: true })
+        .pipe(takeUntilDestroyed(this.#destroyRef))
+        .subscribe(() => {
+          const newScrollTop = this.#elementRef.nativeElement.scrollTop;
+          // Only update if the scroll position has changed significantly
+          // (at least 10% of an item height, to reduce updates)
+          const threshold = Math.max(5, this.itemHeight() * 0.1);
+          if (Math.abs(newScrollTop - this.#scrollTop()) >= threshold) {
+            this.#scrollTop.set(newScrollTop);
+            this.scrollPositionChange.emit(newScrollTop);
+          }
+        });
     });
   }
 
@@ -576,22 +599,6 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
     // Unregister from auto-scroll service
     const id = this.scrollContainerId() ?? this.#generatedScrollId;
     this.#autoScrollService.unregisterContainer(id);
-  }
-
-  /**
-   * Handle scroll events.
-   */
-  protected onScroll(event: Event): void {
-    const target = event.target as HTMLElement;
-    const newScrollTop = target.scrollTop;
-
-    // Only update if the scroll position has changed significantly
-    // (at least 10% of an item height, to reduce updates)
-    const threshold = Math.max(5, this.itemHeight() * 0.1);
-    if (Math.abs(newScrollTop - this.#scrollTop()) >= threshold) {
-      this.#scrollTop.set(newScrollTop);
-      this.scrollPositionChange.emit(newScrollTop);
-    }
   }
 
   /**

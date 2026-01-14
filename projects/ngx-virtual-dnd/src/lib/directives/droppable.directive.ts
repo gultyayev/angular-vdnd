@@ -8,6 +8,7 @@ import {
   OnDestroy,
   OnInit,
   output,
+  untracked,
 } from '@angular/core';
 import { DragStateService } from '../services/drag-state.service';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
@@ -175,8 +176,8 @@ export class DroppableDirective implements OnInit, OnDestroy {
       const active = this.isActive();
       const placeholder = this.placeholderId();
       const draggedItem = this.#dragState.draggedItem();
-      const cursorPosition = this.#dragState.cursorPosition();
       const isDragging = this.#dragState.isDragging();
+      // NOTE: cursorPosition is read with untracked() below to avoid effect running 60x/sec
 
       // Cache state while active for use during drop handling
       if (active && isDragging && draggedItem) {
@@ -218,13 +219,18 @@ export class DroppableDirective implements OnInit, OnDestroy {
 
       // Handle over (placeholder changed)
       if (active && placeholder !== this.#previousPlaceholder) {
-        if (draggedItem && cursorPosition) {
-          this.dragOver.emit({
-            droppableId: this.vdndDroppable(),
-            draggedItem,
-            placeholderId: placeholder,
-            position: cursorPosition,
-          });
+        if (draggedItem) {
+          // Use untracked() to read cursorPosition without tracking it as a dependency
+          // This prevents the effect from running on every cursor move (60Hz during autoscroll)
+          const cursorPosition = untracked(() => this.#dragState.cursorPosition());
+          if (cursorPosition) {
+            this.dragOver.emit({
+              droppableId: this.vdndDroppable(),
+              draggedItem,
+              placeholderId: placeholder,
+              position: cursorPosition,
+            });
+          }
         }
       }
 

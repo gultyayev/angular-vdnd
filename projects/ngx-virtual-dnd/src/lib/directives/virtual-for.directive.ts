@@ -225,7 +225,8 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   }
 
   /**
-   * Update the rendered views.
+   * Update the rendered views with true view recycling.
+   * Views are kept in the DOM and have their context updated in place when possible.
    */
   #updateViews(): void {
     const items = this.vdndVirtualForOf();
@@ -233,112 +234,128 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
     const trackByFn = this.vdndVirtualForTrackBy();
     const placeholderIndex = this.#placeholderIndex();
 
-    // Clear view container but keep views in pool
-    this.#activeViews.forEach((view) => {
-      this.#viewPool.push(view);
-    });
-    this.#activeViews.clear();
-    this.#viewContainer.clear();
+    // 1. Calculate which keys we need and build the ordered list of items to render
+    const itemsToRender: { key: unknown; context: VirtualForContext<T> }[] = [];
 
-    // Clear wrapper content
-    if (this.#wrapper) {
-      this.#wrapper.innerHTML = '';
-    }
-
-    const viewsToRender: EmbeddedViewRef<VirtualForContext<T>>[] = [];
-
-    // Render items in range with placeholder
     for (let i = start; i <= end && i < items.length; i++) {
       // Insert placeholder before this item if needed
       if (placeholderIndex !== null && placeholderIndex === i) {
-        const placeholderContext: VirtualForContext<T> = {
-          $implicit: { __vdndPlaceholder: true } as unknown as T,
-          index: -1,
-          first: false,
-          last: false,
-          count: items.length,
-          isPlaceholder: true,
-        };
-        const placeholderView = this.#getOrCreateView('__placeholder__', placeholderContext);
-        viewsToRender.push(placeholderView);
+        itemsToRender.push({
+          key: '__placeholder__',
+          context: {
+            $implicit: { __vdndPlaceholder: true } as unknown as T,
+            index: -1,
+            first: false,
+            last: false,
+            count: items.length,
+            isPlaceholder: true,
+          },
+        });
       }
 
       const item = items[i];
-      const key = trackByFn(i, item);
-      const context: VirtualForContext<T> = {
-        $implicit: item,
-        index: i,
-        first: i === start,
-        last: i === end || i === items.length - 1,
-        count: items.length,
-        isPlaceholder: false,
-      };
-
-      const view = this.#getOrCreateView(key, context);
-      viewsToRender.push(view);
+      itemsToRender.push({
+        key: trackByFn(i, item),
+        context: {
+          $implicit: item,
+          index: i,
+          first: i === start,
+          last: i === end || i === items.length - 1,
+          count: items.length,
+          isPlaceholder: false,
+        },
+      });
     }
 
     // Insert placeholder at end if needed
     if (placeholderIndex !== null && placeholderIndex >= items.length) {
-      const placeholderContext: VirtualForContext<T> = {
-        $implicit: { __vdndPlaceholder: true } as unknown as T,
-        index: -1,
-        first: false,
-        last: true,
-        count: items.length,
-        isPlaceholder: true,
-      };
-      const placeholderView = this.#getOrCreateView('__placeholder__', placeholderContext);
-      viewsToRender.push(placeholderView);
+      itemsToRender.push({
+        key: '__placeholder__',
+        context: {
+          $implicit: { __vdndPlaceholder: true } as unknown as T,
+          index: -1,
+          first: false,
+          last: true,
+          count: items.length,
+          isPlaceholder: true,
+        },
+      });
     }
 
-    // Insert views into ViewContainerRef (for change detection) and move root nodes to wrapper
-    viewsToRender.forEach((view, index) => {
-      this.#viewContainer.insert(view, index);
+    const neededKeys = new Set(itemsToRender.map((item) => item.key));
 
-      // Move view's root nodes into the wrapper for transform-based positioning
-      if (this.#wrapper) {
-        view.rootNodes.forEach((node) => {
-          this.#wrapper!.appendChild(node);
-        });
+    // 2. Remove views we no longer need (move to pool)
+    for (const [key, view] of this.#activeViews) {
+      if (!neededKeys.has(key)) {
+        const index = this.#viewContainer.indexOf(view);
+        if (index >= 0) {
+          this.#viewContainer.detach(index);
+        }
+        this.#viewPool.push(view);
+        this.#activeViews.delete(key);
       }
-    });
+    }
 
-    // Destroy unused views in pool (keep some for reuse)
+    // 3. For each needed item, update existing view context or get/create from pool
+    const viewsInOrder: EmbeddedViewRef<VirtualForContext<T>>[] = [];
+
+    for (const { key, context } of itemsToRender) {
+      let view = this.#activeViews.get(key);
+
+      if (view) {
+        // View exists - update context in place (no DOM manipulation needed)
+        Object.assign(view.context, context);
+        view.markForCheck();
+      } else {
+        // Need a new view - try pool first, then create
+        view = this.#viewPool.pop();
+        if (view) {
+          Object.assign(view.context, context);
+          view.markForCheck();
+        } else {
+          view = this.#templateRef.createEmbeddedView(context);
+        }
+        this.#activeViews.set(key, view);
+      }
+
+      viewsInOrder.push(view);
+    }
+
+    // 4. Ensure views are in correct order in ViewContainerRef and wrapper
+    for (let i = 0; i < viewsInOrder.length; i++) {
+      const view = viewsInOrder[i];
+      const currentIndex = this.#viewContainer.indexOf(view);
+
+      if (currentIndex !== i) {
+        // View needs to be inserted or moved
+        if (currentIndex >= 0) {
+          this.#viewContainer.move(view, i);
+        } else {
+          this.#viewContainer.insert(view, i);
+        }
+      }
+
+      // Ensure view's root nodes are in the wrapper (for newly inserted views)
+      if (this.#wrapper) {
+        const expectedChild = this.#wrapper.children[i];
+        for (const node of view.rootNodes) {
+          if (node instanceof HTMLElement && node !== expectedChild) {
+            // Node is not at expected position, insert it
+            if (expectedChild) {
+              this.#wrapper.insertBefore(node, expectedChild);
+            } else {
+              this.#wrapper.appendChild(node);
+            }
+          }
+        }
+      }
+    }
+
+    // 5. Destroy unused views in pool (keep some for reuse)
     while (this.#viewPool.length > 10) {
       const view = this.#viewPool.pop();
       view?.destroy();
     }
-  }
-
-  /**
-   * Get an existing view from pool or create a new one.
-   */
-  #getOrCreateView(
-    key: unknown,
-    context: VirtualForContext<T>,
-  ): EmbeddedViewRef<VirtualForContext<T>> {
-    // Check if we have this view active already
-    let view = this.#activeViews.get(key);
-    if (view) {
-      // Update context
-      Object.assign(view.context, context);
-      view.markForCheck();
-      return view;
-    }
-
-    // Try to reuse from pool
-    view = this.#viewPool.pop();
-    if (view) {
-      Object.assign(view.context, context);
-      view.markForCheck();
-    } else {
-      // Create new view
-      view = this.#templateRef.createEmbeddedView(context);
-    }
-
-    this.#activeViews.set(key, view);
-    return view;
   }
 
   /**
