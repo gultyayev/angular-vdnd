@@ -10,6 +10,10 @@ import {
 } from '@angular/core';
 import { VDND_SCROLL_CONTAINER, VdndScrollContainer } from '../tokens/scroll-container.token';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
+import {
+  bindRafThrottledScrollTopSignal,
+  bindResizeObserverHeightSignal,
+} from '../utils/dom-signal-bindings';
 
 /**
  * Directive that marks an element as a scrollable container for virtual scrolling.
@@ -70,15 +74,7 @@ export class ScrollableDirective implements VdndScrollContainer, OnInit, OnDestr
 
   /** Cleanup function for scroll listener */
   #scrollCleanup: (() => void) | null = null;
-
-  /** Pending RAF ID for scroll throttling */
-  #pendingScrollRaf: number | null = null;
-
-  /** Last scroll position committed to signal (for threshold check) */
-  #lastCommittedScrollTop = 0;
-
-  /** ResizeObserver for container height detection */
-  #resizeObserver: ResizeObserver | null = null;
+  #resizeCleanup: (() => void) | null = null;
 
   /** Generated ID for auto-scroll registration */
   #generatedScrollId = `vdnd-scroll-${Math.random().toString(36).slice(2, 9)}`;
@@ -137,7 +133,7 @@ export class ScrollableDirective implements VdndScrollContainer, OnInit, OnDestr
 
   ngOnDestroy(): void {
     this.#scrollCleanup?.();
-    this.#resizeObserver?.disconnect();
+    this.#resizeCleanup?.();
     this.#unregisterAutoScroll();
   }
 
@@ -147,68 +143,21 @@ export class ScrollableDirective implements VdndScrollContainer, OnInit, OnDestr
   readonly #scrollThreshold = 5;
 
   #setupScrollListener(): void {
-    // Throttled scroll handler: combines threshold check + RAF coalescing
-    // No ngZone.run() needed - signals work outside zone and effects react automatically
-    const onScroll = () => {
-      // Skip if already have a pending update
-      if (this.#pendingScrollRaf !== null) {
-        return;
-      }
-
-      const currentScrollTop = this.nativeElement.scrollTop;
-
-      // Apply threshold check to avoid excessive updates
-      if (Math.abs(currentScrollTop - this.#lastCommittedScrollTop) < this.#scrollThreshold) {
-        return;
-      }
-
-      // Schedule update via RAF to coalesce multiple scroll events
-      this.#pendingScrollRaf = requestAnimationFrame(() => {
-        this.#pendingScrollRaf = null;
-        const finalScrollTop = this.nativeElement.scrollTop;
-
-        // Double-check threshold in case scroll reversed
-        if (Math.abs(finalScrollTop - this.#lastCommittedScrollTop) >= this.#scrollThreshold) {
-          this.#lastCommittedScrollTop = finalScrollTop;
-          this.#scrollTop.set(finalScrollTop);
-        }
-      });
-    };
-
-    this.#ngZone.runOutsideAngular(() => {
-      this.nativeElement.addEventListener('scroll', onScroll, { passive: true });
+    this.#scrollCleanup = bindRafThrottledScrollTopSignal({
+      element: this.nativeElement,
+      ngZone: this.#ngZone,
+      scrollTop: this.#scrollTop,
+      thresholdPx: this.#scrollThreshold,
     });
-
-    this.#scrollCleanup = () => {
-      if (this.#pendingScrollRaf !== null) {
-        cancelAnimationFrame(this.#pendingScrollRaf);
-        this.#pendingScrollRaf = null;
-      }
-      this.nativeElement.removeEventListener('scroll', onScroll);
-    };
-
-    // Set initial scroll position
-    this.#lastCommittedScrollTop = this.nativeElement.scrollTop;
-    this.#scrollTop.set(this.nativeElement.scrollTop);
   }
 
   #setupResizeObserver(): void {
-    // No ngZone.run() needed - signals work outside zone and effects react automatically
-    this.#ngZone.runOutsideAngular(() => {
-      this.#resizeObserver = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          const height = entry.contentRect.height;
-          // Only update if height changed significantly (> 1px) to avoid loops
-          if (Math.abs(height - this.#containerHeight()) > 1) {
-            this.#containerHeight.set(height);
-          }
-        }
-      });
-      this.#resizeObserver.observe(this.nativeElement);
+    this.#resizeCleanup = bindResizeObserverHeightSignal({
+      element: this.nativeElement,
+      ngZone: this.#ngZone,
+      height: this.#containerHeight,
+      minDeltaPx: 1,
     });
-
-    // Set initial height
-    this.#containerHeight.set(this.nativeElement.clientHeight);
   }
 
   #registerAutoScroll(): void {

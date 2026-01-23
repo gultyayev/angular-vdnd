@@ -19,7 +19,6 @@ import {
   DroppableGroupDirective,
   DraggableDirective,
   DragPreviewComponent,
-  PlaceholderComponent,
   DropEvent,
   moveItem,
 } from 'ngx-virtual-dnd';
@@ -36,18 +35,13 @@ interface Item {
     DroppableGroupDirective,
     DraggableDirective,
     DragPreviewComponent,
-    PlaceholderComponent,
   ],
   template: `
     <!-- Item template -->
-    <ng-template #itemTpl let-item let-isPlaceholder="isPlaceholder">
-      @if (isPlaceholder) {
-        <vdnd-placeholder [height]="50" />
-      } @else {
-        <div class="item" vdndDraggable="{{ item.id }}" [vdndDraggableData]="item">
-          {{ item.name }}
-        </div>
-      }
+    <ng-template #itemTpl let-item>
+      <div class="item" [vdndDraggable]="item.id" [vdndDraggableData]="item">
+        {{ item.name }}
+      </div>
     </ng-template>
 
     <!-- Wrap lists in a group -->
@@ -96,17 +90,12 @@ Use `moveItem` with multiple lists for cross-list drag-and-drop:
     DroppableGroupDirective,
     DraggableDirective,
     DragPreviewComponent,
-    PlaceholderComponent,
   ],
   template: `
-    <ng-template #itemTpl let-item let-isPlaceholder="isPlaceholder">
-      @if (isPlaceholder) {
-        <vdnd-placeholder [height]="50" />
-      } @else {
-        <div class="item" vdndDraggable="{{ item.id }}" [vdndDraggableData]="item">
-          {{ item.name }}
-        </div>
-      }
+    <ng-template #itemTpl let-item>
+      <div class="item" [vdndDraggable]="item.id" [vdndDraggableData]="item">
+        {{ item.name }}
+      </div>
     </ng-template>
 
     <div vdndGroup="kanban" class="lists-container">
@@ -156,14 +145,12 @@ export class KanbanComponent {
 For maximum control, use individual components instead of `VirtualSortableListComponent`:
 
 ```typescript
-import { Component, signal, computed, inject } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import {
   VirtualScrollContainerComponent,
   DraggableDirective,
   DroppableDirective,
   DragPreviewComponent,
-  PlaceholderComponent,
-  DragStateService,
   DropEvent,
   reorderItems,
 } from 'ngx-virtual-dnd';
@@ -174,22 +161,17 @@ import {
     DraggableDirective,
     DroppableDirective,
     DragPreviewComponent,
-    PlaceholderComponent,
   ],
   template: `
-    <ng-template #itemTpl let-item let-isPlaceholder="isPlaceholder">
-      @if (isPlaceholder) {
-        <vdnd-placeholder [height]="50" />
-      } @else {
-        <div
-          class="item"
-          vdndDraggable="{{ item.id }}"
-          vdndDraggableGroup="my-group"
-          [vdndDraggableData]="item"
-        >
-          {{ item.name }}
-        </div>
-      }
+    <ng-template #itemTpl let-item>
+      <div
+        class="item"
+        [vdndDraggable]="item.id"
+        vdndDraggableGroup="my-group"
+        [vdndDraggableData]="item"
+      >
+        {{ item.name }}
+      </div>
     </ng-template>
 
     <div vdndDroppable="my-list" vdndDroppableGroup="my-group" (drop)="onDrop($event)">
@@ -253,16 +235,14 @@ Customize the preview that follows the cursor:
 
 ## Custom Placeholder
 
-Style the drop indicator in your item template:
+Style the drop indicator via CSS (the library renders it with `.vdnd-drag-placeholder-visible`):
 
-```html
-<ng-template #itemTpl let-item let-isPlaceholder="isPlaceholder">
-  @if (isPlaceholder) {
-  <div class="my-placeholder">Drop here</div>
-  } @else {
-  <div class="item" vdndDraggable="{{ item.id }}">{{ item.name }}</div>
-  }
-</ng-template>
+```css
+.vdnd-drag-placeholder-visible {
+  background: rgba(0, 0, 0, 0.04);
+  border: 2px dashed rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+}
 ```
 
 ## Auto-scroll Configuration
@@ -543,7 +523,7 @@ export class MyComponent {
 ### Placeholder in wrong position
 
 - When using low-level API, set `droppableId` on `vdnd-virtual-scroll`
-- Check that your item template handles `isPlaceholder` correctly
+- Ensure `itemHeight` matches the rendered item height
 
 ### Dragged item disappears during scroll
 
