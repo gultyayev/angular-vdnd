@@ -81,6 +81,43 @@ test.describe('Axis Lock', () => {
     await page.mouse.up();
   });
 
+  test('should not introduce horizontal offset when X axis is locked and drag starts off-axis', async ({
+    page,
+  }) => {
+    await demoPage.setLockAxis('x');
+
+    const sourceItem = demoPage.list1Items.first();
+    await sourceItem.scrollIntoViewIfNeeded();
+    const sourceBox = await sourceItem.boundingBox();
+
+    if (!sourceBox) {
+      throw new Error('Could not get source item bounding box');
+    }
+
+    const startX = sourceBox.x + sourceBox.width / 2;
+    const startY = sourceBox.y + sourceBox.height / 2;
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+
+    // Move sideways enough to exceed the default drag threshold (5px) in a single event.
+    // The preview should keep its locked axis aligned to the original grab position.
+    const sidewaysDelta = 8;
+    await page.mouse.move(startX + sidewaysDelta, startY, { steps: 1 });
+
+    await demoPage.dragPreview.waitFor({ state: 'visible' });
+    await page.waitForTimeout(50); // Allow layout to settle
+
+    const previewBox = await demoPage.dragPreview.boundingBox();
+    expect(previewBox).not.toBeNull();
+
+    // With X locked, the preview should not shift horizontally from the original element position,
+    // even if the cursor moved horizontally while crossing the drag threshold.
+    expect(Math.abs(previewBox!.x - sourceBox.x)).toBeLessThan(3);
+
+    await page.mouse.up();
+  });
+
   test('should lock vertical movement when axis is set to Y', async ({ page }) => {
     await demoPage.setLockAxis('y');
 

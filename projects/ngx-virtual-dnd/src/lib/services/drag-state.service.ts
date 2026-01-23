@@ -99,7 +99,7 @@ export class DragStateService {
    */
   startDrag(
     item: DraggedItem,
-    initialPosition?: CursorPosition,
+    cursorPosition?: CursorPosition,
     grabOffset?: GrabOffset,
     lockAxis?: 'x' | 'y' | null,
     activeDroppableId?: string | null,
@@ -107,6 +107,7 @@ export class DragStateService {
     placeholderIndex?: number | null,
     sourceIndex?: number | null,
     isKeyboardDrag?: boolean,
+    axisLockPosition?: CursorPosition,
   ): void {
     // Reset cancellation flag at start of new drag
     this.#wasCancelled.set(false);
@@ -118,9 +119,9 @@ export class DragStateService {
       activeDroppableId: activeDroppableId ?? null,
       placeholderId: placeholderId ?? null,
       placeholderIndex: placeholderIndex ?? null,
-      cursorPosition: initialPosition ?? null,
+      cursorPosition: cursorPosition ?? null,
       grabOffset: grabOffset ?? null,
-      initialPosition: initialPosition ?? null,
+      initialPosition: axisLockPosition ?? cursorPosition ?? null,
       lockAxis: lockAxis ?? null,
       isKeyboardDrag: isKeyboardDrag ?? false,
       keyboardTargetIndex: isKeyboardDrag ? (sourceIndex ?? 0) : null,
