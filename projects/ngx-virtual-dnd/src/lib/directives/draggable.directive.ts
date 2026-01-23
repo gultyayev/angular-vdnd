@@ -755,6 +755,8 @@ export class DraggableDirective implements OnInit, OnDestroy {
       initialPlaceholderId = indexResult.placeholderId;
     }
 
+    const lockAxis = this.lockAxis();
+
     // Register with drag state service - this triggers isDragging computed to become true
     // which will apply display:none via host binding
     // No ngZone.run() needed - signals work outside zone and effects react automatically
@@ -770,11 +772,13 @@ export class DraggableDirective implements OnInit, OnDestroy {
       },
       position,
       grabOffset,
-      this.lockAxis(),
+      lockAxis,
       activeDroppableId,
       initialPlaceholderId,
       initialPlaceholderIndex,
       sourceIndex,
+      undefined,
+      lockAxis ? startPos : undefined,
     );
 
     // Start auto-scroll monitoring with a callback to recalculate placeholder
