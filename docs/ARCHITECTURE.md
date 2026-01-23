@@ -9,17 +9,30 @@ This document describes the architecture for the Angular virtual scroll + drag-a
 ├── src/
 │   ├── lib/
 │   │   ├── components/
-│   │   │   ├── virtual-scroll-container.component.ts
-│   │   │   ├── drag-preview.component.ts
-│   │   │   └── placeholder.component.ts
+│   │   │   ├── virtual-scroll-container.component.ts  # Low-level virtual scroll
+│   │   │   ├── virtual-sortable-list.component.ts     # High-level sortable list
+│   │   │   ├── virtual-viewport.component.ts          # Self-contained viewport
+│   │   │   ├── virtual-content.component.ts           # For external scroll containers
+│   │   │   ├── drag-preview.component.ts              # Dragged item preview
+│   │   │   ├── drag-placeholder.component.ts          # Internal placeholder
+│   │   │   └── placeholder.component.ts               # Consumer placeholder
 │   │   ├── directives/
-│   │   │   ├── droppable.directive.ts
-│   │   │   └── draggable.directive.ts
+│   │   │   ├── draggable.directive.ts                 # Makes elements draggable
+│   │   │   ├── droppable.directive.ts                 # Marks drop targets
+│   │   │   ├── droppable-group.directive.ts           # Group context provider
+│   │   │   ├── scrollable.directive.ts                # Marks scroll containers
+│   │   │   └── virtual-for.directive.ts               # Structural directive
 │   │   ├── services/
-│   │   │   ├── drag-state.service.ts
-│   │   │   ├── position-calculator.service.ts
-│   │   │   ├── auto-scroll.service.ts
-│   │   │   └── element-clone.service.ts
+│   │   │   ├── drag-state.service.ts                  # Central state management
+│   │   │   ├── position-calculator.service.ts         # Position calculations
+│   │   │   ├── auto-scroll.service.ts                 # Edge auto-scrolling
+│   │   │   ├── keyboard-drag.service.ts               # Keyboard navigation
+│   │   │   └── element-clone.service.ts               # Clone for preview
+│   │   ├── tokens/
+│   │   │   ├── scroll-container.token.ts              # Scroll container DI
+│   │   │   └── virtual-viewport.token.ts              # Viewport DI
+│   │   ├── utils/
+│   │   │   └── drop-helpers.ts                        # moveItem, reorderItems, etc.
 │   │   ├── models/
 │   │   │   └── drag-drop.models.ts
 │   │   └── index.ts
@@ -224,11 +237,84 @@ getScrollDirection(): { x: number; y: number }
 cloneElement(source: HTMLElement): HTMLElement
 ```
 
+### 5. KeyboardDragService
+
+**Purpose:** Handles keyboard-initiated drag operations for accessibility.
+
+**Key Features:**
+
+- Document-level keyboard listeners during drag (since dragged element is hidden)
+- Arrow key navigation between items and lists
+- Focus restoration after drag ends
+
+**Methods:**
+
+```typescript
+startDrag(element, draggableId, groupName, data?): void
+moveUp(): void
+moveDown(): void
+moveToLeft(): void
+moveToRight(): void
+drop(): void
+cancel(): void
+```
+
+**Keyboard Flow:**
+
+1. User presses Space on focused draggable
+2. Document-level listeners capture arrow keys
+3. Arrow up/down: move within current list
+4. Arrow left/right: move to adjacent list
+5. Space: complete drop
+6. Escape: cancel and restore
+
 ## Core Components
 
-### 1. VirtualScrollContainerComponent
+### 1. VirtualSortableListComponent (High-Level)
 
-**Purpose:** Renders only visible items with proper spacers for scrolling.
+**Purpose:** All-in-one component that combines droppable, virtual scroll, and placeholder functionality. This is the **recommended** entry point for most use cases.
+
+**Selector:** `vdnd-sortable-list`
+
+**Key Features:**
+
+- Automatically handles placeholder insertion
+- Manages sticky items for dragged elements
+- Integrates virtual scrolling with drag-and-drop
+- Wraps VirtualScrollContainerComponent and DroppableDirective
+
+**Inputs:**
+
+```typescript
+droppableId = input.required<string>();
+group = input.required<string>();
+items = input.required<T[]>();
+itemHeight = input.required<number>();
+itemIdFn = input.required<(item: T) => string>();
+itemTemplate = input.required<TemplateRef<VirtualScrollItemContext<T>>>();
+// Optional
+trackByFn = input<(index: number, item: T) => string | number>();
+containerHeight = input<number>();
+overscan = input<number>(3);
+disabled = input<boolean>(false);
+autoScrollEnabled = input<boolean>(true);
+autoScrollConfig = input<Partial<AutoScrollConfig>>({});
+```
+
+**Outputs:**
+
+```typescript
+drop = output<DropEvent>();
+dragEnter = output<DragEnterEvent>();
+dragLeave = output<DragLeaveEvent>();
+dragOver = output<DragOverEvent>();
+visibleRangeChange = output<VisibleRangeChange>();
+scrollPositionChange = output<number>();
+```
+
+### 2. VirtualScrollContainerComponent (Low-Level)
+
+**Purpose:** Renders only visible items with proper spacers for scrolling. Use when you need more control than VirtualSortableListComponent provides.
 
 **Selector:** `vdnd-virtual-scroll`
 
@@ -237,12 +323,15 @@ cloneElement(source: HTMLElement): HTMLElement
 ```typescript
 items = input.required<T[]>();
 itemHeight = input.required<number>();
-containerHeight = input<number | null>(null); // Optional - uses CSS height if null
+itemIdFn = input.required<(item: T) => string>();
+itemTemplate = input.required<TemplateRef<VirtualScrollItemContext<T>>>();
+// Optional
+trackByFn = input<(index: number, item: T) => string | number>();
+containerHeight = input<number>(); // Uses CSS height if null
 overscan = input<number>(3);
 stickyItemIds = input<string[]>([]);
-itemIdFn = input.required<(item: T) => string>();
-trackByFn = input.required<(index: number, item: T) => string | number>();
-itemTemplate = input<TemplateRef<VirtualScrollItemContext<T>>>();
+droppableId = input<string>(); // For auto placeholder insertion
+autoStickyDraggedItem = input<boolean>(true);
 ```
 
 **Outputs:**
@@ -334,7 +423,25 @@ height = input<number>(50);
 
 ## Core Directives
 
-### 1. DraggableDirective
+### 1. DroppableGroupDirective
+
+**Selector:** `[vdndGroup]`
+
+**Purpose:** Provides group context to child draggable and droppable directives, reducing boilerplate.
+
+**Inputs:**
+
+```typescript
+group = input.required<string>({ alias: 'vdndGroup' });
+```
+
+**Key Features:**
+
+- Uses Angular's DI to provide group context via `VDND_GROUP_TOKEN`
+- Child draggables/droppables inherit group automatically
+- Eliminates repetitive `vdndDraggableGroup`/`vdndDroppableGroup` attributes
+
+### 2. DraggableDirective
 
 **Selector:** `[vdndDraggable]`
 
@@ -342,7 +449,7 @@ height = input<number>(50);
 
 ```typescript
 vdndDraggable = input.required<string>(); // Draggable ID
-vdndDraggableGroup = input.required<string>(); // Group name
+vdndDraggableGroup = input<string>(); // Group name (inherited from parent if omitted)
 vdndDraggableData = input<unknown>(); // Optional metadata
 disabled = input<boolean>(false);
 dragHandle = input<string>(); // CSS selector for handle
@@ -365,8 +472,10 @@ dragEnd = output<DragEndEvent>();
 host: {
   '[class.vdnd-draggable]': 'true',
   '[class.vdnd-draggable-dragging]': 'isDragging()',
+  '[class.vdnd-drag-pending]': 'isPending()',
   '[style.display]': 'isDragging() ? "none" : null',  // Hide during drag
   '[attr.aria-grabbed]': 'isDragging()',
+  '[tabindex]': 'disabled() ? -1 : 0',
 }
 ```
 
@@ -378,8 +487,9 @@ host: {
 - requestAnimationFrame throttling for smooth drags
 - Source index calculated BEFORE element hidden
 - Placeholder index calculated via mathematical position
+- Full keyboard support (Space, arrows, Escape)
 
-### 2. DroppableDirective
+### 3. DroppableDirective
 
 **Selector:** `[vdndDroppable]`
 
@@ -387,12 +497,11 @@ host: {
 
 ```typescript
 vdndDroppable = input.required<string>(); // Droppable ID
-vdndDroppableGroup = input.required<string>(); // Group name
+vdndDroppableGroup = input<string>(); // Group name (inherited from parent if omitted)
 vdndDroppableData = input<unknown>(); // Optional metadata
 disabled = input<boolean>(false);
 autoScrollEnabled = input<boolean>(true);
 autoScrollConfig = input<Partial<AutoScrollConfig>>({});
-scrollableHost = input<HTMLElement | null>(null); // Custom scroll container
 ```
 
 **Outputs:**
@@ -422,6 +531,37 @@ host: {
 - Caches drag state for drop handling (state clears before effect fires)
 - Auto-scroll registration
 - Scrollability detection (checks overflow and content size)
+
+### 4. ScrollableDirective
+
+**Selector:** `[vdndScrollable]`
+
+**Purpose:** Marks an external scroll container for use with VirtualForDirective.
+
+**Provides:** `VDND_SCROLL_CONTAINER` token with scroll position and container dimensions.
+
+### 5. VirtualForDirective
+
+**Selector:** `*vdndVirtualFor`
+
+**Purpose:** Structural directive for virtual scrolling with maximum flexibility.
+
+**Inputs (via microsyntax):**
+
+```typescript
+vdndVirtualForOf = input.required<T[]>();
+vdndVirtualForItemHeight = input.required<number>();
+vdndVirtualForTrackBy = input.required<(index: number, item: T) => unknown>();
+vdndVirtualForOverscan = input<number>(3);
+vdndVirtualForDroppableId = input<string>();
+```
+
+**Key Features:**
+
+- True view recycling for performance
+- Automatic placeholder insertion when droppableId is set
+- Works with any scroll container via VDND_SCROLL_CONTAINER token
+- Supports wrapper-based positioning (VirtualContentComponent) or absolute positioning
 
 ## Data Flow
 
@@ -572,25 +712,48 @@ State changes trigger updates through signals:
 
 ### Components
 
-- `VirtualScrollContainerComponent`
-- `DragPreviewComponent`
-- `PlaceholderComponent`
+- `VirtualSortableListComponent` - High-level sortable list (recommended)
+- `VirtualScrollContainerComponent` - Low-level virtual scroll
+- `VirtualViewportComponent` - Self-contained viewport
+- `VirtualContentComponent` - For external scroll containers
+- `DragPreviewComponent` - Dragged item preview
+- `PlaceholderComponent` - Consumer placeholder
+- `DragPlaceholderComponent` - Internal placeholder
 
 ### Directives
 
-- `DroppableDirective`
-- `DraggableDirective`
+- `DroppableGroupDirective` - Group context provider
+- `DraggableDirective` - Makes elements draggable
+- `DroppableDirective` - Marks drop targets
+- `ScrollableDirective` - Marks scroll containers
+- `VirtualForDirective` - Structural directive for virtual lists
 
 ### Services
 
-- `DragStateService` (for advanced use cases)
-- `PositionCalculatorService`
-- `AutoScrollService`
-- `ElementCloneService`
+- `DragStateService` - Central state management
+- `PositionCalculatorService` - Position calculations
+- `AutoScrollService` - Edge auto-scrolling
+- `KeyboardDragService` - Keyboard navigation
+- `ElementCloneService` - Clone for preview
+
+### Tokens
+
+- `VDND_GROUP_TOKEN` - Group context injection
+- `VDND_SCROLL_CONTAINER` - Scroll container injection
+- `VDND_VIRTUAL_VIEWPORT` - Virtual viewport injection
+
+### Utilities
+
+- `moveItem()` - Move between signal-based lists
+- `reorderItems()` - Reorder within a single list
+- `applyMove()` - Immutable version
+- `isNoOpDrop()` - Check if drop is no-op
+- `insertAt()` / `removeAt()` - Array helpers
 
 ### Types
 
-- All event interfaces (`DragStartEvent`, `DragMoveEvent`, `DropEvent`, etc.)
+- All event interfaces (`DragStartEvent`, `DragMoveEvent`, `DropEvent`, `DragEndEvent`, etc.)
 - Configuration interfaces (`AutoScrollConfig`)
 - State interfaces (`DragState`, `DraggedItem`, `CursorPosition`, `GrabOffset`)
+- Context interfaces (`VirtualScrollItemContext`, `VirtualForContext`, `DragPreviewContext`, `VdndGroupContext`, `VdndScrollContainer`, `VdndVirtualViewport`)
 - Constants (`END_OF_LIST`, `INITIAL_DRAG_STATE`)

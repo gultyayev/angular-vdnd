@@ -717,7 +717,12 @@ export class DraggableDirective implements OnInit, OnDestroy {
     let initialPlaceholderIndex: number | null = null;
 
     if (droppableElement) {
-      const indexResult = this.#calculatePlaceholderIndex(droppableElement, position, sourceIndex);
+      const indexResult = this.#calculatePlaceholderIndex(
+        droppableElement,
+        position,
+        sourceIndex,
+        grabOffset,
+      );
       initialPlaceholderIndex = indexResult.index;
       initialPlaceholderId = indexResult.placeholderId;
     }
@@ -865,32 +870,74 @@ export class DraggableDirective implements OnInit, OnDestroy {
    * @param droppableElement The droppable container element
    * @param position Current cursor position
    * @param sourceIndexOverride Optional source index (used at drag start before element is hidden)
+   * @param grabOffsetOverride Optional grab offset (used at drag start before state is updated)
    */
   #calculatePlaceholderIndex(
     droppableElement: HTMLElement,
     position: CursorPosition,
     sourceIndexOverride?: number,
+    grabOffsetOverride?: GrabOffset | null,
   ): { index: number; placeholderId: string } {
-    // Get container and measurements
+    // Get container and measurements - handle both embedded virtual-scroll and page-level scroll
     const virtualScroll = droppableElement.querySelector('vdnd-virtual-scroll');
-    const container = (virtualScroll ?? droppableElement) as HTMLElement;
-    // Force layout flush - critical for Safari after programmatic scroll
-    // Safari caches hit-testing results and only invalidates on user-initiated scroll
-    void container.offsetHeight;
-    const rect = container.getBoundingClientRect();
-    const currentScrollTop = container.scrollTop;
-    // Prefer configured item height from virtual scroll over actual element height
-    // This prevents drift when actual element height differs from grid spacing
-    const configuredHeight = virtualScroll?.getAttribute('data-item-height');
-    const itemHeight = configuredHeight
-      ? parseInt(configuredHeight, 10)
+    const virtualContent = droppableElement.matches('vdnd-virtual-content')
+      ? droppableElement
+      : droppableElement.closest('vdnd-virtual-content');
+
+    let container: HTMLElement;
+    let currentScrollTop: number;
+    let rect: DOMRect;
+
+    if (virtualScroll) {
+      // Standard virtual scroll component - scroll container is the virtual scroll element
+      container = virtualScroll as HTMLElement;
+      // Force layout flush - critical for Safari after programmatic scroll
+      void container.offsetHeight;
+      rect = container.getBoundingClientRect();
+      currentScrollTop = container.scrollTop;
+    } else if (virtualContent) {
+      // Page-level scroll: find scrollable parent and get adjusted scroll
+      const scrollableParent = virtualContent.closest('.vdnd-scrollable') as HTMLElement | null;
+      if (scrollableParent) {
+        container = scrollableParent;
+        void container.offsetHeight;
+        // Use scroll container rect + content offset to avoid stale virtualContent rects.
+        rect = container.getBoundingClientRect();
+        const contentOffsetAttr = (virtualContent as HTMLElement).getAttribute(
+          'data-content-offset',
+        );
+        const contentOffset = contentOffsetAttr ? parseFloat(contentOffsetAttr) : 0;
+        const offsetValue = Number.isFinite(contentOffset) ? contentOffset : 0;
+        currentScrollTop = container.scrollTop - offsetValue;
+      } else {
+        container = virtualContent as HTMLElement;
+        void container.offsetHeight;
+        rect = container.getBoundingClientRect();
+        currentScrollTop = 0;
+      }
+    } else {
+      // Fallback: use droppable element directly
+      container = droppableElement;
+      void container.offsetHeight;
+      rect = container.getBoundingClientRect();
+      currentScrollTop = container.scrollTop;
+    }
+    // Prefer configured item height from virtual scroll/content over actual element height.
+    // This prevents drift when actual element height differs from grid spacing.
+    const configuredHeight =
+      virtualScroll?.getAttribute('data-item-height') ??
+      (virtualContent as HTMLElement | null)?.getAttribute('data-item-height');
+    const parsedHeight = configuredHeight ? parseFloat(configuredHeight) : Number.NaN;
+    const itemHeight = Number.isFinite(parsedHeight)
+      ? parsedHeight
       : (this.#dragState.draggedItem()?.height ?? 50);
 
     // Calculate preview center position mathematically
     // The preview is positioned at: cursorPosition - grabOffset (see drag-preview.component.ts)
     // So preview center = cursorPosition.y - grabOffset.y + itemHeight/2
     // Using math avoids Safari's stale getBoundingClientRect() issue during autoscroll
-    const grabOffset = this.#dragState.grabOffset();
+    // Use override if provided (at drag start, before state is updated)
+    const grabOffset = grabOffsetOverride ?? this.#dragState.grabOffset();
     const previewCenterY = position.y - (grabOffset?.y ?? 0) + itemHeight / 2;
 
     // Convert to visual index (which slot the preview center is in)
@@ -914,8 +961,20 @@ export class DraggableDirective implements OnInit, OnDestroy {
       placeholderIndex = visualIndex + 1;
     }
 
-    // Clamp to valid range
+    // Get total items for clamping
     const totalItems = this.#getTotalItemCount(droppableElement, isSameList);
+
+    // Edge detection: allow dropping at the END of the list when cursor is near bottom edge.
+    // Due to max scroll limits, the math alone can't reach totalItems when the list is longer
+    // than the viewport. If cursor is in the bottom portion of the container and we're at
+    // or past the last visible slot, snap to totalItems.
+    const cursorRelativeToBottom = rect.bottom - previewCenterY;
+    const isNearBottomEdge = cursorRelativeToBottom < itemHeight;
+    if (isNearBottomEdge && placeholderIndex >= totalItems - 1) {
+      placeholderIndex = totalItems;
+    }
+
+    // Clamp to valid range
     placeholderIndex = Math.max(0, Math.min(placeholderIndex, totalItems));
 
     return { index: placeholderIndex, placeholderId: END_OF_LIST };
@@ -926,19 +985,52 @@ export class DraggableDirective implements OnInit, OnDestroy {
    * Accounts for hidden item during same-list drag.
    */
   #getTotalItemCount(droppableElement: HTMLElement, isSameList: boolean): number {
+    // Check for embedded virtual scroll component
     const virtualScroll = droppableElement.querySelector('vdnd-virtual-scroll');
     if (virtualScroll) {
-      const scrollHeight = (virtualScroll as HTMLElement).scrollHeight;
-      // Prefer configured item height from virtual scroll over actual element height
+      // Use the spacer's height, NOT scrollHeight, to determine item count.
+      // scrollHeight can be inflated by absolutely-positioned elements like the placeholder.
+      const spacer = virtualScroll.querySelector(
+        '.vdnd-virtual-scroll-spacer',
+      ) as HTMLElement | null;
       const configuredHeight = virtualScroll.getAttribute('data-item-height');
       const itemHeight = configuredHeight
         ? parseInt(configuredHeight, 10)
         : (this.#dragState.draggedItem()?.height ?? 50);
-      // When same-list, scrollHeight reflects N-1 items (one is hidden)
+
+      let totalHeight: number;
+      if (spacer) {
+        // Get the spacer's explicit height (set via Angular binding)
+        totalHeight = parseFloat(spacer.style.height) || 0;
+      } else {
+        // Fallback: use scrollHeight if spacer not found
+        totalHeight = (virtualScroll as HTMLElement).scrollHeight;
+      }
+
+      // When same-list, spacer height reflects N-1 items (one is hidden)
       // Add 1 back to get true total
-      const count = Math.floor(scrollHeight / itemHeight);
+      const count = Math.floor(totalHeight / itemHeight);
       return isSameList ? count + 1 : count;
     }
+
+    // Check for page-level scroll (vdnd-virtual-content)
+    const virtualContent = droppableElement.matches('vdnd-virtual-content')
+      ? droppableElement
+      : droppableElement.closest('vdnd-virtual-content');
+    if (virtualContent) {
+      // Use spacer height to determine total items
+      const spacer = virtualContent.querySelector('.vdnd-content-spacer') as HTMLElement | null;
+      if (spacer) {
+        const totalHeight = parseFloat(spacer.style.height) || 0;
+        const configuredHeight = virtualContent.getAttribute('data-item-height');
+        const itemHeight = configuredHeight
+          ? parseInt(configuredHeight, 10)
+          : (this.#dragState.draggedItem()?.height ?? 72);
+        const count = Math.floor(totalHeight / itemHeight);
+        return isSameList ? count + 1 : count;
+      }
+    }
+
     // Fallback for non-virtual scroll
     const items = droppableElement.querySelectorAll('[data-draggable-id]');
     return items.length + (isSameList ? 1 : 0);

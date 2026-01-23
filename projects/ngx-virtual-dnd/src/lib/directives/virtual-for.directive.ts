@@ -5,14 +5,16 @@ import {
   ElementRef,
   EmbeddedViewRef,
   inject,
+  Injector,
   input,
   OnDestroy,
   OnInit,
   TemplateRef,
   ViewContainerRef,
 } from '@angular/core';
-import { DragStateService } from '../services/drag-state.service';
 import { VDND_SCROLL_CONTAINER } from '../tokens/scroll-container.token';
+import { VDND_VIRTUAL_VIEWPORT } from '../tokens/virtual-viewport.token';
+import { DragStateService } from '../services/drag-state.service';
 
 /**
  * Context provided to the template for each virtual item.
@@ -20,7 +22,7 @@ import { VDND_SCROLL_CONTAINER } from '../tokens/scroll-container.token';
 export interface VirtualForContext<T> {
   /** The item data (also available as implicit context) */
   $implicit: T;
-  /** The item's index in the original array (-1 for placeholders) */
+  /** The item's index in the original array */
   index: number;
   /** Whether this is the first visible item */
   first: boolean;
@@ -28,8 +30,6 @@ export interface VirtualForContext<T> {
   last: boolean;
   /** Count of total items */
   count: number;
-  /** Whether this item is an auto-inserted placeholder */
-  isPlaceholder?: boolean;
 }
 
 /**
@@ -39,6 +39,9 @@ export interface VirtualForContext<T> {
  *
  * The directive must be placed inside a container marked with the `vdndScrollable`
  * directive, which provides the scroll container context via dependency injection.
+ *
+ * Placeholders are handled automatically by the parent component (vdnd-virtual-scroll
+ * or vdnd-virtual-content) - consumers just render their items normally.
  *
  * @example
  * Basic usage:
@@ -59,26 +62,6 @@ export interface VirtualForContext<T> {
  *   </ng-container>
  * </ion-content>
  * ```
- *
- * @example
- * With placeholder support:
- * ```html
- * <div vdndScrollable style="overflow: auto; height: 400px">
- *   <ng-container *vdndVirtualFor="
- *     let item of items();
- *     itemHeight: 50;
- *     trackBy: trackById;
- *     droppableId: 'list-1';
- *     let isPlaceholder = isPlaceholder
- *   ">
- *     @if (isPlaceholder) {
- *       <div class="placeholder"></div>
- *     } @else {
- *       <div class="item">{{ item.name }}</div>
- *     }
- *   </ng-container>
- * </div>
- * ```
  */
 @Directive({
   selector: '[vdndVirtualFor][vdndVirtualForOf]',
@@ -87,8 +70,19 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   readonly #templateRef = inject(TemplateRef<VirtualForContext<T>>);
   readonly #viewContainer = inject(ViewContainerRef);
   readonly #elementRef = inject(ElementRef<Comment>);
-  readonly #dragState = inject(DragStateService);
   readonly #scrollContainer = inject(VDND_SCROLL_CONTAINER);
+  readonly #injector = inject(Injector);
+  readonly #dragState = inject(DragStateService);
+
+  /**
+   * Optional viewport component that provides wrapper-based positioning.
+   * When inside a viewport, items are positioned via the wrapper's transform,
+   * so we skip individual absolute positioning.
+   */
+  readonly #viewport = inject(VDND_VIRTUAL_VIEWPORT, { optional: true });
+
+  /** Whether we're inside a viewport component (use wrapper positioning) */
+  readonly #useViewportPositioning = this.#viewport !== null;
 
   /** Pool of views for reuse */
   readonly #viewPool: EmbeddedViewRef<VirtualForContext<T>>[] = [];
@@ -99,8 +93,11 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   /** Single spacer element for scroll height */
   #spacer: HTMLDivElement | null = null;
 
-  /** Content wrapper for transform-based positioning */
-  #wrapper: HTMLDivElement | null = null;
+  /** Placeholder element for drag operations */
+  #placeholder: HTMLDivElement | null = null;
+
+  /** Whether placeholder is currently in the DOM */
+  #placeholderInDom = false;
 
   // ========== Inputs ==========
 
@@ -116,11 +113,27 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   /** Number of items to render outside the visible area */
   vdndVirtualForOverscan = input<number>(3);
 
-  /** Droppable ID for auto-placeholder support */
+  /**
+   * ID of the droppable this directive belongs to.
+   * Required for placeholder positioning during drag operations.
+   */
   vdndVirtualForDroppableId = input<string>();
 
-  /** Whether to auto-insert placeholder */
-  vdndVirtualForAutoPlaceholder = input<boolean>(true);
+  // ========== Placeholder Computed Values ==========
+
+  /** Whether the placeholder should be shown in this container */
+  readonly #shouldShowPlaceholder = computed(() => {
+    const droppableId = this.vdndVirtualForDroppableId();
+    if (!droppableId) return false;
+    if (!this.#dragState.isDragging()) return false;
+    return this.#dragState.activeDroppableId() === droppableId;
+  });
+
+  /** The placeholder index when placeholder should be shown */
+  readonly #placeholderIndex = computed(() => {
+    if (!this.#shouldShowPlaceholder()) return -1;
+    return this.#dragState.placeholderIndex() ?? -1;
+  });
 
   // ========== Computed Values ==========
 
@@ -152,18 +165,33 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
     return { start, end };
   });
 
-  /** Whether placeholder should be shown */
-  readonly #shouldShowPlaceholder = computed(() => {
-    if (!this.vdndVirtualForAutoPlaceholder()) return false;
-    const droppableId = this.vdndVirtualForDroppableId();
-    if (!droppableId) return false;
-    return this.#dragState.activeDroppableId() === droppableId;
+  /** Map of trackBy keys to item indices for quick lookup */
+  readonly #itemIndexMap = computed(() => {
+    const items = this.vdndVirtualForOf();
+    const trackByFn = this.vdndVirtualForTrackBy();
+    const map = new Map<unknown, number>();
+    for (let i = 0; i < items.length; i++) {
+      map.set(trackByFn(i, items[i]), i);
+    }
+    return map;
   });
 
-  /** Placeholder index if applicable */
-  readonly #placeholderIndex = computed(() => {
-    if (!this.#shouldShowPlaceholder()) return null;
-    return this.#dragState.placeholderIndex();
+  /** Index of the dragged item in this list (-1 if not present or not dragging) */
+  readonly #draggedItemIndex = computed(() => {
+    const draggedItem = this.#dragState.draggedItem();
+    if (!draggedItem) return -1;
+
+    const byId = this.#itemIndexMap().get(draggedItem.draggableId);
+    if (byId !== undefined) {
+      return byId;
+    }
+
+    const data = draggedItem.data as T | null | undefined;
+    if (data !== null && data !== undefined) {
+      return this.vdndVirtualForOf().indexOf(data);
+    }
+
+    return -1;
   });
 
   constructor() {
@@ -174,20 +202,39 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.#updateSpacers();
+    // Only create spacer when NOT inside a viewport component
+    // (viewport provides its own spacer and wrapper positioning)
+    if (!this.#useViewportPositioning) {
+      this.#updateSpacers();
+    }
+
+    // Create placeholder element for drag operations
+    this.#createPlaceholder();
   }
 
   ngOnDestroy(): void {
     this.#viewPool.forEach((view) => view.destroy());
     this.#activeViews.forEach((view) => view.destroy());
 
-    // Clean up spacer and wrapper elements
+    // Clean up spacer element (only if we created one)
     this.#spacer?.remove();
-    this.#wrapper?.remove();
+
+    // Clean up placeholder element
+    this.#placeholder?.remove();
   }
 
   /**
-   * Set up spacer and wrapper elements for transform-based positioning.
+   * Create the placeholder element for drag operations.
+   */
+  #createPlaceholder(): void {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'vdnd-drag-placeholder vdnd-drag-placeholder-visible';
+    placeholder.style.cssText = 'display: block; pointer-events: none;';
+    this.#placeholder = placeholder;
+  }
+
+  /**
+   * Set up spacer element for scroll height.
    */
   #updateSpacers(): void {
     // Create single spacer that maintains total scroll height
@@ -196,32 +243,24 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
     spacer.style.cssText =
       'position: absolute; top: 0; left: 0; width: 1px; visibility: hidden; pointer-events: none;';
 
-    // Create content wrapper for GPU-accelerated transform positioning
-    const wrapper = document.createElement('div');
-    wrapper.className = 'vdnd-virtual-for-content-wrapper';
-    wrapper.style.cssText =
-      'position: absolute; top: 0; left: 0; right: 0; will-change: transform;';
-
-    // Insert elements before the directive's anchor comment
+    // Insert spacer before the directive's anchor comment
     const comment = this.#elementRef.nativeElement;
     comment.parentNode?.insertBefore(spacer, comment);
-    comment.parentNode?.insertBefore(wrapper, comment);
 
     this.#spacer = spacer;
-    this.#wrapper = wrapper;
 
-    // Update spacer height and wrapper transform reactively
-    effect(() => {
-      const { start } = this.#renderRange();
-      const itemHeight = this.vdndVirtualForItemHeight();
-      const total = this.vdndVirtualForOf().length;
+    // Update spacer height reactively
+    // Must pass injector since we're outside constructor
+    effect(
+      () => {
+        const itemHeight = this.vdndVirtualForItemHeight();
+        const total = this.vdndVirtualForOf().length;
 
-      // Single spacer with full content height
-      spacer.style.height = `${total * itemHeight}px`;
-
-      // Transform positions the visible content at the correct offset
-      wrapper.style.transform = `translateY(${start * itemHeight}px)`;
-    });
+        // Single spacer with full content height
+        spacer.style.height = `${total * itemHeight}px`;
+      },
+      { injector: this.#injector },
+    );
   }
 
   /**
@@ -232,29 +271,57 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
     const items = this.vdndVirtualForOf();
     const { start, end } = this.#renderRange();
     const trackByFn = this.vdndVirtualForTrackBy();
+    const itemHeight = this.vdndVirtualForItemHeight();
     const placeholderIndex = this.#placeholderIndex();
+    const showPlaceholder = this.#shouldShowPlaceholder();
+    const draggedIndex = this.#draggedItemIndex();
+    const droppableId = this.vdndVirtualForDroppableId();
+    const sourceDroppableId = this.#dragState.sourceDroppableId();
+    const isSourceList = droppableId ? droppableId === sourceDroppableId : true;
+    const shouldKeepDragged =
+      this.#dragState.isDragging() &&
+      draggedIndex >= 0 &&
+      isSourceList &&
+      draggedIndex < items.length;
+
+    // Notify viewport of render start index for wrapper positioning.
+    // Adjust when the dragged item is above the rendered range so the wrapper
+    // stays aligned with the collapsed list (dragged item is display:none).
+    const shouldAdjustRenderStart =
+      this.#useViewportPositioning &&
+      this.#dragState.isDragging() &&
+      isSourceList &&
+      draggedIndex >= 0 &&
+      draggedIndex < start;
+    const renderStartIndex = shouldAdjustRenderStart ? Math.max(0, start - 1) : start;
+    this.#viewport?.setRenderStartIndex(renderStartIndex);
 
     // 1. Calculate which keys we need and build the ordered list of items to render
-    const itemsToRender: { key: unknown; context: VirtualForContext<T> }[] = [];
+    const itemsToRender: {
+      type: 'item' | 'placeholder';
+      key: unknown;
+      context: VirtualForContext<T> | null;
+      visualIndex: number;
+    }[] = [];
 
     for (let i = start; i <= end && i < items.length; i++) {
-      // Insert placeholder before this item if needed
-      if (placeholderIndex !== null && placeholderIndex === i) {
+      // Insert placeholder before item at placeholderIndex
+      if (
+        showPlaceholder &&
+        placeholderIndex === i &&
+        !itemsToRender.some((r) => r.type === 'placeholder')
+      ) {
         itemsToRender.push({
+          type: 'placeholder',
           key: '__placeholder__',
-          context: {
-            $implicit: { __vdndPlaceholder: true } as unknown as T,
-            index: -1,
-            first: false,
-            last: false,
-            count: items.length,
-            isPlaceholder: true,
-          },
+          context: null,
+          visualIndex: placeholderIndex,
         });
       }
 
       const item = items[i];
       itemsToRender.push({
+        type: 'item',
         key: trackByFn(i, item),
         context: {
           $implicit: item,
@@ -262,27 +329,52 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
           first: i === start,
           last: i === end || i === items.length - 1,
           count: items.length,
-          isPlaceholder: false,
         },
+        visualIndex: i,
       });
     }
 
-    // Insert placeholder at end if needed
-    if (placeholderIndex !== null && placeholderIndex >= items.length) {
+    // If placeholder is at the end (after all rendered items), add it
+    if (
+      showPlaceholder &&
+      placeholderIndex >= items.length &&
+      !itemsToRender.some((r) => r.type === 'placeholder')
+    ) {
       itemsToRender.push({
+        type: 'placeholder',
         key: '__placeholder__',
-        context: {
-          $implicit: { __vdndPlaceholder: true } as unknown as T,
-          index: -1,
-          first: false,
-          last: true,
-          count: items.length,
-          isPlaceholder: true,
-        },
+        context: null,
+        visualIndex: placeholderIndex,
       });
     }
 
-    const neededKeys = new Set(itemsToRender.map((item) => item.key));
+    // Keep the dragged item view alive when it scrolls out of range.
+    // This prevents the draggable directive from being recycled during long autoscrolls.
+    if (shouldKeepDragged && (draggedIndex < start || draggedIndex > end)) {
+      const draggedItem = items[draggedIndex];
+      const draggedKey = trackByFn(draggedIndex, draggedItem);
+      const alreadyRendered = itemsToRender.some(
+        (entry) => entry.type === 'item' && entry.key === draggedKey,
+      );
+      if (!alreadyRendered) {
+        itemsToRender.push({
+          type: 'item',
+          key: draggedKey,
+          context: {
+            $implicit: draggedItem,
+            index: draggedIndex,
+            first: draggedIndex === 0,
+            last: draggedIndex === items.length - 1,
+            count: items.length,
+          },
+          visualIndex: draggedIndex,
+        });
+      }
+    }
+
+    const neededKeys = new Set(
+      itemsToRender.filter((r) => r.type === 'item').map((item) => item.key),
+    );
 
     // 2. Remove views we no longer need (move to pool)
     for (const [key, view] of this.#activeViews) {
@@ -296,62 +388,110 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
       }
     }
 
-    // 3. For each needed item, update existing view context or get/create from pool
-    const viewsInOrder: EmbeddedViewRef<VirtualForContext<T>>[] = [];
+    // Remove placeholder from DOM if not needed
+    if (!showPlaceholder && this.#placeholderInDom && this.#placeholder) {
+      this.#placeholder.remove();
+      this.#placeholderInDom = false;
+    }
 
-    for (const { key, context } of itemsToRender) {
+    // 3. First, process all item views (placeholder is handled separately via DOM)
+    let viewContainerIndex = 0;
+    let placeholderDomPosition = -1; // Track where placeholder should go in DOM
+
+    for (const entry of itemsToRender) {
+      if (entry.type === 'placeholder') {
+        // Remember the DOM position for placeholder (based on how many items rendered before it)
+        placeholderDomPosition = viewContainerIndex;
+        continue;
+      }
+
+      // Handle regular item
+      const { key, context } = entry;
       let view = this.#activeViews.get(key);
 
       if (view) {
         // View exists - update context in place (no DOM manipulation needed)
-        Object.assign(view.context, context);
+        Object.assign(view.context, context!);
         view.markForCheck();
       } else {
         // Need a new view - try pool first, then create
         view = this.#viewPool.pop();
         if (view) {
-          Object.assign(view.context, context);
+          Object.assign(view.context, context!);
           view.markForCheck();
         } else {
-          view = this.#templateRef.createEmbeddedView(context);
+          view = this.#templateRef.createEmbeddedView(context!);
         }
         this.#activeViews.set(key, view);
       }
 
-      viewsInOrder.push(view);
-    }
-
-    // 4. Ensure views are in correct order in ViewContainerRef and wrapper
-    for (let i = 0; i < viewsInOrder.length; i++) {
-      const view = viewsInOrder[i];
+      // Ensure view is in ViewContainerRef at correct position
       const currentIndex = this.#viewContainer.indexOf(view);
-
-      if (currentIndex !== i) {
-        // View needs to be inserted or moved
+      if (currentIndex !== viewContainerIndex) {
         if (currentIndex >= 0) {
-          this.#viewContainer.move(view, i);
+          this.#viewContainer.move(view, viewContainerIndex);
         } else {
-          this.#viewContainer.insert(view, i);
+          this.#viewContainer.insert(view, viewContainerIndex);
         }
       }
 
-      // Ensure view's root nodes are in the wrapper (for newly inserted views)
-      if (this.#wrapper) {
-        const expectedChild = this.#wrapper.children[i];
+      // Apply absolute positioning only when NOT inside a viewport component
+      // (viewport provides wrapper-based transform positioning)
+      if (!this.#useViewportPositioning) {
+        const topOffset = entry.visualIndex * itemHeight;
         for (const node of view.rootNodes) {
-          if (node instanceof HTMLElement && node !== expectedChild) {
-            // Node is not at expected position, insert it
-            if (expectedChild) {
-              this.#wrapper.insertBefore(node, expectedChild);
+          if (node instanceof HTMLElement) {
+            node.style.position = 'absolute';
+            node.style.top = `${topOffset}px`;
+            node.style.left = '0';
+            node.style.right = '0';
+          }
+        }
+      }
+
+      viewContainerIndex++;
+    }
+
+    // 4. Handle placeholder DOM insertion (separate from ViewContainerRef)
+    if (showPlaceholder && this.#placeholder && placeholderDomPosition >= 0) {
+      this.#placeholder.style.height = `${itemHeight}px`;
+
+      // Get the container element (parent of views)
+      const container = this.#viewContainer.element.nativeElement.parentElement;
+      if (container) {
+        // Find the element to insert before (nth child, excluding spacers and placeholder itself)
+        const children = Array.from(container.children).filter((el) => {
+          const element = el as Element;
+          return (
+            !element.classList.contains('vdnd-drag-placeholder') &&
+            !element.classList.contains('vdnd-virtual-for-spacer') &&
+            !element.classList.contains('vdnd-content-spacer')
+          );
+        });
+        const insertBeforeEl = children[placeholderDomPosition] ?? null;
+
+        if (!this.#placeholderInDom) {
+          if (insertBeforeEl) {
+            container.insertBefore(this.#placeholder, insertBeforeEl);
+          } else {
+            container.appendChild(this.#placeholder);
+          }
+          this.#placeholderInDom = true;
+        } else {
+          // Move placeholder to correct position if needed
+          const currentNextSibling = this.#placeholder.nextElementSibling;
+          if (insertBeforeEl !== currentNextSibling) {
+            if (insertBeforeEl) {
+              container.insertBefore(this.#placeholder, insertBeforeEl);
             } else {
-              this.#wrapper.appendChild(node);
+              container.appendChild(this.#placeholder);
             }
           }
         }
       }
     }
 
-    // 5. Destroy unused views in pool (keep some for reuse)
+    // 4. Destroy unused views in pool (keep some for reuse)
     while (this.#viewPool.length > 10) {
       const view = this.#viewPool.pop();
       view?.destroy();

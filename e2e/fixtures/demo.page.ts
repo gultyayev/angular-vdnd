@@ -29,7 +29,7 @@ export class DemoPage {
     this.list2Wrapper = page.locator('.list-card').nth(1);
     this.lockAxisSelect = page.locator('[data-testid="lock-axis-select"]');
     this.keyboardInstructions = page.locator('#vdnd-keyboard-instructions');
-    this.placeholder = page.locator('.vdnd-placeholder');
+    this.placeholder = page.locator('.vdnd-drag-placeholder-visible');
   }
 
   async goto(): Promise<void> {
@@ -201,14 +201,16 @@ export class DemoPage {
     list: 'list1' | 'list2',
   ): Promise<{ text: string; tagName: string; isPlaceholder: boolean }[]> {
     const container = list === 'list1' ? this.list1VirtualScroll : this.list2VirtualScroll;
-    const elements = container.locator('.item:not([style*="display: none"]), vdnd-placeholder');
+    const elements = container.locator(
+      '.item:not([style*="display: none"]), vdnd-drag-placeholder',
+    );
     const count = await elements.count();
     const result: { text: string; tagName: string; isPlaceholder: boolean }[] = [];
 
     for (let i = 0; i < count; i++) {
       const el = elements.nth(i);
       const tagName = await el.evaluate((e) => e.tagName.toLowerCase());
-      const isPlaceholder = tagName === 'vdnd-placeholder';
+      const isPlaceholder = tagName === 'vdnd-drag-placeholder';
       const text = isPlaceholder
         ? ''
         : ((await el.locator('.item-text').textContent())?.trim() ?? '');
@@ -224,6 +226,6 @@ export class DemoPage {
    */
   async getVisibleElementCount(list: 'list1' | 'list2'): Promise<number> {
     const container = list === 'list1' ? this.list1VirtualScroll : this.list2VirtualScroll;
-    return container.locator('.item:not([style*="display: none"]), vdnd-placeholder').count();
+    return container.locator('.item:not([style*="display: none"]), vdnd-drag-placeholder').count();
   }
 }

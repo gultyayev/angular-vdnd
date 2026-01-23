@@ -4,6 +4,8 @@ export * from './models/drag-drop.models';
 // Tokens
 export { VDND_SCROLL_CONTAINER } from './tokens/scroll-container.token';
 export type { VdndScrollContainer } from './tokens/scroll-container.token';
+export { VDND_VIRTUAL_VIEWPORT } from './tokens/virtual-viewport.token';
+export type { VdndVirtualViewport } from './tokens/virtual-viewport.token';
 
 // Services
 export { DragStateService } from './services/drag-state.service';
@@ -23,7 +25,10 @@ export { DragPreviewComponent } from './components/drag-preview.component';
 export type { DragPreviewContext } from './components/drag-preview.component';
 export { PlaceholderComponent } from './components/placeholder.component';
 export type { PlaceholderContext } from './components/placeholder.component';
+export { DragPlaceholderComponent } from './components/drag-placeholder.component';
 export { VirtualSortableListComponent } from './components/virtual-sortable-list.component';
+export { VirtualViewportComponent } from './components/virtual-viewport.component';
+export { VirtualContentComponent } from './components/virtual-content.component';
 
 // Directives
 export { DraggableDirective } from './directives/draggable.directive';

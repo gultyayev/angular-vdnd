@@ -22,8 +22,6 @@ npm install ngx-virtual-dnd
 
 ## Quick Start
 
-The fastest way to get started:
-
 ```typescript
 import {
   VirtualSortableListComponent,
@@ -90,7 +88,6 @@ export class MyComponent {
 
   getItemId = (item: Item) => item.id;
 
-  // One-liner drop handler
   onDrop(event: DropEvent): void {
     moveItem(event, {
       'list-1': this.list1,
@@ -100,160 +97,48 @@ export class MyComponent {
 }
 ```
 
-**That's it!** The `VirtualSortableListComponent` handles placeholder positioning, sticky items during drag, and virtual scroll integration automatically.
+**That's it!** `VirtualSortableListComponent` handles placeholder positioning, sticky items during drag, and virtual scroll integration automatically.
 
-## API Reference
+## API Overview
 
-### VirtualSortableListComponent
+The library exports these main pieces (use IDE completion for full details):
 
-High-level component combining droppable, virtual scroll, and placeholder handling.
+**Components:**
 
-```html
-<vdnd-sortable-list
-  droppableId="list-1"
-  group="my-group"
-  [items]="items()"
-  [itemHeight]="50"
-  [itemIdFn]="getItemId"
-  [itemTemplate]="itemTpl"
-  (drop)="onDrop($event)"
-/>
-```
+- `VirtualSortableListComponent` - High-level component combining droppable, virtual scroll, and placeholder
+- `VirtualScrollContainerComponent` - Low-level virtual scroll container
+- `VirtualViewportComponent` - Self-contained virtual scroll viewport
+- `VirtualContentComponent` - Virtual content for external scroll containers (page-level scroll)
+- `DragPreviewComponent` - Renders the dragged item preview (required)
+- `PlaceholderComponent` - Drop position indicator
 
-| Input                 | Type                  | Required | Description                                     |
-| --------------------- | --------------------- | -------- | ----------------------------------------------- |
-| `droppableId`         | `string`              | Yes      | Unique ID for this list                         |
-| `group`               | `string`              | Yes      | Group name for cross-list drag                  |
-| `items`               | `T[]`                 | Yes      | Array of items                                  |
-| `itemHeight`          | `number`              | Yes      | Height of each item (px)                        |
-| `itemIdFn`            | `(item: T) => string` | Yes      | Function to get unique ID                       |
-| `itemTemplate`        | `TemplateRef`         | Yes      | Template for rendering items                    |
-| `containerHeight`     | `number`              | No       | Container height (px), auto-detected if omitted |
-| `disabled`            | `boolean`             | No       | Disable dropping                                |
-| `overscan`            | `number`              | No       | Items to render outside viewport (default: 3)   |
-| `placeholderTemplate` | `TemplateRef`         | No       | Custom placeholder template                     |
-| `autoScrollEnabled`   | `boolean`             | No       | Enable edge auto-scroll (default: true)         |
-| `autoScrollConfig`    | `object`              | No       | `{ threshold, maxSpeed, accelerate }`           |
+**Directives:**
 
-| Output      | Description                       |
-| ----------- | --------------------------------- |
-| `drop`      | Emitted when an item is dropped   |
-| `dragEnter` | Draggable entered this list       |
-| `dragLeave` | Draggable left this list          |
-| `dragOver`  | Draggable hovering over this list |
+- `DraggableDirective` (`vdndDraggable`) - Makes an element draggable
+- `DroppableDirective` (`vdndDroppable`) - Marks a drop target
+- `DroppableGroupDirective` (`vdndGroup`) - Provides group context to children
+- `ScrollableDirective` (`vdndScrollable`) - Marks external scroll container
+- `VirtualForDirective` (`*vdndVirtualFor`) - Structural directive for virtual lists
 
-### DraggableDirective
+**Services:**
 
-Makes an element draggable.
+- `DragStateService` - Access drag state (isDragging, draggedItem, placeholderIndex, etc.)
+- `AutoScrollService` - Controls edge auto-scrolling
+- `PositionCalculatorService` - Calculates placeholder positions
 
-```html
-<div
-  vdndDraggable="item-id"
-  [vdndDraggableData]="item"
-  [vdndDraggableGroup]="groupName"
-  [disabled]="false"
-  [dragHandle]=".handle"
-  [dragThreshold]="5"
-  [dragDelay]="0"
-  [lockAxis]="'y'"
-  (dragStart)="onStart($event)"
-  (dragMove)="onMove($event)"
-  (dragEnd)="onEnd($event)"
-></div>
-```
+**Utilities:**
 
-| Input                | Description                                    |
-| -------------------- | ---------------------------------------------- |
-| `vdndDraggable`      | Unique ID for this draggable                   |
-| `vdndDraggableData`  | Data attached to the draggable                 |
-| `vdndDraggableGroup` | Group name (auto-inherited from `vdndGroup`)   |
-| `disabled`           | Disable dragging                               |
-| `dragHandle`         | CSS selector for handle element                |
-| `dragThreshold`      | Min distance before drag starts (default: 5px) |
-| `dragDelay`          | Delay before drag starts (ms)                  |
-| `lockAxis`           | Constrain to `'x'` or `'y'` axis               |
-
-### DroppableDirective
-
-Marks an element as a drop target. Use this for custom layouts or when not using `VirtualSortableListComponent`.
-
-```html
-<div
-  vdndDroppable="list-id"
-  vdndDroppableGroup="group-name"
-  [vdndDroppableData]="data"
-  [disabled]="false"
-  (drop)="onDrop($event)"
-></div>
-```
-
-### DroppableGroupDirective
-
-Provides group context to child draggables/droppables, reducing repetition.
-
-```html
-<!-- Without group directive -->
-<div vdndDroppable="list-1" vdndDroppableGroup="my-group">
-  <div vdndDraggable="item-1" vdndDraggableGroup="my-group">Item</div>
-</div>
-
-<!-- With group directive (cleaner) -->
-<div vdndGroup="my-group">
-  <div vdndDroppable="list-1">
-    <div vdndDraggable="item-1">Item</div>
-  </div>
-</div>
-```
-
-### Drop Utilities
-
-```typescript
-import { moveItem, reorderItems, applyMove, isNoOpDrop, insertAt, removeAt } from 'ngx-virtual-dnd';
-
-// Move between signal-based lists (mutates signals)
-moveItem(event, {
-  'list-1': this.list1,
-  'list-2': this.list2,
-});
-
-// Reorder within a single list (mutates signal)
-reorderItems(event, this.items);
-
-// Immutable version (returns new arrays)
-const updated = applyMove(event, {
-  'list-1': this.list1(),
-  'list-2': this.list2(),
-});
-
-// Check if drop would be a no-op (same position)
-if (isNoOpDrop(event)) return;
-
-// Low-level array helpers
-const newArray = insertAt(array, index, item);
-const newArray = removeAt(array, index);
-```
-
-### DragStateService
-
-Access drag state for custom integrations.
-
-```typescript
-@Injectable({ providedIn: 'root' })
-export class DragStateService {
-  readonly isDragging: Signal<boolean>;
-  readonly draggedItem: Signal<DraggedItem | null>;
-  readonly sourceDroppableId: Signal<string | null>;
-  readonly activeDroppableId: Signal<string | null>;
-  readonly placeholderIndex: Signal<number | null>;
-  readonly cursorPosition: Signal<{ x: number; y: number } | null>;
-}
-```
+- `moveItem()` - Move between signal-based lists
+- `reorderItems()` - Reorder within a single list
+- `applyMove()` - Immutable version (returns new arrays)
+- `isNoOpDrop()` - Check if drop would be a no-op
+- `insertAt()` / `removeAt()` - Low-level array helpers
 
 ## Advanced Usage
 
 ### Low-Level API
 
-For maximum control, use individual components/directives instead of `VirtualSortableListComponent`:
+For maximum control, use individual components instead of `VirtualSortableListComponent`:
 
 ```typescript
 @Component({
@@ -305,49 +190,82 @@ export class ListComponent {
 }
 ```
 
-### External Scroll Containers
+### Page-Level Scroll
 
-Use `vdndScrollable` with `*vdndVirtualFor` when you need virtual scrolling inside a custom scroll host (like Ionic's `ion-content`):
+Use `VirtualContentComponent` with `vdndScrollable` for page-level scrolling with headers/footers:
 
-```html
-<ion-content vdndScrollable class="ion-content-scroll-host">
-  <ng-container
-    *vdndVirtualFor="
-    let item of items();
-    itemHeight: 50;
-    trackBy: trackById;
-    droppableId: 'list-1';
-    let isPlaceholder = isPlaceholder
-  "
-  >
-    @if (isPlaceholder) {
-    <vdnd-placeholder [height]="50" />
-    } @else {
-    <div vdndDraggable="{{ item.id }}">{{ item.name }}</div>
-    }
-  </ng-container>
-</ion-content>
+```typescript
+@Component({
+  imports: [
+    ScrollableDirective,
+    VirtualContentComponent,
+    VirtualForDirective,
+    DraggableDirective,
+    DroppableDirective,
+    DroppableGroupDirective,
+    DragPreviewComponent,
+  ],
+  template: `
+    <ion-content [scrollY]="false">
+      <div class="scroll-container ion-content-scroll-host" vdndScrollable>
+        <!-- Header that scrolls away -->
+        <div class="header" #header>Welcome!</div>
+
+        <!-- Virtual list -->
+        <div vdndGroup="tasks">
+          <vdnd-virtual-content
+            [itemHeight]="72"
+            [totalItems]="items().length"
+            [contentOffset]="headerHeight()"
+            [style.height.px]="items().length * 72"
+            vdndDroppable="list-1"
+            (drop)="onDrop($event)"
+          >
+            <ng-container
+              *vdndVirtualFor="
+                let item of items();
+                itemHeight: 72;
+                trackBy: trackById;
+                droppableId: 'list-1'
+              "
+            >
+              <div class="item" [vdndDraggable]="item.id">{{ item.name }}</div>
+            </ng-container>
+          </vdnd-virtual-content>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">Load more</div>
+      </div>
+    </ion-content>
+
+    <vdnd-drag-preview />
+  `,
+})
+export class PageComponent {
+  items = signal<Item[]>([...]);
+  headerHeight = signal(0);
+
+  // Track header height with ResizeObserver
+  constructor() {
+    afterNextRender(() => {
+      const header = this.header().nativeElement;
+      this.headerHeight.set(header.offsetHeight);
+    });
+  }
+}
 ```
 
-The `vdndScrollable` directive:
+Key points:
 
-- Provides scroll container context to child virtual scroll directives
-- Supports auto-scroll during drag operations
-- Works with any scrollable element (`overflow: auto/scroll`)
+- `vdndScrollable` marks the scroll container
+- `VirtualContentComponent` provides wrapper-based positioning
+- `contentOffset` accounts for content above the list (headers)
+- Set explicit height on `vdnd-virtual-content` matching total item height
 
-### Keyboard Navigation
+### Screen Reader Announcements
 
-| Key         | Action                      |
-| ----------- | --------------------------- |
-| `Tab`       | Navigate to draggable items |
-| `Space`     | Start/end drag              |
-| `Arrow ↑/↓` | Move item up/down           |
-| `Arrow ←/→` | Move to adjacent list       |
-| `Escape`    | Cancel drag                 |
-
-ARIA attributes (`aria-grabbed`, `aria-dropeffect`, `tabindex`) are managed automatically.
-
-**Screen Reader Announcements:** The library emits events with position data. Implement announcements in your app:
+The library emits events with position data. Implement announcements in your app:
 
 ```typescript
 @Component({
@@ -379,17 +297,29 @@ export class MyComponent {
 }
 ```
 
+## Keyboard Navigation
+
+| Key         | Action                      |
+| ----------- | --------------------------- |
+| `Tab`       | Navigate to draggable items |
+| `Space`     | Start/end drag              |
+| `Arrow ↑/↓` | Move item up/down           |
+| `Arrow ←/→` | Move to adjacent list       |
+| `Escape`    | Cancel drag                 |
+
+ARIA attributes (`aria-grabbed`, `aria-dropeffect`, `tabindex`) are managed automatically.
+
 ## CSS Classes
 
-| Class                     | Element   | Applied When                |
-| ------------------------- | --------- | --------------------------- |
-| `vdnd-draggable`          | Draggable | Always                      |
-| `vdnd-draggable-dragging` | Draggable | While being dragged         |
-| `vdnd-draggable-disabled` | Draggable | When disabled               |
-| `vdnd-drag-pending`       | Draggable | After delay, ready to drag  |
-| `vdnd-droppable`          | Droppable | Always                      |
-| `vdnd-droppable-active`   | Droppable | When a draggable is over it |
-| `vdnd-droppable-disabled` | Droppable | When disabled               |
+| Class                     | Applied When                |
+| ------------------------- | --------------------------- |
+| `vdnd-draggable`          | Always on draggable         |
+| `vdnd-draggable-dragging` | While being dragged         |
+| `vdnd-draggable-disabled` | When disabled               |
+| `vdnd-drag-pending`       | After delay, ready to drag  |
+| `vdnd-droppable`          | Always on droppable         |
+| `vdnd-droppable-active`   | When a draggable is over it |
+| `vdnd-droppable-disabled` | When disabled               |
 
 ## How It Works
 
@@ -406,10 +336,10 @@ This library uses **element-under-point detection**: temporarily hide the dragge
 ## Development
 
 ```bash
-npm start              # Dev server (localhost:4200)
-ng build ngx-virtual-dnd  # Build library (required after lib edits)
-npm test               # Unit tests
-npm run e2e            # E2E tests
+npm start                    # Dev server (localhost:4200)
+ng build ngx-virtual-dnd     # Build library (required after lib edits)
+npm test                     # Unit tests
+npm run e2e                  # E2E tests
 ```
 
 ## License

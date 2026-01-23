@@ -23,7 +23,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { fromEvent } from 'rxjs';
 import { DragStateService } from '../services/drag-state.service';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
-import { PlaceholderContext } from './placeholder.component';
+import { DragPlaceholderComponent } from './drag-placeholder.component';
 
 /**
  * Context provided to the item template.
@@ -31,12 +31,10 @@ import { PlaceholderContext } from './placeholder.component';
 export interface VirtualScrollItemContext<T> {
   /** The item data */
   $implicit: T;
-  /** The item's index in the original array (-1 for placeholders) */
+  /** The item's index in the original array */
   index: number;
   /** Whether this item is "sticky" (always rendered) */
   isSticky: boolean;
-  /** Whether this item is an auto-inserted placeholder */
-  isPlaceholder?: boolean;
 }
 
 /**
@@ -85,7 +83,7 @@ export interface VisibleRangeChange {
 @Component({
   selector: 'vdnd-virtual-scroll',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet],
+  imports: [NgTemplateOutlet, DragPlaceholderComponent],
   host: {
     class: 'vdnd-virtual-scroll',
     '[style.height.px]': 'containerHeight() ?? null',
@@ -100,22 +98,22 @@ export interface VisibleRangeChange {
 
       <!-- Content wrapper positioned via GPU-accelerated transform -->
       <div class="vdnd-virtual-scroll-content-wrapper" [style.transform]="contentTransform()">
-        @for (
-          item of renderedItems();
-          track item.isPlaceholder ? 'placeholder' : effectiveTrackByFn()(item.index, item.data)
-        ) {
-          <ng-container
-            *ngTemplateOutlet="
-              itemTemplate();
-              context: {
-                $implicit: item.data,
-                index: item.index,
-                isSticky: item.isSticky,
-                isPlaceholder: item.isPlaceholder,
-              }
-            "
-          >
-          </ng-container>
+        @for (entry of renderedItems(); track trackEntry($index, entry)) {
+          @if (entry.type === 'placeholder') {
+            <vdnd-drag-placeholder [itemHeight]="itemHeight()" />
+          } @else {
+            <ng-container
+              *ngTemplateOutlet="
+                itemTemplate();
+                context: {
+                  $implicit: entry.data,
+                  index: entry.index,
+                  isSticky: entry.isSticky,
+                }
+              "
+            >
+            </ng-container>
+          }
         }
       </div>
     </div>
@@ -220,22 +218,9 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
 
   /**
    * ID of the droppable this virtual scroll belongs to.
-   * Required for auto-placeholder insertion.
+   * Required for placeholder positioning.
    */
   droppableId = input<string>();
-
-  /**
-   * Whether to automatically insert a placeholder at the correct position.
-   * Requires droppableId to be set.
-   * @default true
-   */
-  autoPlaceholder = input<boolean>(true);
-
-  /**
-   * Custom template for the placeholder.
-   * Only used when autoPlaceholder is enabled.
-   */
-  placeholderTemplate = input<TemplateRef<PlaceholderContext>>();
 
   /**
    * Whether to automatically add the dragged item to the sticky list.
@@ -254,6 +239,20 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
     const idFn = this.itemIdFn();
     return (_index: number, item: T) => idFn(item);
   });
+
+  /**
+   * Track function for rendered entries (items + placeholder).
+   */
+  protected trackEntry(
+    _index: number,
+    entry: { type: 'item' | 'placeholder'; data: T | null; index: number },
+  ): string | number {
+    if (entry.type === 'placeholder') {
+      return '__placeholder__';
+    }
+    const trackFn = this.effectiveTrackByFn();
+    return trackFn(entry.index, entry.data as T);
+  }
 
   /**
    * Effective sticky item IDs - combines user-provided IDs with auto-sticky dragged item.
@@ -291,8 +290,10 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   protected readonly totalHeight = computed(() => {
     const count = this.items().length;
     const draggedId = this.draggedItemId();
-    // Subtract 1 when dragging - the dragged item is position:absolute (out of flow)
-    const effectiveCount = draggedId ? count - 1 : count;
+    // Only subtract 1 if the dragged item belongs to THIS list (is in our items array).
+    // Cross-list drags shouldn't affect the target list's height.
+    const isDraggedItemInThisList = draggedId !== null && this.#itemIndexMap().has(draggedId);
+    const effectiveCount = isDraggedItemInThisList ? count - 1 : count;
     return effectiveCount * this.itemHeight();
   });
 
@@ -357,43 +358,53 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   /** Memoized Set of sticky IDs - rebuilt only when effectiveStickyIds() changes */
   readonly #stickyIdsSet = computed(() => new Set(this.effectiveStickyIds()));
 
-  /** Items to render, including sticky items and auto-placeholder */
+  /** Whether the placeholder should be shown in this container */
+  protected readonly shouldShowPlaceholder = computed(() => {
+    if (!this.#dragState.isDragging()) return false;
+    return this.#dragState.activeDroppableId() === this.droppableId();
+  });
+
+  /** The placeholder index when placeholder should be shown */
+  protected readonly placeholderIndex = computed(() => {
+    if (!this.shouldShowPlaceholder()) return -1;
+    return this.#dragState.placeholderIndex() ?? -1;
+  });
+
+  /** Items to render, including sticky items and placeholder */
   protected readonly renderedItems = computed(() => {
     const items = this.items();
     const { start, end } = this.#renderRange();
     const stickyIds = this.#stickyIdsSet();
     const idFn = this.itemIdFn();
     const draggedId = this.draggedItemId();
-
-    // Check if we should insert a placeholder
-    const shouldInsertPlaceholder = this.#shouldInsertPlaceholder();
-    const placeholderIndex = shouldInsertPlaceholder ? this.#dragState.placeholderIndex() : null;
+    const placeholderIdx = this.placeholderIndex();
 
     const result: {
-      data: T;
+      type: 'item' | 'placeholder';
+      data: T | null;
       index: number;
       isSticky: boolean;
       isDragging: boolean;
-      isPlaceholder?: boolean;
     }[] = [];
     const renderedIds = new Set<string>();
 
-    // First, add all items in the visible range (with placeholder insertion)
+    // Add all items in the visible range, inserting placeholder at correct position
     for (let i = start; i <= end && i < items.length; i++) {
-      // Insert placeholder before this item if needed
-      if (placeholderIndex !== null && placeholderIndex === i) {
+      // Insert placeholder before item at placeholderIndex
+      if (placeholderIdx === i && !result.some((r) => r.type === 'placeholder')) {
         result.push({
-          data: { __vdndPlaceholder: true } as unknown as T,
-          index: -1,
+          type: 'placeholder',
+          data: null,
+          index: placeholderIdx,
           isSticky: false,
           isDragging: false,
-          isPlaceholder: true,
         });
       }
 
       const item = items[i];
       const id = idFn(item);
       result.push({
+        type: 'item',
         data: item,
         index: i,
         isSticky: stickyIds.has(id),
@@ -402,24 +413,25 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
       renderedIds.add(id);
     }
 
-    // Insert placeholder at end if needed
-    if (placeholderIndex !== null && placeholderIndex >= items.length) {
+    // If placeholder is at the end (after all items), add it
+    if (placeholderIdx >= items.length && !result.some((r) => r.type === 'placeholder')) {
       result.push({
-        data: { __vdndPlaceholder: true } as unknown as T,
-        index: -1,
+        type: 'placeholder',
+        data: null,
+        index: placeholderIdx,
         isSticky: false,
         isDragging: false,
-        isPlaceholder: true,
       });
     }
 
-    // Then, add any sticky items that aren't already rendered
+    // Add any sticky items that aren't already rendered
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       const id = idFn(item);
 
       if (stickyIds.has(id) && !renderedIds.has(id)) {
         result.push({
+          type: 'item',
           data: item,
           index: i,
           isSticky: true,
@@ -430,35 +442,6 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
     }
 
     return result;
-  });
-
-  /**
-   * Determines if a placeholder should be automatically inserted.
-   * Skips auto-insertion if items already contain a manual placeholder.
-   */
-  readonly #shouldInsertPlaceholder = computed(() => {
-    if (!this.autoPlaceholder()) return false;
-    if (!this.droppableId()) return false;
-
-    const activeDroppable = this.#dragState.activeDroppableId();
-    if (activeDroppable !== this.droppableId()) return false;
-
-    // Check if items already contain a manual placeholder
-    // Skip auto-insertion to prevent double placeholders
-    const items = this.items();
-    const hasManualPlaceholder = items.some(
-      (item) =>
-        item &&
-        typeof item === 'object' &&
-        'isPlaceholder' in item &&
-        (item as Record<string, unknown>)['isPlaceholder'] === true,
-    );
-
-    if (hasManualPlaceholder) {
-      return false;
-    }
-
-    return true;
   });
 
   /** Generated ID for auto-scroll registration */
