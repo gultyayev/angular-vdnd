@@ -48,16 +48,18 @@ export interface DragPreviewContext<T = unknown> {
       <div
         class="vdnd-drag-preview"
         [style.position]="'fixed'"
-        [style.left.px]="position().x"
-        [style.top.px]="position().y"
+        [style.left.px]="0"
+        [style.top.px]="0"
+        [style.transform]="transform()"
+        [style.will-change]="'transform'"
         [style.width.px]="dimensions().width"
         [style.height.px]="dimensions().height"
         [style.pointer-events]="'none'"
         [style.z-index]="1000"
-        [style.opacity]="0.9">
+        [style.opacity]="0.9"
+      >
         @if (previewTemplate()) {
-          <ng-container
-            *ngTemplateOutlet="previewTemplate()!; context: templateContext()">
+          <ng-container *ngTemplateOutlet="previewTemplate()!; context: templateContext()">
           </ng-container>
         } @else if (clonedElement()) {
           <div class="vdnd-drag-preview-clone" #cloneContainer></div>
@@ -160,6 +162,12 @@ export class DragPreviewComponent<T = unknown> {
     }
 
     return { x, y };
+  });
+
+  /** Transform-based positioning for better performance (avoid layout from left/top). */
+  protected readonly transform = computed(() => {
+    const { x, y } = this.position();
+    return `translate3d(${x}px, ${y}px, 0)`;
   });
 
   /** Dimensions of the preview */

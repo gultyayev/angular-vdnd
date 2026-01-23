@@ -136,8 +136,7 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
 
         const preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
-        expect(preview.nativeElement.style.left).toBe('140px');
-        expect(preview.nativeElement.style.top).toBe('180px');
+        expect(preview.nativeElement.style.transform).toBe('translate3d(140px, 180px, 0)');
       });
 
       it('should use default cursorOffset when no grab offset', () => {
@@ -149,8 +148,7 @@ describe('DragPreviewComponent', () => {
 
         const preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
         // Should use default cursorOffset input: (100-8, 100-8) = (92, 92)
-        expect(preview.nativeElement.style.left).toBe('92px');
-        expect(preview.nativeElement.style.top).toBe('92px');
+        expect(preview.nativeElement.style.transform).toBe('translate3d(92px, 92px, 0)');
       });
 
       it('should update position when cursor moves', () => {
@@ -160,7 +158,7 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
 
         let preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
-        expect(preview.nativeElement.style.left).toBe('100px');
+        expect(preview.nativeElement.style.transform).toBe('translate3d(100px, 100px, 0)');
 
         dragStateService.updateDragPosition({
           cursorPosition: { x: 200, y: 200 },
@@ -172,8 +170,7 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
 
         preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
-        expect(preview.nativeElement.style.left).toBe('200px');
-        expect(preview.nativeElement.style.top).toBe('200px');
+        expect(preview.nativeElement.style.transform).toBe('translate3d(200px, 200px, 0)');
       });
     });
 
@@ -197,8 +194,7 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
 
         const preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
-        expect(preview.nativeElement.style.left).toBe('100px');
-        expect(preview.nativeElement.style.top).toBe('200px');
+        expect(preview.nativeElement.style.transform).toBe('translate3d(100px, 200px, 0)');
       });
 
       it('should lock y axis when configured', () => {
@@ -220,8 +216,7 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
 
         const preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
-        expect(preview.nativeElement.style.left).toBe('200px');
-        expect(preview.nativeElement.style.top).toBe('100px');
+        expect(preview.nativeElement.style.transform).toBe('translate3d(200px, 100px, 0)');
       });
     });
 

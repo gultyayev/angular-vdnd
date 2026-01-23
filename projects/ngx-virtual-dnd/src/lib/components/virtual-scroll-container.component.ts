@@ -376,6 +376,7 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
     const { start, end } = this.#renderRange();
     const stickyIds = this.#stickyIdsSet();
     const idFn = this.itemIdFn();
+    const itemIndexMap = this.#itemIndexMap();
     const draggedId = this.draggedItemId();
     const placeholderIdx = this.placeholderIndex();
 
@@ -387,11 +388,12 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
       isDragging: boolean;
     }[] = [];
     const renderedIds = new Set<string>();
+    let hasPlaceholder = false;
 
     // Add all items in the visible range, inserting placeholder at correct position
     for (let i = start; i <= end && i < items.length; i++) {
       // Insert placeholder before item at placeholderIndex
-      if (placeholderIdx === i && !result.some((r) => r.type === 'placeholder')) {
+      if (placeholderIdx === i && !hasPlaceholder) {
         result.push({
           type: 'placeholder',
           data: null,
@@ -399,6 +401,7 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
           isSticky: false,
           isDragging: false,
         });
+        hasPlaceholder = true;
       }
 
       const item = items[i];
@@ -414,7 +417,7 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
     }
 
     // If placeholder is at the end (after all items), add it
-    if (placeholderIdx >= items.length && !result.some((r) => r.type === 'placeholder')) {
+    if (placeholderIdx >= items.length && placeholderIdx >= 0 && !hasPlaceholder) {
       result.push({
         type: 'placeholder',
         data: null,
@@ -422,23 +425,31 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
         isSticky: false,
         isDragging: false,
       });
+      hasPlaceholder = true;
     }
 
     // Add any sticky items that aren't already rendered
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      const id = idFn(item);
+    const missingStickyIndices: { id: string; index: number }[] = [];
+    for (const id of stickyIds) {
+      if (renderedIds.has(id)) continue;
+      const index = itemIndexMap.get(id);
+      if (index === undefined) continue;
+      missingStickyIndices.push({ id, index });
+    }
+    if (missingStickyIndices.length > 1) {
+      missingStickyIndices.sort((a, b) => a.index - b.index);
+    }
 
-      if (stickyIds.has(id) && !renderedIds.has(id)) {
-        result.push({
-          type: 'item',
-          data: item,
-          index: i,
-          isSticky: true,
-          isDragging: id === draggedId,
-        });
-        renderedIds.add(id);
-      }
+    for (const { id, index } of missingStickyIndices) {
+      const item = items[index];
+      if (item === undefined) continue;
+      result.push({
+        type: 'item',
+        data: item,
+        index,
+        isSticky: true,
+        isDragging: id === draggedId,
+      });
     }
 
     return result;
