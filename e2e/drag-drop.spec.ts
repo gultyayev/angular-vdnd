@@ -201,7 +201,7 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
     await sourceItem.hover();
     await page.mouse.down();
     await page.mouse.move(sourceBox.x + 5, sourceBox.y + 5, { steps: 2 });
-    await demoPage.dragPreview.waitFor({ state: 'visible', timeout: 1000 }).catch(() => {});
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
     await page.waitForTimeout(50);
 
     // Move to target position
@@ -267,7 +267,7 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
     await sourceItem.hover();
     await page.mouse.down();
     await page.mouse.move(sourceBox.x + 5, sourceBox.y + 5, { steps: 2 });
-    await demoPage.dragPreview.waitFor({ state: 'visible', timeout: 1000 }).catch(() => {});
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
     await page.waitForTimeout(50);
 
     // Move to target position
