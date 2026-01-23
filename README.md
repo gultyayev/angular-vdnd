@@ -28,7 +28,6 @@ import {
   DroppableGroupDirective,
   DraggableDirective,
   DragPreviewComponent,
-  PlaceholderComponent,
   DropEvent,
   moveItem,
 } from 'ngx-virtual-dnd';
@@ -39,18 +38,13 @@ import {
     DroppableGroupDirective,
     DraggableDirective,
     DragPreviewComponent,
-    PlaceholderComponent,
   ],
   template: `
     <!-- Item template -->
-    <ng-template #itemTpl let-item let-isPlaceholder="isPlaceholder">
-      @if (isPlaceholder) {
-        <vdnd-placeholder [height]="50" />
-      } @else {
-        <div class="item" vdndDraggable="{{ item.id }}" [vdndDraggableData]="item">
-          {{ item.name }}
-        </div>
-      }
+    <ng-template #itemTpl let-item>
+      <div class="item" [vdndDraggable]="item.id" [vdndDraggableData]="item">
+        {{ item.name }}
+      </div>
     </ng-template>
 
     <!-- Lists wrapped in a group -->
@@ -144,49 +138,35 @@ For maximum control, use individual components instead of `VirtualSortableListCo
 @Component({
   imports: [
     VirtualScrollContainerComponent,
+    DroppableGroupDirective,
     DroppableDirective,
     DraggableDirective,
     DragPreviewComponent,
-    PlaceholderComponent,
   ],
   template: `
-    <div vdndDroppable="list-1" vdndDroppableGroup="demo" (drop)="onDrop($event)">
-      <vdnd-virtual-scroll
-        [items]="itemsWithPlaceholder()"
-        [itemHeight]="50"
-        [stickyItemIds]="stickyIds()"
-        [itemIdFn]="getItemId"
-        [trackByFn]="trackById"
-        [itemTemplate]="itemTpl"
-      />
+    <ng-template #itemTpl let-item>
+      <div class="item" [vdndDraggable]="item.id" [vdndDraggableData]="item">
+        {{ item.name }}
+      </div>
+    </ng-template>
+
+    <div vdndGroup="demo">
+      <div vdndDroppable="list-1" (drop)="onDrop($event)">
+        <vdnd-virtual-scroll
+          droppableId="list-1"
+          [items]="items()"
+          [itemHeight]="50"
+          [itemIdFn]="getItemId"
+          [trackByFn]="trackById"
+          [itemTemplate]="itemTpl"
+        />
+      </div>
     </div>
     <vdnd-drag-preview />
   `,
 })
 export class ListComponent {
-  readonly #dragState = inject(DragStateService);
   items = signal<Item[]>([]);
-
-  // Keep dragged item rendered during scroll
-  stickyIds = computed(() => {
-    const item = this.#dragState.draggedItem();
-    return item ? [item.draggableId] : [];
-  });
-
-  // Insert placeholder into list
-  itemsWithPlaceholder = computed(() => {
-    const items = this.items();
-    const activeDroppable = this.#dragState.activeDroppableId();
-    const placeholderIndex = this.#dragState.placeholderIndex();
-
-    if (activeDroppable !== 'list-1' || placeholderIndex === null) {
-      return items;
-    }
-
-    const result = [...items];
-    result.splice(placeholderIndex, 0, { id: 'placeholder', isPlaceholder: true } as any);
-    return result;
-  });
 }
 ```
 

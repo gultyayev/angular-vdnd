@@ -13,6 +13,10 @@ import {
 import { VDND_VIRTUAL_VIEWPORT, VdndVirtualViewport } from '../tokens/virtual-viewport.token';
 import { VDND_SCROLL_CONTAINER, VdndScrollContainer } from '../tokens/scroll-container.token';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
+import {
+  bindRafThrottledScrollTopSignal,
+  bindResizeObserverHeightSignal,
+} from '../utils/dom-signal-bindings';
 
 /**
  * A virtual viewport component that provides efficient wrapper-based positioning
@@ -125,15 +129,7 @@ export class VirtualViewportComponent
 
   /** Cleanup function for scroll listener */
   #scrollCleanup: (() => void) | null = null;
-
-  /** Pending RAF ID for scroll throttling */
-  #pendingScrollRaf: number | null = null;
-
-  /** Last scroll position committed to signal */
-  #lastCommittedScrollTop = 0;
-
-  /** ResizeObserver for container height detection */
-  #resizeObserver: ResizeObserver | null = null;
+  #resizeCleanup: (() => void) | null = null;
 
   /** Generated ID for auto-scroll registration */
   #generatedScrollId = `vdnd-viewport-${Math.random().toString(36).slice(2, 9)}`;
@@ -225,10 +221,7 @@ export class VirtualViewportComponent
 
   ngOnDestroy(): void {
     this.#scrollCleanup?.();
-    if (this.#pendingScrollRaf !== null) {
-      cancelAnimationFrame(this.#pendingScrollRaf);
-    }
-    this.#resizeObserver?.disconnect();
+    this.#resizeCleanup?.();
     this.#unregisterAutoScroll();
   }
 
@@ -238,56 +231,21 @@ export class VirtualViewportComponent
   readonly #scrollThreshold = 5;
 
   #setupScrollListener(): void {
-    const onScroll = () => {
-      if (this.#pendingScrollRaf !== null) {
-        return;
-      }
-
-      const currentScrollTop = this.nativeElement.scrollTop;
-
-      if (Math.abs(currentScrollTop - this.#lastCommittedScrollTop) < this.#scrollThreshold) {
-        return;
-      }
-
-      this.#pendingScrollRaf = requestAnimationFrame(() => {
-        this.#pendingScrollRaf = null;
-        const finalScrollTop = this.nativeElement.scrollTop;
-
-        if (Math.abs(finalScrollTop - this.#lastCommittedScrollTop) >= this.#scrollThreshold) {
-          this.#lastCommittedScrollTop = finalScrollTop;
-          this.#scrollTop.set(finalScrollTop);
-        }
-      });
-    };
-
-    this.#ngZone.runOutsideAngular(() => {
-      this.nativeElement.addEventListener('scroll', onScroll, { passive: true });
+    this.#scrollCleanup = bindRafThrottledScrollTopSignal({
+      element: this.nativeElement,
+      ngZone: this.#ngZone,
+      scrollTop: this.#scrollTop,
+      thresholdPx: this.#scrollThreshold,
     });
-
-    this.#scrollCleanup = () => {
-      this.nativeElement.removeEventListener('scroll', onScroll);
-    };
-
-    // Set initial scroll position
-    this.#lastCommittedScrollTop = this.nativeElement.scrollTop;
-    this.#scrollTop.set(this.nativeElement.scrollTop);
   }
 
   #setupResizeObserver(): void {
-    this.#ngZone.runOutsideAngular(() => {
-      this.#resizeObserver = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          const height = entry.contentRect.height;
-          if (Math.abs(height - this.#containerHeight()) > 1) {
-            this.#containerHeight.set(height);
-          }
-        }
-      });
-      this.#resizeObserver.observe(this.nativeElement);
+    this.#resizeCleanup = bindResizeObserverHeightSignal({
+      element: this.nativeElement,
+      ngZone: this.#ngZone,
+      height: this.#containerHeight,
+      minDeltaPx: 1,
     });
-
-    // Set initial height
-    this.#containerHeight.set(this.nativeElement.clientHeight);
   }
 
   #registerAutoScroll(): void {
