@@ -18,6 +18,9 @@ class MockResizeObserver {
   disconnect = jest.fn();
 }
 
+const nextAnimationFrame = (): Promise<void> =>
+  new Promise((resolve) => requestAnimationFrame(() => resolve()));
+
 interface TestItem {
   id: string;
   name: string;
@@ -168,10 +171,11 @@ describe('VirtualScrollContainerComponent', () => {
       expect(firstItem.nativeElement.getAttribute('data-index')).toBe('0');
     });
 
-    it('should update rendered items on scroll', () => {
+    it('should update rendered items on scroll', async () => {
       // Scroll to middle of list
       virtualScrollEl.scrollTop = 2000; // Position for item 40
       virtualScrollEl.dispatchEvent(new Event('scroll'));
+      await nextAnimationFrame(); // raf-throttled scroll binding
       fixture.detectChanges();
       fixture.detectChanges();
 
@@ -271,9 +275,10 @@ describe('VirtualScrollContainerComponent', () => {
       expect(wrapper.nativeElement.style.transform).toBe('translateY(0px)');
     });
 
-    it('should update transform when scrolled', () => {
+    it('should update transform when scrolled', async () => {
       virtualScrollEl.scrollTop = 1000;
       virtualScrollEl.dispatchEvent(new Event('scroll'));
+      await nextAnimationFrame(); // raf-throttled scroll binding
       fixture.detectChanges();
       fixture.detectChanges();
 
@@ -312,9 +317,10 @@ describe('VirtualScrollContainerComponent', () => {
   });
 
   describe('scroll events', () => {
-    it('should emit scrollPositionChange on scroll', () => {
+    it('should emit scrollPositionChange on scroll', async () => {
       virtualScrollEl.scrollTop = 500;
       virtualScrollEl.dispatchEvent(new Event('scroll'));
+      await nextAnimationFrame(); // raf-throttled scroll binding
       fixture.detectChanges();
       fixture.detectChanges();
 

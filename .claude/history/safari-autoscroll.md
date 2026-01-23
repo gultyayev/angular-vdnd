@@ -49,16 +49,18 @@ requestAnimationFrame(() => {
 **Synchronous callback in AutoScrollService** (Dec 2025)
 
 - Use direct property assignment (`element.scrollTop += delta`) instead of `scrollBy()` for guaranteed synchronous behavior
-- Force layout flush immediately (`void element.offsetHeight`)
 - Call the placeholder recalculation callback immediately in the same frame (no RAF delay)
 - No `ngZone.run()` wrapper needed - the callback already enters the zone when updating drag state
 
 ```typescript
 // In AutoScrollService.#performScroll():
 element.scrollTop += scrollY;
-void element.offsetHeight; // Force layout flush
 this.#onScrollCallback?.(); // Immediate, no RAF
 ```
+
+**Update (Jan 2026):** The forced layout flush was removed after the placeholder/index math was stabilized and E2E
+passed across browsers. If a Safari/WebKit regression reappears (e.g. stale hit-testing or drift), consider
+re-introducing the flush behind a targeted condition rather than unconditionally on every scroll frame.
 
 ## Key Insights
 

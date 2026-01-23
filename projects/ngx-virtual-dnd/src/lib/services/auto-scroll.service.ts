@@ -232,10 +232,6 @@ export class AutoScrollService {
       element.scrollLeft += scrollX;
     }
 
-    // Force layout flush immediately to ensure Safari's layout is updated
-    // before placeholder calculation. This invalidates any cached values.
-    void element.offsetHeight;
-
     // Notify callback IMMEDIATELY in the same frame (no RAF delay)
     // Delaying via RAF causes cumulative drift during continuous autoscroll
     // because multiple scrolls happen before each delayed callback runs.

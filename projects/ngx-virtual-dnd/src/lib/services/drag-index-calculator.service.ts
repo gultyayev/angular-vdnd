@@ -46,8 +46,6 @@ export class DragIndexCalculatorService {
     if (virtualScroll) {
       // Standard virtual scroll component - scroll container is the virtual scroll element
       container = virtualScroll as HTMLElement;
-      // Force layout flush - critical for Safari after programmatic scroll
-      void container.offsetHeight;
       rect = container.getBoundingClientRect();
       currentScrollTop = container.scrollTop;
     } else if (virtualContent) {
@@ -55,7 +53,6 @@ export class DragIndexCalculatorService {
       const scrollableParent = virtualContent.closest('.vdnd-scrollable') as HTMLElement | null;
       if (scrollableParent) {
         container = scrollableParent;
-        void container.offsetHeight;
         // Use scroll container rect + content offset to avoid stale virtualContent rects.
         rect = container.getBoundingClientRect();
         const contentOffsetAttr = (virtualContent as HTMLElement).getAttribute(
@@ -66,14 +63,12 @@ export class DragIndexCalculatorService {
         currentScrollTop = container.scrollTop - offsetValue;
       } else {
         container = virtualContent as HTMLElement;
-        void container.offsetHeight;
         rect = container.getBoundingClientRect();
         currentScrollTop = 0;
       }
     } else {
       // Fallback: use droppable element directly
       container = droppableElement;
-      void container.offsetHeight;
       rect = container.getBoundingClientRect();
       currentScrollTop = container.scrollTop;
     }
