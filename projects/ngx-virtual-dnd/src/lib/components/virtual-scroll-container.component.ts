@@ -4,7 +4,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  DestroyRef,
   effect,
   ElementRef,
   inject,
@@ -16,14 +15,15 @@ import {
   output,
   signal,
   TemplateRef,
-  viewChild,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
-import { fromEvent } from 'rxjs';
 import { DragStateService } from '../services/drag-state.service';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
 import { DragPlaceholderComponent } from './drag-placeholder.component';
+import {
+  bindRafThrottledScrollTopSignal,
+  bindResizeObserverHeightSignal,
+} from '../utils/dom-signal-bindings';
 
 /**
  * Context provided to the item template.
@@ -92,7 +92,7 @@ export interface VisibleRangeChange {
     '[attr.data-item-height]': 'itemHeight()',
   },
   template: `
-    <div class="vdnd-virtual-scroll-content" #contentContainer>
+    <div class="vdnd-virtual-scroll-content">
       <!-- Single spacer maintains scroll height -->
       <div class="vdnd-virtual-scroll-spacer" [style.height.px]="totalHeight()"></div>
 
@@ -158,16 +158,13 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   readonly #autoScrollService = inject(AutoScrollService);
   readonly #ngZone = inject(NgZone);
   readonly #injector = inject(Injector);
-  readonly #destroyRef = inject(DestroyRef);
 
-  /** ResizeObserver for automatic height detection */
-  #resizeObserver: ResizeObserver | null = null;
+  /** Cleanup function for scroll listener */
+  #scrollCleanup: (() => void) | null = null;
+  #resizeCleanup: (() => void) | null = null;
 
   /** Measured height from ResizeObserver (used when containerHeight is not provided) */
   readonly #measuredHeight = signal(0);
-
-  /** The scrollable container element */
-  protected readonly contentContainer = viewChild<ElementRef<HTMLElement>>('contentContainer');
 
   /** Template for rendering each item - passed as input instead of content child for reliability */
   itemTemplate = input.required<TemplateRef<VirtualScrollItemContext<T>>>();
@@ -555,40 +552,31 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   }
 
   ngAfterViewInit(): void {
-    // Set up ResizeObserver for automatic height detection when containerHeight is not provided
-    this.#ngZone.runOutsideAngular(() => {
-      this.#resizeObserver = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          const height = entry.contentRect.height;
-          // Only update if height changed significantly (> 1px) to avoid loops
-          // No ngZone.run() needed - signals work outside zone and effects react automatically
-          if (Math.abs(height - this.#measuredHeight()) > 1) {
-            this.#measuredHeight.set(height);
-          }
-        }
-      });
-      this.#resizeObserver.observe(this.#elementRef.nativeElement);
+    const element = this.#elementRef.nativeElement;
 
-      // Set up scroll listener outside Angular zone using RxJS fromEvent
-      // This avoids template event binding which would mark the component dirty 60x/sec
-      fromEvent(this.#elementRef.nativeElement, 'scroll', { passive: true })
-        .pipe(takeUntilDestroyed(this.#destroyRef))
-        .subscribe(() => {
-          const newScrollTop = this.#elementRef.nativeElement.scrollTop;
-          // Only update if the scroll position has changed significantly
-          // (at least 10% of an item height, to reduce updates)
-          const threshold = Math.max(5, this.itemHeight() * 0.1);
-          if (Math.abs(newScrollTop - this.#scrollTop()) >= threshold) {
-            this.#scrollTop.set(newScrollTop);
-            this.scrollPositionChange.emit(newScrollTop);
-          }
-        });
+    this.#resizeCleanup = bindResizeObserverHeightSignal({
+      element,
+      ngZone: this.#ngZone,
+      height: this.#measuredHeight,
+      minDeltaPx: 1,
+    });
+
+    // Scroll listener outside Angular zone with RAF throttling.
+    // This avoids template event binding which would mark the component dirty 60x/sec.
+    this.#scrollCleanup = bindRafThrottledScrollTopSignal({
+      element,
+      ngZone: this.#ngZone,
+      scrollTop: this.#scrollTop,
+      thresholdPx: 5,
+      onCommit: (newScrollTop) => {
+        this.scrollPositionChange.emit(newScrollTop);
+      },
     });
   }
 
   ngOnDestroy(): void {
-    // Clean up ResizeObserver
-    this.#resizeObserver?.disconnect();
+    this.#scrollCleanup?.();
+    this.#resizeCleanup?.();
 
     // Unregister from auto-scroll service
     const id = this.scrollContainerId() ?? this.#generatedScrollId;

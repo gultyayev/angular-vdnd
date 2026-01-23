@@ -5,8 +5,9 @@ export function bindRafThrottledScrollTopSignal(options: {
   ngZone: NgZone;
   scrollTop: WritableSignal<number>;
   thresholdPx?: number;
+  onCommit?: (scrollTop: number) => void;
 }): () => void {
-  const { element, ngZone, scrollTop, thresholdPx = 5 } = options;
+  const { element, ngZone, scrollTop, thresholdPx = 5, onCommit } = options;
 
   let pendingRaf: number | null = null;
   let lastCommittedScrollTop = element.scrollTop;
@@ -27,6 +28,7 @@ export function bindRafThrottledScrollTopSignal(options: {
       if (Math.abs(finalScrollTop - lastCommittedScrollTop) >= thresholdPx) {
         lastCommittedScrollTop = finalScrollTop;
         scrollTop.set(finalScrollTop);
+        onCommit?.(finalScrollTop);
       }
     });
   };

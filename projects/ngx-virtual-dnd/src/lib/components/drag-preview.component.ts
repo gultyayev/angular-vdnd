@@ -119,10 +119,15 @@ export class DragPreviewComponent<T = unknown> {
       const container = this.cloneContainer()?.nativeElement;
       const clone = this.clonedElement();
 
-      if (container && clone) {
-        // Clear previous content and append clone
-        container.innerHTML = '';
-        container.appendChild(clone.cloneNode(true));
+      if (!container) {
+        return;
+      }
+
+      // Clear previous content and append the prepared clone element.
+      // Avoid cloning again: ElementCloneService already creates a styled/sanitized clone.
+      container.innerHTML = '';
+      if (clone) {
+        container.appendChild(clone);
       }
     });
   }
