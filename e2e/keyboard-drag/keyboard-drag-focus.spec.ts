@@ -114,8 +114,10 @@ test.describe('Keyboard Drag - Focus Management', () => {
     // Item should have visible focus indicator (not :focus-visible but at least :focus)
     const hasFocusStyle = await demoPage.list1Items.first().evaluate((el) => {
       const styles = getComputedStyle(el);
-      // Check for common focus indicators
-      return styles.outline !== 'none' || styles.boxShadow !== 'none' || styles.border !== 'none';
+      const outlineWidth = parseFloat(styles.outlineWidth || '0');
+      const hasOutline = styles.outlineStyle !== 'none' && outlineWidth > 0;
+      const hasBoxShadow = styles.boxShadow !== 'none';
+      return hasOutline || hasBoxShadow;
     });
 
     // Verify there's some focus indicator

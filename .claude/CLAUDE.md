@@ -197,6 +197,7 @@ See `.claude/history/safari-autoscroll.md` for failed approaches and detailed in
 
 ## Testing
 
+- **Lazy docs:** `.ai/E2E.md` (load when working on Playwright/E2E tests)
 - **Unit tests:** Jest with zoneless environment
 - **E2E tests:** Playwright - **ALWAYS run after code changes**
 - Use Page Object Model pattern for E2E tests

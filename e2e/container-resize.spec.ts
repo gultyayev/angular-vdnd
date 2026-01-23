@@ -121,34 +121,51 @@ test.describe('Container Resize', () => {
   });
 
   test('should handle container resizing during drag operation', async ({ page }) => {
+    const initialList1Count = await demoPage.getItemCount('list1');
+    const initialList2Count = await demoPage.getItemCount('list2');
+    const draggedItemText = await demoPage.getItemText('list1', 0);
+
     const sourceItem = demoPage.list1Items.first();
+    await sourceItem.scrollIntoViewIfNeeded();
     const sourceBox = await sourceItem.boundingBox();
     const container = demoPage.list1VirtualScroll;
 
     // Start dragging
     await sourceItem.hover();
     await page.mouse.down();
-    await page.mouse.move(sourceBox!.x + 50, sourceBox!.y + 50);
+    await page.mouse.move(sourceBox!.x + sourceBox!.width / 2 + 10, sourceBox!.y + 10, {
+      steps: 2,
+    });
 
     // Verify drag preview is visible
-    await expect(demoPage.dragPreview).toBeVisible();
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
 
     // Resize the container during drag
     await container.evaluate((el) => {
       el.style.height = '500px';
     });
-    await page.waitForTimeout(100);
+    await expect(async () => {
+      const box = await container.boundingBox();
+      expect(box?.height).toBe(500);
+    }).toPass({ timeout: 2000 });
 
     // Continue the drag and drop
     const targetBox = await demoPage.list2VirtualScroll.boundingBox();
-    await page.mouse.move(targetBox!.x + 50, targetBox!.y + 50, { steps: 5 });
-    await page.waitForTimeout(50);
+    const targetX = targetBox!.x + targetBox!.width / 2;
+    const targetY = Math.min(targetBox!.y + 25, targetBox!.y + targetBox!.height - 10);
+    await page.mouse.move(targetX, targetY, { steps: 10 });
+
+    // Ensure the drop target has been resolved before releasing the mouse.
+    // Drag updates are RAF-throttled; dropping immediately after a move can keep the old droppable.
+    await expect(demoPage.list2Container.locator('.vdnd-drag-placeholder-visible')).toBeVisible({
+      timeout: 2000,
+    });
     await page.mouse.up();
 
     // Verify the drag completed successfully (item moved to list2)
-    await page.waitForTimeout(100);
-    const list2Items = await demoPage.list2Items.count();
-    expect(list2Items).toBeGreaterThan(0);
+    await expect.poll(() => demoPage.getItemCount('list1')).toBe(initialList1Count - 1);
+    await expect.poll(() => demoPage.getItemCount('list2')).toBe(initialList2Count + 1);
+    await expect.poll(() => demoPage.getItemText('list2', 0)).toBe(draggedItemText);
   });
 
   test('should render correctly after multiple rapid resizes', async ({ page }) => {

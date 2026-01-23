@@ -72,10 +72,7 @@ test.describe('Page Scroll Demo', () => {
     await page.mouse.move(sourceBox.x + 5, sourceBox.y + 5, { steps: 2 });
 
     // Wait for drag to initiate
-    await page
-      .locator('.vdnd-drag-preview')
-      .waitFor({ state: 'visible', timeout: 1000 })
-      .catch(() => {});
+    await expect(page.locator('.vdnd-drag-preview')).toBeVisible({ timeout: 2000 });
     await page.waitForTimeout(50);
 
     // Move to second item position (72px item height)
@@ -108,7 +105,7 @@ test.describe('Page Scroll Demo', () => {
 
     // Wait for drag preview to appear
     const dragPreview = page.locator('.vdnd-drag-preview');
-    await dragPreview.waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
+    await expect(dragPreview).toBeVisible({ timeout: 2000 });
 
     // Move more to ensure drag is fully active
     await page.mouse.move(sourceBox.x + 100, sourceBox.y + 100, { steps: 10 });
@@ -258,18 +255,16 @@ test.describe('Page Scroll Demo', () => {
     await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY, { steps: 10 });
     await page.waitForTimeout(200);
 
-    // Check if placeholder exists and verify position
-    const placeholder = page.locator('.vdnd-drop-placeholder');
-    const placeholderVisible = await placeholder.isVisible().catch(() => false);
-
-    if (placeholderVisible) {
+    // Verify placeholder exists and is reasonably aligned with the target slot.
+    // (The placeholder element is the authoritative representation of the computed drop position.)
+    const placeholder = page.locator('.vdnd-drag-placeholder-visible');
+    await expect(placeholder).toBeVisible({ timeout: 2000 });
+    await expect(async () => {
       const placeholderBox = await placeholder.boundingBox();
-      if (placeholderBox) {
-        // Verify placeholder is within reasonable distance of target position
-        const distance = Math.abs(placeholderBox.y - targetY);
-        expect(distance).toBeLessThan(200);
-      }
-    }
+      expect(placeholderBox).not.toBeNull();
+      const distance = Math.abs(placeholderBox!.y - targetY);
+      expect(distance).toBeLessThan(200);
+    }).toPass({ timeout: 2000 });
 
     await page.mouse.up();
   });

@@ -83,6 +83,8 @@ export class DemoPage {
       targetList === 'list1' ? this.list1VirtualScroll : this.list2VirtualScroll;
 
     const sourceItem = sourceItems.nth(itemIndex);
+    await sourceItem.scrollIntoViewIfNeeded();
+    await targetContainer.scrollIntoViewIfNeeded();
     const sourceBox = await sourceItem.boundingBox();
     const targetBox = await targetContainer.boundingBox();
 
@@ -104,10 +106,14 @@ export class DemoPage {
     await this.page.mouse.down();
 
     // Move slightly to initiate drag (critical for WebKit - triggers drag detection)
-    await this.page.mouse.move(sourceBox.x + 5, sourceBox.y + 5, { steps: 2 });
+    await this.page.mouse.move(
+      sourceBox.x + sourceBox.width / 2 + 10,
+      sourceBox.y + sourceBox.height / 2 + 10,
+      { steps: 2 },
+    );
 
     // Wait for drag preview to appear (critical for WebKit timing)
-    await this.dragPreview.waitFor({ state: 'visible', timeout: 1000 }).catch(() => {});
+    await this.dragPreview.waitFor({ state: 'visible', timeout: 2000 });
     await this.page.waitForTimeout(50); // Allow preview to be positioned
 
     // Move to target with more steps for smoother movement

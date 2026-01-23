@@ -55,25 +55,35 @@ test.describe('Keyboard Drag - Cross-List Movement', () => {
   });
 
   test('should maintain approximate vertical position when changing lists', async ({ page }) => {
-    // Navigate to 3rd item in list1
+    const initialList1Count = await demoPage.getItemCount('list1');
+    const initialList2Count = await demoPage.getItemCount('list2');
+
+    const movedItemText = await demoPage.getItemText('list1', 2);
+    const list2Item0 = await demoPage.getItemText('list2', 0);
+    const list2Item1 = await demoPage.getItemText('list2', 1);
+    const list2Item2 = await demoPage.getItemText('list2', 2);
+
+    // Start from 3rd item in list1.
     await demoPage.list1Items.nth(2).focus();
     await page.keyboard.press('Space');
-    await page.waitForTimeout(100); // Wait for drag to start
+    await expect(demoPage.dragPreview).toBeVisible();
 
-    // Move to list2 (should land near same vertical position)
+    // Move to list2 and drop.
     await page.keyboard.press('ArrowRight');
-    await page.waitForTimeout(100); // Wait for cross-list move
+    await expect(demoPage.list2Container.locator('.vdnd-drag-placeholder-visible')).toBeVisible({
+      timeout: 2000,
+    });
     await page.keyboard.press('Space');
-    await page.waitForTimeout(200); // Wait for drop to complete
+    await expect(demoPage.dragPreview).not.toBeVisible();
 
-    // Get item counts to verify drop
-    const list1Count = await demoPage.getItemCount('list1');
-    const list2Count = await demoPage.getItemCount('list2');
+    await expect.poll(() => demoPage.getItemCount('list1')).toBe(initialList1Count - 1);
+    await expect.poll(() => demoPage.getItemCount('list2')).toBe(initialList2Count + 1);
 
-    // Initial counts were 50 each, so after move:
-    // list1 should have 49, list2 should have 51
-    expect(list1Count).toBe(49);
-    expect(list2Count).toBe(51);
+    // The moved item should land at the same visual slot (index 2) in list2.
+    expect(await demoPage.getItemText('list2', 0)).toBe(list2Item0);
+    expect(await demoPage.getItemText('list2', 1)).toBe(list2Item1);
+    expect(await demoPage.getItemText('list2', 2)).toBe(movedItemText);
+    expect(await demoPage.getItemText('list2', 3)).toBe(list2Item2);
   });
 
   test('should stay in list when ArrowLeft at leftmost list', async ({ page }) => {
