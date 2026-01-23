@@ -5,6 +5,7 @@ import {
   ElementRef,
   inject,
   input,
+  isDevMode,
   OnDestroy,
   OnInit,
   output,
@@ -71,19 +72,26 @@ export class DroppableDirective implements OnInit, OnDestroy {
 
   /**
    * Resolved group name - uses explicit input or falls back to parent group.
-   * Throws error if neither is available.
+   * Returns null (and disables dropping) if neither is available.
    */
-  readonly effectiveGroup = computed(() => {
+  #hasWarnedMissingGroup = false;
+  readonly effectiveGroup = computed((): string | null => {
     const explicit = this.vdndDroppableGroup();
     if (explicit) return explicit;
 
     const inherited = this.#parentGroup?.group();
     if (inherited) return inherited;
 
-    throw new Error(
-      `[vdndDroppable="${this.vdndDroppable()}"] requires a group. ` +
-        'Either set vdndDroppableGroup or wrap in a vdndGroup directive.',
-    );
+    if (isDevMode() && !this.#hasWarnedMissingGroup) {
+      console.warn(
+        `[ngx-virtual-dnd] [vdndDroppable="${this.vdndDroppable()}"] requires a group. ` +
+          'Either set vdndDroppableGroup or wrap in a vdndGroup directive. ' +
+          'Dropping will be disabled for this element.',
+      );
+      this.#hasWarnedMissingGroup = true;
+    }
+
+    return null;
   });
 
   /** Optional data associated with this droppable */
@@ -135,6 +143,11 @@ export class DroppableDirective implements OnInit, OnDestroy {
   #cachedDragState: DragState | null = null;
 
   ngOnInit(): void {
+    // Without a group, this droppable can't participate in DnD (fail gracefully).
+    if (!this.effectiveGroup()) {
+      return;
+    }
+
     // Register with auto-scroll service only if this element is actually scrollable
     // (i.e., has overflow: auto/scroll and content taller than container)
     if (this.autoScrollEnabled() && this.#isScrollable()) {

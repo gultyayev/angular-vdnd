@@ -6,6 +6,7 @@ import {
   EnvironmentInjector,
   inject,
   input,
+  isDevMode,
   NgZone,
   OnDestroy,
   OnInit,
@@ -92,19 +93,26 @@ export class DraggableDirective implements OnInit, OnDestroy {
 
   /**
    * Resolved group name - uses explicit input or falls back to parent group.
-   * Throws error if neither is available.
+   * Returns null (and disables drag) if neither is available.
    */
-  readonly #effectiveGroup = computed(() => {
+  #hasWarnedMissingGroup = false;
+  readonly #effectiveGroup = computed((): string | null => {
     const explicit = this.vdndDraggableGroup();
     if (explicit) return explicit;
 
     const inherited = this.#parentGroup?.group();
     if (inherited) return inherited;
 
-    throw new Error(
-      `[vdndDraggable="${this.vdndDraggable()}"] requires a group. ` +
-        'Either set vdndDraggableGroup or wrap in a vdndGroup directive.',
-    );
+    if (isDevMode() && !this.#hasWarnedMissingGroup) {
+      console.warn(
+        `[ngx-virtual-dnd] [vdndDraggable="${this.vdndDraggable()}"] requires a group. ` +
+          'Either set vdndDraggableGroup or wrap in a vdndGroup directive. ' +
+          'Drag will be disabled for this element.',
+      );
+      this.#hasWarnedMissingGroup = true;
+    }
+
+    return null;
   });
 
   /** Optional data associated with this draggable */
@@ -191,6 +199,10 @@ export class DraggableDirective implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    // If destroyed mid-drag, cancel to avoid stale global state / ongoing RAF loops.
+    if (this.isDragging()) {
+      this.#endDrag(true);
+    }
     this.#cleanup();
     this.#cleanupKeyboardDragListeners();
   }
@@ -200,6 +212,11 @@ export class DraggableDirective implements OnInit, OnDestroy {
    */
   protected onPointerDown(event: MouseEvent | TouchEvent, isTouch: boolean): void {
     if (this.disabled()) {
+      return;
+    }
+
+    // Without a group, this draggable can't participate in DnD (fail gracefully).
+    if (!this.#effectiveGroup()) {
       return;
     }
 
@@ -441,6 +458,9 @@ export class DraggableDirective implements OnInit, OnDestroy {
     }
 
     const groupName = this.#effectiveGroup();
+    if (!groupName) {
+      return;
+    }
     const adjacent = this.#positionCalculator.findAdjacentDroppable(
       currentDroppableId,
       direction,
@@ -481,6 +501,9 @@ export class DraggableDirective implements OnInit, OnDestroy {
     const element = this.#elementRef.nativeElement;
     const rect = element.getBoundingClientRect();
     const groupName = this.#effectiveGroup();
+    if (!groupName) {
+      return;
+    }
 
     // Find the parent droppable
     const droppableElement = this.#positionCalculator.getDroppableParent(element, groupName);
@@ -698,6 +721,11 @@ export class DraggableDirective implements OnInit, OnDestroy {
     // Find droppable and calculate initial placeholder position
     // This fixes the UI glitch by ensuring placeholder is set before the element is hidden
     const groupName = this.#effectiveGroup();
+    if (!groupName) {
+      // Misconfigured - cancel tracking and don't start drag.
+      this.#cleanup();
+      return;
+    }
     const droppableElement = this.#positionCalculator.findDroppableAtPoint(
       position.x,
       position.y,
@@ -805,6 +833,12 @@ export class DraggableDirective implements OnInit, OnDestroy {
   #updateDrag(position: CursorPosition): void {
     const element = this.#elementRef.nativeElement;
     const groupName = this.#effectiveGroup();
+    if (!groupName) {
+      // Group became unavailable mid-drag; cancel to avoid inconsistent state.
+      this.#endDrag(true);
+      this.#cleanup();
+      return;
+    }
 
     // Apply axis locking to effective position for droppable detection
     // When axis is locked, use the start position for the locked axis
@@ -1069,9 +1103,14 @@ export class DraggableDirective implements OnInit, OnDestroy {
    * Get the parent droppable ID.
    */
   #getParentDroppableId(): string | null {
+    const groupName = this.#effectiveGroup();
+    if (!groupName) {
+      return null;
+    }
+
     const droppable = this.#positionCalculator.getDroppableParent(
       this.#elementRef.nativeElement,
-      this.#effectiveGroup(),
+      groupName,
     );
 
     return droppable ? this.#positionCalculator.getDroppableId(droppable) : null;

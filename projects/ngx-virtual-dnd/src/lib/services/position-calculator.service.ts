@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, isDevMode } from '@angular/core';
 
 /**
  * Service for calculating drop positions and finding elements at cursor positions.
@@ -282,7 +282,7 @@ export class PositionCalculatorService {
       const configuredHeight = virtualScroll.getAttribute('data-item-height');
 
       if (!configuredHeight) {
-        if (typeof ngDevMode === 'undefined' || ngDevMode) {
+        if (isDevMode()) {
           console.error(
             '[ngx-virtual-dnd] vdnd-virtual-scroll requires data-item-height attribute ' +
               'for keyboard navigation. Cross-list keyboard drag will not work correctly.',
