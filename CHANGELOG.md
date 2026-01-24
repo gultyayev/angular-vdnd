@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.2.2](https://github.com/gultyayev/angular-vdnd/compare/v1.2.1...v1.2.2) (2026-01-24)
+
+### Performance
+
+- **lib:** reduce drag jank and dedupe scroll bindings ([#9](https://github.com/gultyayev/angular-vdnd/issues/9)) ([52b0177](https://github.com/gultyayev/angular-vdnd/commit/52b01773113ed05db9dfc1820f2882454c7467f6))
+
 ## [1.2.1](https://github.com/gultyayev/angular-vdnd/compare/v1.2.0...v1.2.1) (2026-01-23)
 
 ### Bug Fixes
