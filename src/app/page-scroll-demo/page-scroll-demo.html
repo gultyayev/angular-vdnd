@@ -1,0 +1,98 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-button slot="start" fill="clear" class="back-button" routerLink="/">
+      <ion-icon name="arrow-back" slot="icon-only"></ion-icon>
+    </ion-button>
+    <ion-title>Task Manager</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<!-- ion-content with scroll disabled - we use our own scroll container -->
+<ion-content [scrollY]="false">
+  <!-- Custom scroll container with Ionic's scroll host class -->
+  <div #scrollContainer class="scroll-container ion-content-scroll-host" vdndScrollable>
+    <!-- Header section that scrolls away -->
+    <div class="page-header" #headerElement>
+      @if (showBanner()) {
+        <div class="welcome-banner">
+          <ion-button fill="clear" class="close-btn" (click)="dismissBanner()">
+            <ion-icon name="close" slot="icon-only"></ion-icon>
+          </ion-button>
+          <h2>Welcome Back!</h2>
+          <p>You have {{ filteredTasks().length }} tasks to complete</p>
+        </div>
+      }
+
+      <h3 class="section-title">My Tasks</h3>
+
+      <!-- Sticky category filter -->
+      <div class="category-chips">
+        @for (cat of categories; track cat.value) {
+          <ion-chip [class.active]="category() === cat.value" (click)="setCategory(cat.value)">
+            {{ cat.label }}
+          </ion-chip>
+        }
+      </div>
+    </div>
+
+    <!-- Virtual list with wrapper-based positioning -->
+    <div vdndGroup="tasks">
+      <vdnd-virtual-content
+        class="virtual-list-wrapper"
+        [itemHeight]="itemHeight"
+        [totalItems]="filteredTasks().length"
+        [contentOffset]="headerHeight()"
+        [style.height.px]="filteredTasks().length * itemHeight"
+        vdndDroppable="tasks"
+        (drop)="onDrop($event)"
+      >
+        <ng-container
+          *vdndVirtualFor="
+            let task of filteredTasks();
+            itemHeight: itemHeight;
+            trackBy: trackById;
+            droppableId: 'tasks'
+          "
+        >
+          <div class="task-item" [vdndDraggable]="task.id">
+            <ion-icon name="reorder-three" class="drag-handle"></ion-icon>
+            <ion-checkbox [checked]="task.done" (ionChange)="toggleTask(task)"></ion-checkbox>
+            <span class="task-title" [class.done]="task.done">
+              {{ task.title }}
+            </span>
+            <ion-badge [color]="getBadgeColor(task.category)">
+              {{ task.category }}
+            </ion-badge>
+          </div>
+        </ng-container>
+      </vdnd-virtual-content>
+    </div>
+
+    <!-- Footer that appears after list -->
+    <div class="add-task-footer">
+      <ion-button expand="block" (click)="addTask()">
+        <ion-icon name="add" slot="start"></ion-icon>
+        Add New Task
+      </ion-button>
+    </div>
+  </div>
+</ion-content>
+
+<!-- Drag preview portal -->
+<vdnd-drag-preview>
+  <ng-template let-item>
+    <div
+      class="task-item"
+      style="
+        width: 300px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+        transform: rotate(2deg);
+      "
+    >
+      <ion-icon name="reorder-three" class="drag-handle"></ion-icon>
+      <span class="task-title">{{ item.title }}</span>
+      <ion-badge [color]="getBadgeColor(item.category)">{{ item.category }}</ion-badge>
+    </div>
+  </ng-template>
+</vdnd-drag-preview>

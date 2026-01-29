@@ -1,0 +1,146 @@
+/* stylelint-disable */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+ion-header {
+  flex-shrink: 0;
+}
+
+ion-content {
+  --background: var(--ion-background-color, #f4f5f8);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+ion-content::part(scroll) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.scroll-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.page-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 16px;
+}
+
+.welcome-banner {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.welcome-banner h2 {
+  margin: 0 0 8px;
+  font-size: 1.5rem;
+}
+
+.welcome-banner p {
+  margin: 0;
+  opacity: 0.9;
+}
+
+.welcome-banner .close-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  --background: transparent;
+  --color: white;
+}
+
+.section-title {
+  margin: 16px 0 12px;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.category-chips {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 12px 0;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.category-chips ion-chip {
+  --background: rgba(255, 255, 255, 0.2);
+  --color: white;
+  flex-shrink: 0;
+}
+
+.category-chips ion-chip.active {
+  --background: white;
+  --color: #667eea;
+}
+
+.virtual-list-wrapper {
+  position: relative;
+  background: var(--ion-background-color, #f4f5f8);
+}
+
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  height: 72px;
+  box-sizing: border-box;
+  cursor: grab;
+}
+
+.task-item:active {
+  cursor: grabbing;
+}
+
+.task-item .drag-handle {
+  color: #999;
+  font-size: 24px;
+}
+
+.task-item .task-title {
+  flex: 1;
+  font-size: 1rem;
+}
+
+.task-item .task-title.done {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.add-task-footer {
+  padding: 16px;
+  background: var(--ion-background-color, #f4f5f8);
+}
+
+.add-task-footer ion-button {
+  --background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Drag preview styling */
+:host ::ng-deep .vdnd-drag-preview .task-item {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  transform: rotate(2deg);
+}
+
+.back-button {
+  --color: white;
+}
