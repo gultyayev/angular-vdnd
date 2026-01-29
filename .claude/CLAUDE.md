@@ -337,3 +337,7 @@ Run `npm run release [patch|minor|major]` to release. Use `npm run release:dry-r
 | `npm run lint`                                                           | Run ESLint                              |
 | `ng build ngx-virtual-dnd`                                               | Build library (required after edits)    |
 | `npm run release`                                                        | Release new version                     |
+
+## Design System
+
+When working on demo pages, refer to `.claude/demo/DESIGN_SYSTEM.md` for consistent styling guidelines.

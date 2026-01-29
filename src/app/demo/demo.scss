@@ -5,16 +5,16 @@
    ======================================== */
 :host {
   /* Colors */
-  --color-bg: #f8fafc;
+  --color-bg: #f5f7fa;
   --color-surface: #fff;
   --color-border: #e2e8f0;
   --color-border-hover: #cbd5e1;
   --color-text: #1e293b;
   --color-text-muted: #64748b;
   --color-text-subtle: #94a3b8;
-  --color-primary: #6366f1;
-  --color-primary-hover: #4f46e5;
-  --color-primary-light: #eef2ff;
+  --color-primary: #3b82f6;
+  --color-primary-hover: #2563eb;
+  --color-primary-light: #eff6ff;
   --color-success: #10b981;
   --color-success-light: #d1fae5;
 
@@ -78,7 +78,7 @@
    Header
    ======================================== */
 .header {
-  background: linear-gradient(135deg, var(--color-primary) 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #60a5fa 100%);
   color: white;
   padding: var(--space-xl) var(--space-lg);
 }
@@ -376,9 +376,6 @@
 }
 
 .list-card {
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
   overflow: hidden;
 }
 
@@ -386,8 +383,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-md) var(--space-lg);
-  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-sm) 0;
 }
 
 .list-title {
@@ -411,8 +407,8 @@
 }
 
 .list {
-  border-radius: 0;
   overflow: hidden;
+  border-radius: var(--radius);
   transition: background var(--transition);
 
   &.vdnd-droppable-active {
@@ -433,20 +429,16 @@
   align-items: center;
   gap: var(--space-sm);
   padding: 0 var(--space-md);
-  background: linear-gradient(
-    135deg,
-    var(--item-color) 0%,
-    color-mix(in srgb, var(--item-color) 80%, white) 100%
-  );
-  border-bottom: 1px solid rgb(0 0 0 / 0.06);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
   cursor: grab;
   user-select: none;
   transition:
-    filter var(--transition),
+    background var(--transition),
     transform var(--transition);
 
   &:hover {
-    filter: brightness(0.97);
+    background: var(--color-bg);
   }
 
   &:active {
@@ -498,7 +490,7 @@
   justify-content: center;
   width: 20px;
   height: 20px;
-  color: rgb(0 0 0 / 0.3);
+  color: var(--color-text-subtle);
   flex-shrink: 0;
 
   svg {
@@ -510,7 +502,7 @@
 .item-text {
   font-size: var(--text-sm);
   font-weight: 500;
-  color: rgb(0 0 0 / 0.8);
+  color: var(--color-text);
 }
 
 /* ========================================

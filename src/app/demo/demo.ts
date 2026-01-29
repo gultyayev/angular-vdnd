@@ -16,7 +16,6 @@ import {
 interface Item {
   id: string;
   name: string;
-  color: string;
 }
 
 /**
@@ -104,12 +103,6 @@ export class DemoComponent {
     this.debugExpanded.update((v) => !v);
   }
 
-  /** Generate a random color */
-  private randomColor(): string {
-    const hue = Math.floor(Math.random() * 360);
-    return `hsl(${hue}, 70%, 85%)`;
-  }
-
   /** Generate items for both lists */
   regenerateItems(): void {
     const count = this.itemCount();
@@ -120,7 +113,6 @@ export class DemoComponent {
       items1.push({
         id: `list1-${i}`,
         name: `Item ${i + 1}`,
-        color: this.randomColor(),
       });
     }
 
@@ -129,7 +121,6 @@ export class DemoComponent {
       items2.push({
         id: `list2-${i}`,
         name: `Item ${i + 1}`,
-        color: this.randomColor(),
       });
     }
 

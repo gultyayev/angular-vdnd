@@ -1,6 +1,16 @@
 /* stylelint-disable */
 
 :host {
+  --color-primary: #3b82f6;
+  --color-accent: #60a5fa;
+  --color-bg: #f5f7fa;
+  --color-surface: #fff;
+  --color-border: #e2e8f0;
+  --color-text: #1e293b;
+  --color-text-muted: #64748b;
+  --color-text-subtle: #94a3b8;
+  --color-primary-light: #eff6ff;
+
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -8,10 +18,23 @@
 
 ion-header {
   flex-shrink: 0;
+  box-shadow:
+    0 1px 3px 0 rgb(0 0 0 / 0.1),
+    0 1px 2px -1px rgb(0 0 0 / 0.1);
+
+  ion-toolbar {
+    --background: var(--color-primary);
+    --color: white;
+
+    ion-title {
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+  }
 }
 
 ion-content {
-  --background: var(--ion-background-color, #f4f5f8);
+  --background: var(--color-bg);
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -30,7 +53,7 @@ ion-content::part(scroll) {
 }
 
 .page-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   color: white;
   padding: 16px;
 }
@@ -57,8 +80,21 @@ ion-content::part(scroll) {
   position: absolute;
   top: 8px;
   right: 8px;
-  --background: transparent;
+  --background: rgba(255, 255, 255, 0.2);
+  --background-hover: rgba(255, 255, 255, 0.35);
   --color: white;
+  --color-hover: white;
+  --border-radius: 50%;
+  --padding-start: 0;
+  --padding-end: 0;
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  font-size: 18px;
+  overflow: hidden;
+  border-radius: 50%;
 }
 
 .section-title {
@@ -71,27 +107,38 @@ ion-content::part(scroll) {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 12px 0;
+  padding: 12px 16px;
   display: flex;
   gap: 8px;
   overflow-x: auto;
 }
 
 .category-chips ion-chip {
-  --background: rgba(255, 255, 255, 0.2);
-  --color: white;
+  --background: rgba(255, 255, 255, 0.15);
+  --color: rgba(255, 255, 255, 0.9);
   flex-shrink: 0;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+
+  &:hover {
+    --background: rgba(255, 255, 255, 0.25);
+    --border-color: rgba(255, 255, 255, 0.5);
+  }
 }
 
 .category-chips ion-chip.active {
   --background: white;
-  --color: #667eea;
+  --color: var(--color-primary);
+  --border-color: white;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .virtual-list-wrapper {
   position: relative;
-  background: var(--ion-background-color, #f4f5f8);
 }
 
 .task-item {
@@ -99,11 +146,16 @@ ion-content::part(scroll) {
   align-items: center;
   gap: 12px;
   padding: 16px;
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
   height: 72px;
   box-sizing: border-box;
   cursor: grab;
+  transition: background 150ms ease;
+}
+
+.task-item:hover {
+  background: var(--color-bg);
 }
 
 .task-item:active {
@@ -111,13 +163,14 @@ ion-content::part(scroll) {
 }
 
 .task-item .drag-handle {
-  color: #999;
+  color: var(--color-text-subtle);
   font-size: 24px;
 }
 
 .task-item .task-title {
   flex: 1;
   font-size: 1rem;
+  color: var(--color-text);
 }
 
 .task-item .task-title.done {
@@ -127,11 +180,11 @@ ion-content::part(scroll) {
 
 .add-task-footer {
   padding: 16px;
-  background: var(--ion-background-color, #f4f5f8);
+  background: var(--color-bg);
 }
 
 .add-task-footer ion-button {
-  --background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --background: var(--color-primary);
 }
 
 /* Drag preview styling */
