@@ -5,7 +5,6 @@ import {
   ElementRef,
   inject,
   input,
-  isDevMode,
   OnDestroy,
   OnInit,
   output,
@@ -22,6 +21,7 @@ import {
   END_OF_LIST,
 } from '../models/drag-drop.models';
 import { VDND_GROUP_TOKEN } from './droppable-group.directive';
+import { createEffectiveGroupSignal } from '../utils/group-resolution';
 
 /**
  * Marks an element as a valid drop target within the virtual scroll drag-and-drop system.
@@ -74,24 +74,11 @@ export class DroppableDirective implements OnInit, OnDestroy {
    * Resolved group name - uses explicit input or falls back to parent group.
    * Returns null (and disables dropping) if neither is available.
    */
-  #hasWarnedMissingGroup = false;
-  readonly effectiveGroup = computed((): string | null => {
-    const explicit = this.vdndDroppableGroup();
-    if (explicit) return explicit;
-
-    const inherited = this.#parentGroup?.group();
-    if (inherited) return inherited;
-
-    if (isDevMode() && !this.#hasWarnedMissingGroup) {
-      console.warn(
-        `[ngx-virtual-dnd] [vdndDroppable="${this.vdndDroppable()}"] requires a group. ` +
-          'Either set vdndDroppableGroup or wrap in a vdndGroup directive. ' +
-          'Dropping will be disabled for this element.',
-      );
-      this.#hasWarnedMissingGroup = true;
-    }
-
-    return null;
+  readonly effectiveGroup = createEffectiveGroupSignal({
+    explicitGroup: this.vdndDroppableGroup,
+    parentGroup: this.#parentGroup,
+    elementId: this.vdndDroppable,
+    elementType: 'droppable',
   });
 
   /** Optional data associated with this droppable */

@@ -369,26 +369,45 @@ test.describe('Page Scroll Demo', () => {
     const viewportHeight = await page.evaluate(() => window.innerHeight);
     const placeholderEdgeAllowance = 80;
     const previewEdgeAllowance = 40;
-    const measureAlignment = async () => {
-      const previewBox = await dragPreview.boundingBox();
-      if (!previewBox) throw new Error('Drag preview not rendered');
-      expect(previewBox.y).toBeGreaterThanOrEqual(-20);
-      expect(previewBox.y + previewBox.height).toBeLessThanOrEqual(
-        viewportHeight + previewEdgeAllowance,
-      );
 
-      const placeholderBox = await placeholder.boundingBox();
-      if (!placeholderBox) throw new Error('Placeholder not rendered');
-      expect(placeholderBox.y).toBeGreaterThanOrEqual(scrollBox.y - 20);
-      expect(placeholderBox.y).toBeLessThanOrEqual(
+    // Measure both elements atomically in a single browser evaluation to avoid
+    // timing skew between sequential boundingBox() calls during rapid autoscroll
+    const measureAlignment = async () => {
+      const result = await page.evaluate(() => {
+        const preview = document.querySelector('.vdnd-drag-preview');
+        const placeholder = document.querySelector('.vdnd-drag-placeholder');
+
+        if (!preview || !placeholder) {
+          return null;
+        }
+
+        const previewRect = preview.getBoundingClientRect();
+        const placeholderRect = placeholder.getBoundingClientRect();
+
+        return {
+          previewY: previewRect.top,
+          previewHeight: previewRect.height,
+          placeholderY: placeholderRect.top,
+          placeholderHeight: placeholderRect.height,
+        };
+      });
+
+      if (!result) throw new Error('Elements not rendered');
+
+      const { previewY, previewHeight, placeholderY, placeholderHeight } = result;
+
+      expect(previewY).toBeGreaterThanOrEqual(-20);
+      expect(previewY + previewHeight).toBeLessThanOrEqual(viewportHeight + previewEdgeAllowance);
+      expect(placeholderY).toBeGreaterThanOrEqual(scrollBox.y - 20);
+      expect(placeholderY).toBeLessThanOrEqual(
         scrollBox.y + scrollBox.height + placeholderEdgeAllowance,
       );
 
-      const previewCenterY = previewBox.y + previewBox.height / 2;
-      const placeholderCenterY = placeholderBox.y + placeholderBox.height / 2;
+      const previewCenterY = previewY + previewHeight / 2;
+      const placeholderCenterY = placeholderY + placeholderHeight / 2;
       return {
         drift: Math.abs(previewCenterY - placeholderCenterY),
-        itemHeight: placeholderBox.height,
+        itemHeight: placeholderHeight,
       };
     };
 

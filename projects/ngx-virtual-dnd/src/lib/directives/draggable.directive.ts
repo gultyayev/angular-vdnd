@@ -6,7 +6,6 @@ import {
   EnvironmentInjector,
   inject,
   input,
-  isDevMode,
   NgZone,
   OnDestroy,
   OnInit,
@@ -27,6 +26,7 @@ import {
   GrabOffset,
 } from '../models/drag-drop.models';
 import { VDND_GROUP_TOKEN } from './droppable-group.directive';
+import { createEffectiveGroupSignal } from '../utils/group-resolution';
 
 /**
  * Makes an element draggable within the virtual scroll drag-and-drop system.
@@ -96,24 +96,11 @@ export class DraggableDirective implements OnInit, OnDestroy {
    * Resolved group name - uses explicit input or falls back to parent group.
    * Returns null (and disables drag) if neither is available.
    */
-  #hasWarnedMissingGroup = false;
-  readonly #effectiveGroup = computed((): string | null => {
-    const explicit = this.vdndDraggableGroup();
-    if (explicit) return explicit;
-
-    const inherited = this.#parentGroup?.group();
-    if (inherited) return inherited;
-
-    if (isDevMode() && !this.#hasWarnedMissingGroup) {
-      console.warn(
-        `[ngx-virtual-dnd] [vdndDraggable="${this.vdndDraggable()}"] requires a group. ` +
-          'Either set vdndDraggableGroup or wrap in a vdndGroup directive. ' +
-          'Drag will be disabled for this element.',
-      );
-      this.#hasWarnedMissingGroup = true;
-    }
-
-    return null;
+  readonly #effectiveGroup = createEffectiveGroupSignal({
+    explicitGroup: this.vdndDraggableGroup,
+    parentGroup: this.#parentGroup,
+    elementId: this.vdndDraggable,
+    elementType: 'draggable',
   });
 
   /** Optional data associated with this draggable */

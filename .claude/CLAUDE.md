@@ -249,6 +249,28 @@ await expect(async () => {
 - Firefox: longer timeouts, position mouse closer to edge (10px vs 20px) for autoscroll
 - WebKit: may cache hit-testing (force layout flush with `void element.offsetHeight`)
 
+**Atomic measurements during animations:**
+
+When measuring multiple element positions during rapid updates (autoscroll, animations), use a single `page.evaluate()` to capture all measurements atomically. Sequential `boundingBox()` calls have round-trip latency, allowing positions to change between calls.
+
+```typescript
+// WRONG - sequential calls introduce timing skew during rapid scroll
+const previewBox = await preview.boundingBox(); // Round-trip 1
+const placeholderBox = await placeholder.boundingBox(); // Round-trip 2 - position may have changed!
+const drift = Math.abs(previewBox.y - placeholderBox.y);
+
+// CORRECT - atomic measurement in single browser evaluation
+const { previewY, placeholderY } = await page.evaluate(() => {
+  const preview = document.querySelector('.preview');
+  const placeholder = document.querySelector('.placeholder');
+  return {
+    previewY: preview?.getBoundingClientRect().top,
+    placeholderY: placeholder?.getBoundingClientRect().top,
+  };
+});
+const drift = Math.abs(previewY - placeholderY);
+```
+
 **Viewport boundary gotcha:**
 
 `document.elementFromPoint(x, y)` returns **null** for coordinates outside the viewport. When UI changes (adding header elements, resizing) push content down, target elements may be below the viewport even if their `boundingBox()` is valid.
