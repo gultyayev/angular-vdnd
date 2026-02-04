@@ -73,7 +73,7 @@ test.describe('Keyboard Drag - Accessibility', () => {
     await expect(movedItem).toHaveAttribute('aria-grabbed', 'false');
   });
 
-  test('should maintain focusability on draggable items', async ({ page }) => {
+  test('should maintain focusability on draggable items', async () => {
     const firstItem = demoPage.list1Items.first();
 
     // Draggable items should be focusable

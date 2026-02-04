@@ -43,7 +43,6 @@ test.describe('Placeholder Behavior During Drag', () => {
 
   test('should show only one placeholder when dragging to different list', async ({ page }) => {
     const sourceItem = demoPage.list1Items.first();
-    const sourceBox = await sourceItem.boundingBox();
     const targetBox = await demoPage.list2VirtualScroll.boundingBox();
 
     // Start dragging

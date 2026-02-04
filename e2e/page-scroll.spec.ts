@@ -49,12 +49,7 @@ test.describe('Page Scroll Demo', () => {
   });
 
   test('should reorder tasks within the list via drag and drop', async ({ page }) => {
-    // Get first two item texts
-    const firstItemText = await page
-      .locator('.task-item')
-      .nth(0)
-      .locator('.task-title')
-      .textContent();
+    // Get second item text for verification
     const secondItemText = await page
       .locator('.task-item')
       .nth(1)

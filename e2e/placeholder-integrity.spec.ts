@@ -37,7 +37,6 @@ test.describe('Placeholder Rendering Integrity', () => {
       page,
     }) => {
       const sourceItem = demoPage.list1Items.first();
-      const sourceBox = await sourceItem.boundingBox();
       const targetBox = await demoPage.list2VirtualScroll.boundingBox();
 
       await sourceItem.hover();
@@ -156,7 +155,6 @@ test.describe('Placeholder Rendering Integrity', () => {
 
     test('should not have duplicate placeholders', async ({ page }) => {
       const sourceItem = demoPage.list1Items.first();
-      const sourceBox = await sourceItem.boundingBox();
       const targetBox = await demoPage.list2VirtualScroll.boundingBox();
 
       await sourceItem.hover();

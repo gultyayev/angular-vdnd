@@ -148,13 +148,13 @@ export class DemoPage {
     await this.page.keyboard.press('Space');
   }
 
-  async keyboardMoveDown(steps: number = 1): Promise<void> {
+  async keyboardMoveDown(steps = 1): Promise<void> {
     for (let i = 0; i < steps; i++) {
       await this.page.keyboard.press('ArrowDown');
     }
   }
 
-  async keyboardMoveUp(steps: number = 1): Promise<void> {
+  async keyboardMoveUp(steps = 1): Promise<void> {
     for (let i = 0; i < steps; i++) {
       await this.page.keyboard.press('ArrowUp');
     }

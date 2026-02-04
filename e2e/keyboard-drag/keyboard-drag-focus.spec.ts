@@ -108,7 +108,7 @@ test.describe('Keyboard Drag - Focus Management', () => {
     await expect(focusedElement).toBeVisible({ timeout: 5000 });
   });
 
-  test('should have visible focus indicator during keyboard drag', async ({ page }) => {
+  test('should have visible focus indicator during keyboard drag', async () => {
     await demoPage.list1Items.first().focus();
 
     // Item should have visible focus indicator (not :focus-visible but at least :focus)
@@ -135,7 +135,6 @@ test.describe('Keyboard Drag - Focus Management', () => {
     await expect(demoPage.dragPreview).not.toBeVisible();
 
     // Focus should have moved
-    const focusedElement = page.locator(':focus');
     const isFocused = await demoPage.list1Items
       .first()
       .evaluate((el) => document.activeElement === el);

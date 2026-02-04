@@ -72,8 +72,7 @@ test.describe('Drag and Drop', () => {
   });
 
   // Previously skipped on WebKit, testing fix
-  test('should reorder item within same list', async ({ page }) => {
-    const firstItemText = await demoPage.getItemText('list1', 0);
+  test('should reorder item within same list', async () => {
     const secondItemText = await demoPage.getItemText('list1', 1);
 
     // Drag first item to second position
@@ -151,8 +150,7 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
   });
 
   // Previously skipped on WebKit, testing fix
-  test('should reorder item within same list in simplified mode', async ({ page }) => {
-    const firstItemText = await demoPage.getItemText('list1', 0);
+  test('should reorder item within same list in simplified mode', async () => {
     const secondItemText = await demoPage.getItemText('list1', 1);
 
     // Drag first item to second position
@@ -311,8 +309,6 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
       'Playwright mouse events not properly triggering autoscroll in simplified mode on Firefox',
     );
 
-    // Get the first item text - we'll drag this to the bottom
-    const firstItemText = await demoPage.getItemText('list2', 0);
     const secondItemText = await demoPage.getItemText('list2', 1);
 
     // Get container bounds for edge detection
