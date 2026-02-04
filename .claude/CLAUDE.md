@@ -20,6 +20,16 @@ These rules prevent common mistakes that cause hard-to-debug issues:
 
 7. **Run ESLint on changed files:** Before considering a task done, run `npm run lint` or `npx eslint --flag v10_config_lookup_from_file <changed-files>` to catch formatting and style issues.
 
+8. **Test fails = you broke it:** If a test fails after your changes, you broke it. Fix it. Do not check main. Do not claim "pre-existing." Do not claim "flaky." Do not claim "unrelated to my changes." Fix it.
+
+9. **Keep this file in sync:** If you add/remove/rename a service, directive, component, data attribute, public API export, or E2E test file, update the corresponding table in this file in the same commit.
+
+## Version Requirements
+
+- **Angular:** 21.0.0+
+- **TypeScript:** 5.9+
+- **Node:** 20+
+
 ## Project Structure
 
 - **Main app** (`/src`) - Demo application showcasing the library
@@ -27,11 +37,86 @@ These rules prevent common mistakes that cause hard-to-debug issues:
 
 **Prefixes:** `app-` for main app components, `vdnd-` for library components/directives.
 
-**Key files:**
+### Services
 
-- `DragStateService` - `/projects/ngx-virtual-dnd/src/lib/services/drag-state.service.ts`
-- `AutoScrollService` - `/projects/ngx-virtual-dnd/src/lib/services/auto-scroll.service.ts`
-- `PositionCalculatorService` - `/projects/ngx-virtual-dnd/src/lib/services/position-calculator.service.ts`
+| Service | Path | Purpose |
+|---------|------|---------|
+| DragStateService | `lib/services/drag-state.service.ts` | Central signals-based drag state |
+| PositionCalculatorService | `lib/services/position-calculator.service.ts` | DOM hit-testing, drop index calculation |
+| AutoScrollService | `lib/services/auto-scroll.service.ts` | RAF-based edge scrolling |
+| ElementCloneService | `lib/services/element-clone.service.ts` | Clone elements for drag preview |
+| KeyboardDragService | `lib/services/keyboard-drag.service.ts` | Keyboard drag state management |
+| DragIndexCalculatorService | `lib/services/drag-index-calculator.service.ts` | Placeholder index with virtual scroll math |
+
+*All paths relative to `/projects/ngx-virtual-dnd/src/`*
+
+### Directives
+
+| Directive | Selector | Key Inputs |
+|-----------|----------|------------|
+| DraggableDirective | `vdndDraggable` | ID (required), group, data, disabled |
+| DroppableDirective | `vdndDroppable` | ID (required), group, data, autoScrollConfig, disabled |
+| DroppableGroupDirective | `vdndGroup` | group name (required) |
+| ScrollableDirective | `vdndScrollable` | scrollContainerId, autoScrollEnabled, autoScrollConfig |
+| VirtualForDirective | `*vdndVirtualFor` | items, itemHeight, trackBy |
+
+### Components
+
+| Component | Purpose |
+|-----------|---------|
+| VirtualScrollContainerComponent | High-level virtual scroll + auto-sticky |
+| VirtualSortableListComponent | Combines droppable + virtual scroll + placeholder |
+| VirtualViewportComponent | Self-contained viewport with GPU-accelerated positioning |
+| VirtualContentComponent | Virtual content within external scroll container |
+| DragPreviewComponent | Preview following cursor (place at root) |
+| PlaceholderComponent | Drop position indicator |
+
+### Service Dependencies
+
+```
+DraggableDirective
+├── DragStateService
+├── PositionCalculatorService
+├── AutoScrollService
+├── ElementCloneService
+├── KeyboardDragService
+└── DragIndexCalculatorService
+
+DragIndexCalculatorService → PositionCalculatorService
+AutoScrollService → DragStateService, PositionCalculatorService
+```
+
+### Data Attributes
+
+| Attribute | Set By | Used For |
+|-----------|--------|----------|
+| `data-draggable-id` | DraggableDirective | Identify draggable elements |
+| `data-droppable-id` | DroppableDirective | Identify drop targets |
+| `data-droppable-group` | DroppableDirective | Group membership for cross-list drag |
+| `data-item-height` | VirtualForDirective | Virtual scroll item height |
+
+### Test Files
+
+| Source Area | Unit Test | E2E Tests |
+|-------------|-----------|-----------|
+| DraggableDirective | `draggable.directive.spec.ts` | `drag-drop.spec.ts`, `keyboard-drag/*.spec.ts` |
+| DroppableDirective | `droppable.directive.spec.ts` | `drop-accuracy.spec.ts` |
+| DragStateService | `drag-state.service.spec.ts` | - |
+| AutoScrollService | `auto-scroll.service.spec.ts` | `auto-scroll.spec.ts`, `autoscroll-drift.spec.ts` |
+| Placeholder logic | - | `placeholder-behavior.spec.ts`, `placeholder-integrity.spec.ts` |
+| Keyboard drag | - | `keyboard-drag/*.spec.ts` (6 files) |
+| Page scroll | - | `page-scroll.spec.ts` |
+| Mobile touch | - | `touch-scroll.mobile.spec.ts` |
+
+### Public API (from public-api.ts)
+
+**Events:** `DragStartEvent`, `DragMoveEvent`, `DragEnterEvent`, `DragLeaveEvent`, `DragOverEvent`, `DropEvent`, `DragEndEvent`
+
+**Utilities:** `moveItem()`, `reorderItems()`, `applyMove()`, `isNoOpDrop()`, `insertAt()`, `removeAt()`
+
+**Tokens:** `VDND_SCROLL_CONTAINER`, `VDND_VIRTUAL_VIEWPORT`
+
+**Constants:** `INITIAL_DRAG_STATE`, `END_OF_LIST`
 
 ## Code Patterns
 
@@ -195,9 +280,45 @@ See `.claude/history/safari-autoscroll.md` for failed approaches and detailed in
 
 **Screen Reader Announcements:** Not built-in (i18n complexity). Consumers implement using position data in drag events. See README.md for example.
 
+## Lazy Documentation
+
+Load these ONLY when working on specific areas:
+
+| Doc | When to Load |
+|-----|--------------|
+| `.ai/E2E.md` | Before writing/modifying Playwright tests |
+| `.claude/demo/DESIGN_SYSTEM.md` | Before styling demo pages |
+| `.claude/history/safari-autoscroll.md` | If debugging Safari scroll drift |
+
+## Troubleshooting
+
+| Error/Symptom | Cause | Fix |
+|---------------|-------|-----|
+| `elementFromPoint` returns null | Target outside viewport | `scrollIntoViewIfNeeded()` first |
+| Placeholder not appearing | Group mismatch | Check `vdndDroppableGroup` matches |
+| Drag preview stuck | Listener cleanup missed | Check `ngOnDestroy` removes listeners |
+| Safari drift during scroll | Using `scrollBy()` | Use direct `scrollTop +=` |
+| Changes not appearing in demo | Library not rebuilt | Run `ng build ngx-virtual-dnd` |
+| Signal write error in effect | Using deprecated option | Remove `allowSignalWrites: true` |
+
+## Common Tasks
+
+### Adding a new E2E test
+
+1. Read `.ai/E2E.md` first
+2. Create in `e2e/` following Page Object Model pattern
+3. Use `demo.page.ts` fixture for common operations
+4. Test all browsers: `npx playwright test --reporter=dot --max-failures=1`
+
+### Modifying placeholder calculation
+
+1. Read `DragIndexCalculatorService` thoroughly
+2. Understand: preview CENTER positioning, same-list +1 adjustment, virtual scroll height math
+3. Write E2E test first (TDD)
+4. Run `placeholder-behavior.spec.ts` and `placeholder-integrity.spec.ts`
+
 ## Testing
 
-- **Lazy docs:** `.ai/E2E.md` (load when working on Playwright/E2E tests)
 - **Unit tests:** Jest with zoneless environment
 - **E2E tests:** Playwright - **ALWAYS run after code changes**
 - Use Page Object Model pattern for E2E tests
