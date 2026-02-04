@@ -10,7 +10,6 @@ export default [
       'setup-jest.ts',
       '.storybook/',
       'src/stories/',
-      'e2e',
       'dist',
       'node_modules',
       '.angular',

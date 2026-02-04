@@ -1,0 +1,9 @@
+/* tsconfig for E2E tests (Playwright) */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/e2e",
+    "types": ["node"]
+  },
+  "include": ["e2e/**/*.ts"]
+}

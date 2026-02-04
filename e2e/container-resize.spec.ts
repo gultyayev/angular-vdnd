@@ -38,7 +38,6 @@ test.describe('Container Resize', () => {
 
     // Get initial state
     const initialVisibleItems = await demoPage.list1Items.count();
-    const initialBox = await container.boundingBox();
 
     // Change the container height via JavaScript (simulating CSS change)
     await container.evaluate((el) => {

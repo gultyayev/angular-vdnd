@@ -214,7 +214,7 @@ test.describe('Axis Lock', () => {
     expect(finalList2Count).toBe(initialList2Count + 1);
   });
 
-  test('should update axis lock setting dynamically', async ({ page }) => {
+  test('should update axis lock setting dynamically', async () => {
     // Start with no lock
     await demoPage.setLockAxis(null);
     await expect(demoPage.lockAxisSelect).toHaveValue('');

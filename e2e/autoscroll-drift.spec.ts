@@ -295,11 +295,6 @@ test.describe('Autoscroll Placeholder Drift', () => {
       await page.mouse.move(centerX, nearBottomY, { steps: 5 });
       await page.waitForTimeout(3000);
 
-      // Check state after reaching bottom
-      const bottomState = await page.evaluate(() => {
-        const stateEl = document.querySelector('h3 + pre');
-        return stateEl?.textContent;
-      });
       const bottomScrollTop = await demoPage.getScrollTop('list1');
       const bottomItems = await demoPage.list1Items.count();
 
@@ -307,11 +302,6 @@ test.describe('Autoscroll Placeholder Drift', () => {
       await page.mouse.move(centerX, nearTopY, { steps: 5 });
       await page.waitForTimeout(3000);
 
-      // Check state after reaching top
-      const topState = await page.evaluate(() => {
-        const stateEl = document.querySelector('h3 + pre');
-        return stateEl?.textContent;
-      });
       const topScrollTop = await demoPage.getScrollTop('list1');
       const topItems = await demoPage.list1Items.count();
 
@@ -424,16 +414,6 @@ test.describe('Autoscroll Placeholder Drift', () => {
       // Stay at bottom edge for autoscroll
       await page.mouse.move(startX, bottomEdge - 15, { steps: 3 });
       await page.waitForTimeout(4000); // 4 seconds of autoscroll
-
-      const bottomState = await getState();
-      const bottomScroll = await demoPage.getScrollTop('list2');
-
-      // Calculate expected placeholder index based on preview position
-      // Preview center Y relative to container + scroll position / item height
-      const expectedBottomIndex = Math.floor(
-        (bottomState.previewTop - containerTop + bottomScroll + 25) / 50,
-      );
-      const bottomDrift = Math.abs(expectedBottomIndex - bottomState.placeholderIndex);
 
       // Slowly approach top edge
       for (let y = bottomEdge - 15; y > topEdge + 15; y -= 20) {

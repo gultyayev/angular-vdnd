@@ -121,8 +121,6 @@ test.describe('Keyboard Drag - Cross-List Movement', () => {
   });
 
   test('should allow vertical and horizontal movement combination', async ({ page }) => {
-    const itemText = await demoPage.getItemText('list1', 0);
-
     await demoPage.list1Items.first().focus();
     await page.keyboard.press('Space');
     await page.waitForTimeout(100); // Wait for drag to start
