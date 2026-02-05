@@ -314,7 +314,7 @@ describe('DraggableDirective', () => {
       expect(draggableNative.classList.contains('vdnd-draggable-dragging')).toBe(false);
     });
 
-    it('should restore display after drag ends', () => {
+    it('should restore display after drag ends and drop transition completes', () => {
       dragStateService.startDrag({
         draggableId: 'test-item',
         droppableId: 'test-list',
@@ -327,6 +327,14 @@ describe('DraggableDirective', () => {
       dragStateService.endDrag();
       fixture.detectChanges();
 
+      // Item stays hidden during drop-pending phase
+      expect(draggableNative.style.display).toBe('none');
+
+      // Simulate what DroppableDirective does after emitting drop event
+      dragStateService.completeDropTransition();
+      fixture.detectChanges();
+
+      // Now the item should be visible
       expect(draggableNative.style.display).not.toBe('none');
     });
   });

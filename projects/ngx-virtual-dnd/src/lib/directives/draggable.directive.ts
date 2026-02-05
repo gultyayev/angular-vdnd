@@ -57,7 +57,7 @@ import { createEffectiveGroupSignal } from '../utils/group-resolution';
     '[class.vdnd-draggable-dragging]': 'isDragging()',
     '[class.vdnd-draggable-disabled]': 'disabled()',
     '[class.vdnd-drag-pending]': 'isPending()',
-    '[style.display]': 'isDragging() ? "none" : null',
+    '[style.display]': 'shouldBeHidden() ? "none" : null',
     '[attr.aria-grabbed]': 'isDragging() ? "true" : "false"',
     '[tabindex]': 'disabled() ? -1 : 0',
     '(mousedown)': 'onPointerDown($event, false)',
@@ -145,6 +145,22 @@ export class DraggableDirective implements OnInit, OnDestroy {
   readonly isDragging = computed(() => {
     const draggedItem = this.#dragState.draggedItem();
     return draggedItem?.draggableId === this.vdndDraggable();
+  });
+
+  /**
+   * Whether this element should be hidden.
+   * True during active drag AND during the drop-pending phase.
+   * The drop-pending phase prevents a visual flicker where the item
+   * briefly appears at its original position before the list reorders.
+   */
+  protected readonly shouldBeHidden = computed(() => {
+    const id = this.vdndDraggable();
+    // Hidden during active drag
+    if (this.isDragging()) {
+      return true;
+    }
+    // Hidden during drop-pending transition
+    return this.#dragState.dropPendingItemId() === id;
   });
 
   /** Starting position of the drag */

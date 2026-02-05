@@ -297,6 +297,11 @@ export class DroppableDirective implements OnInit, OnDestroy {
         data: this.vdndDroppableData(),
       },
     });
+
+    // Complete the drop transition - this makes the dragged item visible again.
+    // Called after emit() to ensure the consumer's drop handler has run first,
+    // so the item becomes visible at its new position (not the old one).
+    this.#dragState.completeDropTransition();
   }
 
   /**

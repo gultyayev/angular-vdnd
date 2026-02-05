@@ -21,6 +21,17 @@ export class DragStateService {
   /** Flag indicating if the last drag was cancelled (not dropped) */
   readonly #wasCancelled = signal<boolean>(false);
 
+  /**
+   * Tracks an item during the "drop pending" phase.
+   * This keeps the dragged item hidden (display: none) until the consumer's
+   * drop handler has finished updating the data. This prevents a visual flicker
+   * where the item briefly appears at its original position before the list reorders.
+   */
+  readonly #dropPendingItemId = signal<string | null>(null);
+
+  /** Read-only signal to check if a specific item is in drop-pending state */
+  readonly dropPendingItemId = this.#dropPendingItemId.asReadonly();
+
   /** Whether the last drag was cancelled (for droppable to check before emitting drop) */
   readonly wasCancelled = this.#wasCancelled.asReadonly();
 
@@ -180,10 +191,34 @@ export class DragStateService {
 
   /**
    * End the drag operation and reset state (normal drop).
+   * Sets dropPendingItemId to keep the item hidden until completeDropTransition() is called.
    */
   endDrag(): void {
+    const draggedId = this.#state().draggedItem?.draggableId ?? null;
     this.#wasCancelled.set(false);
+    // Set drop pending BEFORE clearing state to keep item hidden
+    this.#dropPendingItemId.set(draggedId);
     this.#state.set(INITIAL_DRAG_STATE);
+
+    // Safety: clear pending state after effects have had a chance to run.
+    // This handles edge cases like dropping outside any droppable, where no
+    // drop event fires and completeDropTransition() is never called.
+    // Using setTimeout(..., 0) ensures this runs after the current synchronous
+    // execution including all effects. If a droppable did handle the drop,
+    // dropPendingItemId will already be null and this does nothing.
+    setTimeout(() => {
+      if (this.#dropPendingItemId() === draggedId) {
+        this.#dropPendingItemId.set(null);
+      }
+    }, 0);
+  }
+
+  /**
+   * Complete the drop transition - called after the drop event has been processed.
+   * This makes the dragged item visible again (at its new position).
+   */
+  completeDropTransition(): void {
+    this.#dropPendingItemId.set(null);
   }
 
   /**
