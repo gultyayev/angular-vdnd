@@ -1,8 +1,26 @@
 {
   "hooks": {
-    "postEdit": {
-      "command": "npx tsc --noEmit --pretty 2>&1 | head -20",
-      "description": "Type-check after edits to catch errors early"
-    }
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/install-playwright.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx tsc --noEmit --pretty 2>&1 | head -20"
+          }
+        ]
+      }
+    ]
   }
 }
