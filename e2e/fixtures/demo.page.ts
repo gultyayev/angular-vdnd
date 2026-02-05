@@ -1,4 +1,4 @@
-import { Locator, Page } from '@playwright/test';
+import { expect, Locator, Page } from '@playwright/test';
 
 export class DemoPage {
   readonly page: Page;
@@ -23,33 +23,39 @@ export class DemoPage {
     this.list2VirtualScroll = this.list2Container.locator('vdnd-virtual-scroll');
     this.list1Items = this.list1Container.locator('[data-draggable-id]');
     this.list2Items = this.list2Container.locator('[data-draggable-id]');
-    this.dragPreview = page.locator('.vdnd-drag-preview');
+    // Use data-testid for library components (stable selectors)
+    this.dragPreview = page.getByTestId('vdnd-drag-preview');
     // List cards contain the headings and badges with actual item counts
     this.list1Wrapper = page.locator('.list-card').nth(0);
     this.list2Wrapper = page.locator('.list-card').nth(1);
-    this.lockAxisSelect = page.locator('[data-testid="lock-axis-select"]');
+    this.lockAxisSelect = page.getByTestId('lock-axis-select');
     this.keyboardInstructions = page.locator('#vdnd-keyboard-instructions');
-    this.placeholder = page.locator('.vdnd-drag-placeholder-visible');
+    // Placeholder uses data-testid and visible class for accurate selection
+    this.placeholder = page
+      .getByTestId('vdnd-placeholder')
+      .and(page.locator('.vdnd-drag-placeholder-visible'));
   }
 
   async goto(): Promise<void> {
     await this.page.goto('/');
-    // Wait for items to be rendered
-    await this.list1Items.first().waitFor({ state: 'visible' });
+    // Wait for items to be rendered using auto-waiting assertion
+    await expect(this.list1Items.first()).toBeVisible();
     // Scroll lists into view (in case header/settings push them below viewport)
     await this.list1Container.scrollIntoViewIfNeeded();
     // Ensure lists are scrolled to top (WebKit may preserve scroll across navigations)
     await this.scrollList('list1', 0);
     await this.scrollList('list2', 0);
-    await this.page.waitForTimeout(50);
+    // Wait for scroll to be applied
+    await expect(async () => {
+      const scrollTop = await this.getScrollTop('list1');
+      expect(scrollTop).toBe(0);
+    }).toPass({ timeout: 1000 });
   }
 
   async enableSimplifiedApi(): Promise<void> {
-    await this.page.locator('[data-testid="simplified-api-checkbox"]').click();
-    // Wait for the list to re-render with new API
-    await this.list1Items.first().waitFor({ state: 'visible' });
-    // Additional wait for Angular to fully stabilize after checkbox toggle
-    await this.page.waitForTimeout(100);
+    await this.page.getByTestId('simplified-api-checkbox').click();
+    // Wait for the list to re-render with new API using auto-waiting assertion
+    await expect(this.list1Items.first()).toBeVisible();
   }
 
   async getItemCount(list: 'list1' | 'list2'): Promise<number> {
@@ -112,16 +118,16 @@ export class DemoPage {
       { steps: 2 },
     );
 
-    // Wait for drag preview to appear (critical for WebKit timing)
-    await this.dragPreview.waitFor({ state: 'visible', timeout: 2000 });
-    await this.page.waitForTimeout(50); // Allow preview to be positioned
+    // Wait for drag preview to appear using auto-waiting assertion
+    await expect(this.dragPreview).toBeVisible({ timeout: 2000 });
 
     // Move to target with more steps for smoother movement
     await this.page.mouse.move(targetX, targetY, { steps: 15 });
-    // Longer wait for placeholder calculation - WebKit needs more time especially for same-list drags
-    await this.page.waitForTimeout(150);
+    // Wait for placeholder to appear at target (WebKit needs more time for same-list drags)
+    await expect(this.placeholder).toBeVisible({ timeout: 2000 });
     await this.page.mouse.up();
-    await this.page.waitForTimeout(200); // Wait for state updates
+    // Wait for drag to complete (preview should disappear)
+    await expect(this.dragPreview).not.toBeVisible({ timeout: 2000 });
   }
 
   async scrollList(list: 'list1' | 'list2', scrollTop: number): Promise<void> {

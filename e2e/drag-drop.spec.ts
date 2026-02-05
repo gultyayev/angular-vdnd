@@ -40,12 +40,13 @@ test.describe('Drag and Drop', () => {
   test('should show drag preview while dragging', async ({ page }) => {
     const sourceItem = demoPage.list1Items.first();
     const sourceBox = await sourceItem.boundingBox();
+    if (!sourceBox) throw new Error('Could not get source item bounding box');
 
     await sourceItem.hover();
     await page.mouse.down();
-    await page.mouse.move(sourceBox!.x + 100, sourceBox!.y + 100);
+    await page.mouse.move(sourceBox.x + 100, sourceBox.y + 100);
 
-    // Verify drag preview is visible
+    // Verify drag preview is visible using auto-waiting assertion
     await expect(demoPage.dragPreview).toBeVisible();
 
     await page.mouse.up();
@@ -54,12 +55,13 @@ test.describe('Drag and Drop', () => {
   test('should visually hide the original element during drag', async ({ page }) => {
     const sourceItem = demoPage.list1Items.first();
     const sourceBox = await sourceItem.boundingBox();
+    if (!sourceBox) throw new Error('Could not get source item bounding box');
     const itemId = await sourceItem.getAttribute('data-draggable-id');
 
     // Start dragging
     await sourceItem.hover();
     await page.mouse.down();
-    await page.mouse.move(sourceBox!.x + 100, sourceBox!.y + 100);
+    await page.mouse.move(sourceBox.x + 100, sourceBox.y + 100);
 
     // The original element should be hidden via CSS (display: none)
     const originalElement = page.locator(`[data-draggable-id="${itemId}"]`);
@@ -200,15 +202,15 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
     await page.mouse.down();
     await page.mouse.move(sourceBox.x + 5, sourceBox.y + 5, { steps: 2 });
     await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
-    await page.waitForTimeout(50);
 
     // Move to target position
     await page.mouse.move(targetX, targetY, { steps: 10 });
-    await page.waitForTimeout(100);
+    // Wait for placeholder to appear using auto-waiting assertion
+    await expect(demoPage.placeholder).toBeVisible({ timeout: 2000 });
 
-    // Drop
+    // Drop and wait for drag to complete
     await page.mouse.up();
-    await page.waitForTimeout(200);
+    await expect(demoPage.dragPreview).not.toBeVisible({ timeout: 2000 });
 
     // Verify the item ended up at the correct position
     // List 2 should now be: [original item 0, original item 1, DROPPED ITEM, original item 2, ...]
@@ -241,11 +243,14 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
 
     // Scroll list2 down before dragging
     await demoPage.scrollList('list2', scrollAmount);
-    await page.waitForTimeout(100);
+    // Wait for scroll to be applied
+    await expect(async () => {
+      const scrollTop = await demoPage.getScrollTop('list2');
+      expect(scrollTop).toBe(scrollAmount);
+    }).toPass({ timeout: 2000 });
 
     // Ensure list2 is fully in viewport (header may push it down)
     await demoPage.list2VirtualScroll.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(50);
 
     // Get container bounds
     const sourceItem = demoPage.list1Items.first();
@@ -266,25 +271,31 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
     await page.mouse.down();
     await page.mouse.move(sourceBox.x + 5, sourceBox.y + 5, { steps: 2 });
     await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
-    await page.waitForTimeout(50);
 
     // Move to target position
     await page.mouse.move(targetX, targetY, { steps: 10 });
-    await page.waitForTimeout(100);
+    // Wait for placeholder to appear
+    await expect(demoPage.placeholder).toBeVisible({ timeout: 2000 });
 
-    // Drop
+    // Drop and wait for drag to complete
     await page.mouse.up();
-    await page.waitForTimeout(200);
+    await expect(demoPage.dragPreview).not.toBeVisible({ timeout: 2000 });
 
     // Scroll back to top to verify the item was inserted at the correct array index
     await demoPage.scrollList('list2', 0);
-    await page.waitForTimeout(100);
+    await expect(async () => {
+      const scrollTop = await demoPage.getScrollTop('list2');
+      expect(scrollTop).toBe(0);
+    }).toPass({ timeout: 2000 });
 
     // The dropped item should be at array index expectedDropIndex
     // Scroll to bring that index into view
     const scrollToIndex = Math.max(0, expectedDropIndex - 3); // Show a few items before
     await demoPage.scrollList('list2', scrollToIndex * itemHeight);
-    await page.waitForTimeout(100);
+    await expect(async () => {
+      const scrollTop = await demoPage.getScrollTop('list2');
+      expect(scrollTop).toBe(scrollToIndex * itemHeight);
+    }).toPass({ timeout: 2000 });
 
     // Check the item at the expected position (accounting for overscan)
     // With overscan, items at indices (scrollToIndex - overscan) are in DOM
@@ -327,18 +338,25 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
     await page.mouse.move(containerBox.x + 100, nearBottomY);
 
     // Wait for autoscroll (3 seconds should scroll significantly)
+    // Note: This timeout is intentional - we need real time for autoscroll behavior
     await page.waitForTimeout(3000);
 
-    const scrollTop = await demoPage.getScrollTop('list2');
-    expect(scrollTop).toBeGreaterThan(200);
+    // Verify scroll happened using auto-waiting assertion
+    await expect(async () => {
+      const scrollTop = await demoPage.getScrollTop('list2');
+      expect(scrollTop).toBeGreaterThan(200);
+    }).toPass({ timeout: 1000 });
 
-    // Drop the item
+    // Drop the item and wait for drag to complete
     await page.mouse.up();
-    await page.waitForTimeout(200);
+    await expect(demoPage.dragPreview).not.toBeVisible({ timeout: 2000 });
 
     // Scroll back to top to verify reorder happened
     await demoPage.scrollList('list2', 0);
-    await page.waitForTimeout(100);
+    await expect(async () => {
+      const scrollTop = await demoPage.getScrollTop('list2');
+      expect(scrollTop).toBe(0);
+    }).toPass({ timeout: 2000 });
 
     // First item should now be what was second (Item 1 was moved somewhere else)
     const newFirstItemText = await demoPage.getItemText('list2', 0);

@@ -14,32 +14,32 @@ test.describe('Axis Lock', () => {
 
     const sourceItem = demoPage.list1Items.first();
     const sourceBox = await sourceItem.boundingBox();
+    if (!sourceBox) throw new Error('Could not get source item bounding box');
 
     // Start dragging
     await sourceItem.hover();
     await page.mouse.down();
 
-    // Get initial preview position (wait for preview to be positioned in WebKit)
-    await page.mouse.move(sourceBox!.x + 10, sourceBox!.y + 10, { steps: 2 });
-    await demoPage.dragPreview.waitFor({ state: 'visible' });
-    await page.waitForTimeout(50); // Allow layout to settle
+    // Get initial preview position (wait for preview to be visible)
+    await page.mouse.move(sourceBox.x + 10, sourceBox.y + 10, { steps: 2 });
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
     const initialPreviewBox = await demoPage.dragPreview.boundingBox();
+    if (!initialPreviewBox) throw new Error('Could not get initial preview bounding box');
 
     // Move diagonally by a significant amount
     const deltaX = 100;
     const deltaY = 80;
-    await page.mouse.move(sourceBox!.x + 10 + deltaX, sourceBox!.y + 10 + deltaY, { steps: 5 });
-    await page.waitForTimeout(50); // Allow layout to settle
+    await page.mouse.move(sourceBox.x + 10 + deltaX, sourceBox.y + 10 + deltaY, { steps: 5 });
 
-    // Get final preview position
-    const finalPreviewBox = await demoPage.dragPreview.boundingBox();
-
-    // Preview should have moved both horizontally and vertically
-    const movedX = finalPreviewBox!.x - initialPreviewBox!.x;
-    const movedY = finalPreviewBox!.y - initialPreviewBox!.y;
-
-    expect(Math.abs(movedX - deltaX)).toBeLessThan(10);
-    expect(Math.abs(movedY - deltaY)).toBeLessThan(10);
+    // Verify preview moved using retrying assertion
+    await expect(async () => {
+      const finalPreviewBox = await demoPage.dragPreview.boundingBox();
+      if (!finalPreviewBox) throw new Error('Could not get final preview bounding box');
+      const movedX = finalPreviewBox.x - initialPreviewBox.x;
+      const movedY = finalPreviewBox.y - initialPreviewBox.y;
+      expect(Math.abs(movedX - deltaX)).toBeLessThan(10);
+      expect(Math.abs(movedY - deltaY)).toBeLessThan(10);
+    }).toPass({ timeout: 2000 });
 
     await page.mouse.up();
   });
@@ -49,34 +49,34 @@ test.describe('Axis Lock', () => {
 
     const sourceItem = demoPage.list1Items.first();
     const sourceBox = await sourceItem.boundingBox();
+    if (!sourceBox) throw new Error('Could not get source item bounding box');
 
     // Start dragging
     await sourceItem.hover();
     await page.mouse.down();
 
-    // Get initial preview position (wait for preview to be positioned in WebKit)
-    await page.mouse.move(sourceBox!.x + 10, sourceBox!.y + 10, { steps: 2 });
-    await demoPage.dragPreview.waitFor({ state: 'visible' });
-    await page.waitForTimeout(50); // Allow layout to settle
+    // Get initial preview position (wait for preview to be visible)
+    await page.mouse.move(sourceBox.x + 10, sourceBox.y + 10, { steps: 2 });
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
     const initialPreviewBox = await demoPage.dragPreview.boundingBox();
+    if (!initialPreviewBox) throw new Error('Could not get initial preview bounding box');
 
     // Move diagonally by a significant amount
     const deltaX = 100;
     const deltaY = 80;
-    await page.mouse.move(sourceBox!.x + 10 + deltaX, sourceBox!.y + 10 + deltaY, { steps: 5 });
-    await page.waitForTimeout(50); // Allow layout to settle
+    await page.mouse.move(sourceBox.x + 10 + deltaX, sourceBox.y + 10 + deltaY, { steps: 5 });
 
-    // Get final preview position
-    const finalPreviewBox = await demoPage.dragPreview.boundingBox();
-
-    // With X locked, the preview should NOT move horizontally but SHOULD move vertically
-    const movedX = finalPreviewBox!.x - initialPreviewBox!.x;
-    const movedY = finalPreviewBox!.y - initialPreviewBox!.y;
-
-    // X should stay approximately the same (locked)
-    expect(Math.abs(movedX)).toBeLessThan(10);
-    // Y should have moved with the cursor
-    expect(Math.abs(movedY - deltaY)).toBeLessThan(10);
+    // Verify X is locked but Y moves using retrying assertion
+    await expect(async () => {
+      const finalPreviewBox = await demoPage.dragPreview.boundingBox();
+      if (!finalPreviewBox) throw new Error('Could not get final preview bounding box');
+      const movedX = finalPreviewBox.x - initialPreviewBox.x;
+      const movedY = finalPreviewBox.y - initialPreviewBox.y;
+      // X should stay approximately the same (locked)
+      expect(Math.abs(movedX)).toBeLessThan(10);
+      // Y should have moved with the cursor
+      expect(Math.abs(movedY - deltaY)).toBeLessThan(10);
+    }).toPass({ timeout: 2000 });
 
     await page.mouse.up();
   });
@@ -89,10 +89,7 @@ test.describe('Axis Lock', () => {
     const sourceItem = demoPage.list1Items.first();
     await sourceItem.scrollIntoViewIfNeeded();
     const sourceBox = await sourceItem.boundingBox();
-
-    if (!sourceBox) {
-      throw new Error('Could not get source item bounding box');
-    }
+    if (!sourceBox) throw new Error('Could not get source item bounding box');
 
     const startX = sourceBox.x + sourceBox.width / 2;
     const startY = sourceBox.y + sourceBox.height / 2;
@@ -105,15 +102,14 @@ test.describe('Axis Lock', () => {
     const sidewaysDelta = 8;
     await page.mouse.move(startX + sidewaysDelta, startY, { steps: 1 });
 
-    await demoPage.dragPreview.waitFor({ state: 'visible' });
-    await page.waitForTimeout(50); // Allow layout to settle
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
 
-    const previewBox = await demoPage.dragPreview.boundingBox();
-    expect(previewBox).not.toBeNull();
-
-    // With X locked, the preview should not shift horizontally from the original element position,
-    // even if the cursor moved horizontally while crossing the drag threshold.
-    expect(Math.abs(previewBox!.x - sourceBox.x)).toBeLessThan(3);
+    // With X locked, the preview should not shift horizontally from the original element position
+    await expect(async () => {
+      const previewBox = await demoPage.dragPreview.boundingBox();
+      expect(previewBox).not.toBeNull();
+      expect(Math.abs(previewBox!.x - sourceBox.x)).toBeLessThan(3);
+    }).toPass({ timeout: 2000 });
 
     await page.mouse.up();
   });
@@ -123,34 +119,34 @@ test.describe('Axis Lock', () => {
 
     const sourceItem = demoPage.list1Items.first();
     const sourceBox = await sourceItem.boundingBox();
+    if (!sourceBox) throw new Error('Could not get source item bounding box');
 
     // Start dragging
     await sourceItem.hover();
     await page.mouse.down();
 
-    // Get initial preview position (wait for preview to be positioned in WebKit)
-    await page.mouse.move(sourceBox!.x + 10, sourceBox!.y + 10, { steps: 2 });
-    await demoPage.dragPreview.waitFor({ state: 'visible' });
-    await page.waitForTimeout(50); // Allow layout to settle
+    // Get initial preview position (wait for preview to be visible)
+    await page.mouse.move(sourceBox.x + 10, sourceBox.y + 10, { steps: 2 });
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
     const initialPreviewBox = await demoPage.dragPreview.boundingBox();
+    if (!initialPreviewBox) throw new Error('Could not get initial preview bounding box');
 
     // Move diagonally by a significant amount
     const deltaX = 100;
     const deltaY = 80;
-    await page.mouse.move(sourceBox!.x + 10 + deltaX, sourceBox!.y + 10 + deltaY, { steps: 5 });
-    await page.waitForTimeout(50); // Allow layout to settle
+    await page.mouse.move(sourceBox.x + 10 + deltaX, sourceBox.y + 10 + deltaY, { steps: 5 });
 
-    // Get final preview position
-    const finalPreviewBox = await demoPage.dragPreview.boundingBox();
-
-    // With Y locked, the preview should NOT move vertically but SHOULD move horizontally
-    const movedX = finalPreviewBox!.x - initialPreviewBox!.x;
-    const movedY = finalPreviewBox!.y - initialPreviewBox!.y;
-
-    // X should have moved with the cursor
-    expect(Math.abs(movedX - deltaX)).toBeLessThan(10);
-    // Y should stay approximately the same (locked)
-    expect(Math.abs(movedY)).toBeLessThan(10);
+    // Verify Y is locked but X moves using retrying assertion
+    await expect(async () => {
+      const finalPreviewBox = await demoPage.dragPreview.boundingBox();
+      if (!finalPreviewBox) throw new Error('Could not get final preview bounding box');
+      const movedX = finalPreviewBox.x - initialPreviewBox.x;
+      const movedY = finalPreviewBox.y - initialPreviewBox.y;
+      // X should have moved with the cursor
+      expect(Math.abs(movedX - deltaX)).toBeLessThan(10);
+      // Y should stay approximately the same (locked)
+      expect(Math.abs(movedY)).toBeLessThan(10);
+    }).toPass({ timeout: 2000 });
 
     await page.mouse.up();
   });
@@ -164,6 +160,7 @@ test.describe('Axis Lock', () => {
     const sourceItem = demoPage.list1Items.first();
     const sourceBox = await sourceItem.boundingBox();
     const list2Box = await demoPage.list2VirtualScroll.boundingBox();
+    if (!sourceBox || !list2Box) throw new Error('Could not get bounding boxes');
 
     // Start dragging from list1
     await sourceItem.hover();
@@ -171,17 +168,18 @@ test.describe('Axis Lock', () => {
 
     // Try to move to list2 (which is to the right)
     // With X locked, the drop target detection should stay in list1
-    await page.mouse.move(list2Box!.x + list2Box!.width / 2, sourceBox!.y + 50, { steps: 10 });
-    await page.waitForTimeout(100);
+    await page.mouse.move(list2Box.x + list2Box.width / 2, sourceBox.y + 50, { steps: 10 });
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
     await page.mouse.up();
-    await page.waitForTimeout(100);
+    await expect(demoPage.dragPreview).not.toBeVisible({ timeout: 2000 });
 
     // Since X is locked, the item should stay in list1 (reordered within it)
-    const finalList1Count = await demoPage.getItemCount('list1');
-    const finalList2Count = await demoPage.getItemCount('list2');
-
-    expect(finalList1Count).toBe(initialList1Count);
-    expect(finalList2Count).toBe(initialList2Count);
+    await expect(async () => {
+      const finalList1Count = await demoPage.getItemCount('list1');
+      const finalList2Count = await demoPage.getItemCount('list2');
+      expect(finalList1Count).toBe(initialList1Count);
+      expect(finalList2Count).toBe(initialList2Count);
+    }).toPass({ timeout: 2000 });
   });
 
   test('should allow cross-list drag when Y axis is locked but lists are side by side', async ({
@@ -195,23 +193,25 @@ test.describe('Axis Lock', () => {
     const sourceItem = demoPage.list1Items.first();
     const sourceBox = await sourceItem.boundingBox();
     const list2Box = await demoPage.list2VirtualScroll.boundingBox();
+    if (!sourceBox || !list2Box) throw new Error('Could not get bounding boxes');
 
     // Start dragging from list1
     await sourceItem.hover();
     await page.mouse.down();
 
     // Move to list2 horizontally (Y locked means we can move horizontally freely)
-    await page.mouse.move(list2Box!.x + list2Box!.width / 2, sourceBox!.y, { steps: 10 });
-    await page.waitForTimeout(100);
+    await page.mouse.move(list2Box.x + list2Box.width / 2, sourceBox.y, { steps: 10 });
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
     await page.mouse.up();
-    await page.waitForTimeout(100);
+    await expect(demoPage.dragPreview).not.toBeVisible({ timeout: 2000 });
 
     // With Y locked but horizontal movement allowed, item should move to list2
-    const finalList1Count = await demoPage.getItemCount('list1');
-    const finalList2Count = await demoPage.getItemCount('list2');
-
-    expect(finalList1Count).toBe(initialList1Count - 1);
-    expect(finalList2Count).toBe(initialList2Count + 1);
+    await expect(async () => {
+      const finalList1Count = await demoPage.getItemCount('list1');
+      const finalList2Count = await demoPage.getItemCount('list2');
+      expect(finalList1Count).toBe(initialList1Count - 1);
+      expect(finalList2Count).toBe(initialList2Count + 1);
+    }).toPass({ timeout: 2000 });
   });
 
   test('should update axis lock setting dynamically', async () => {

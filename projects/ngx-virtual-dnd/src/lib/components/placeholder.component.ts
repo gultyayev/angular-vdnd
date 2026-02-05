@@ -38,13 +38,15 @@ export interface PlaceholderContext {
   imports: [NgTemplateOutlet],
   host: {
     class: 'vdnd-placeholder',
+    'data-testid': 'vdnd-placeholder',
     '[style.height.px]': 'height()',
     '[attr.data-draggable-id]': '"placeholder"',
   },
   template: `
     @if (template()) {
       <ng-container
-        *ngTemplateOutlet="template()!; context: { $implicit: height(), height: height() }">
+        *ngTemplateOutlet="template()!; context: { $implicit: height(), height: height() }"
+      >
       </ng-container>
     }
   `,
