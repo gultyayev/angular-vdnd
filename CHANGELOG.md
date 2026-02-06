@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.2.3](https://github.com/gultyayev/angular-vdnd/compare/v1.2.2...v1.2.3) (2026-02-06)
+
+### Bug Fixes
+
+- **lib:** teleport drag preview to body overlay to fix CSS transform offset ([979c443](https://github.com/gultyayev/angular-vdnd/commit/979c44372b1b6e4c93c48567ac06515b2a01409f))
+
 ## [1.2.2](https://github.com/gultyayev/angular-vdnd/compare/v1.2.1...v1.2.2) (2026-01-24)
 
 ### Performance
