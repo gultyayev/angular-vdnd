@@ -2,12 +2,14 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { JsonPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import {
+  applyMove,
   DraggableDirective,
   DragPreviewComponent,
   DragStateService,
   DropEvent,
   DroppableDirective,
   DroppableGroupDirective,
+  isNoOpDrop,
   moveItem,
   VirtualScrollContainerComponent,
   VirtualSortableListComponent,
@@ -166,36 +168,18 @@ export class DemoComponent {
   }
 
   /** Handle drop events (verbose API) */
-  onDrop(event: DropEvent, targetList: 'list1' | 'list2'): void {
-    const sourceList = event.source.droppableId === 'list-1' ? 'list1' : 'list2';
-    const item = event.source.data as Item;
-
-    if (!item) {
+  onDrop(event: DropEvent): void {
+    if (isNoOpDrop(event)) {
       return;
     }
 
-    // Remove from source
-    if (sourceList === 'list1') {
-      this.list1.update((items) => items.filter((i) => i.id !== item.id));
-    } else {
-      this.list2.update((items) => items.filter((i) => i.id !== item.id));
-    }
+    const moved = applyMove(event, {
+      'list-1': this.list1(),
+      'list-2': this.list2(),
+    });
 
-    // Add to destination
-    const destIndex = event.destination.index;
-    if (targetList === 'list1') {
-      this.list1.update((items) => {
-        const newItems = [...items];
-        newItems.splice(destIndex, 0, item);
-        return newItems;
-      });
-    } else {
-      this.list2.update((items) => {
-        const newItems = [...items];
-        newItems.splice(destIndex, 0, item);
-        return newItems;
-      });
-    }
+    this.list1.set(moved['list-1']);
+    this.list2.set(moved['list-2']);
   }
 
   /**

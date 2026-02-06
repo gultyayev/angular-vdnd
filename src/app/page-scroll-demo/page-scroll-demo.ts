@@ -28,6 +28,10 @@ import {
   DropEvent,
   DroppableDirective,
   DroppableGroupDirective,
+  insertAt,
+  isNoOpDrop,
+  removeAt,
+  reorderItems,
   ScrollableDirective,
   VirtualContentComponent,
   VirtualForDirective,
@@ -169,15 +173,33 @@ export class PageScrollDemoComponent implements OnDestroy {
   }
 
   onDrop(event: DropEvent): void {
-    const sourceIndex = event.source.index;
-    const targetIndex = event.destination.index;
-    if (sourceIndex === targetIndex) return;
+    if (isNoOpDrop(event)) {
+      return;
+    }
+
+    const cat = this.category();
+    if (cat === 'all') {
+      reorderItems(event, this.tasks);
+      return;
+    }
 
     this.tasks.update((tasks) => {
-      const result = [...tasks];
-      const [removed] = result.splice(sourceIndex, 1);
-      result.splice(targetIndex, 0, removed);
-      return result;
+      const matchesFilter = (task: Task): boolean => task.category === cat;
+
+      const visibleTasks = tasks.filter(matchesFilter);
+      const item = visibleTasks[event.source.index];
+      if (!item) {
+        return tasks;
+      }
+
+      const nextVisibleTasks = insertAt(
+        removeAt(visibleTasks, event.source.index),
+        item,
+        event.destination.index,
+      );
+
+      let visibleIndex = 0;
+      return tasks.map((task) => (matchesFilter(task) ? nextVisibleTasks[visibleIndex++]! : task));
     });
   }
 
