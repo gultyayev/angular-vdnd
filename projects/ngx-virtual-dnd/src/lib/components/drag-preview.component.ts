@@ -1,4 +1,5 @@
 import {
+  afterNextRender,
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -6,11 +7,13 @@ import {
   ElementRef,
   inject,
   input,
+  OnDestroy,
   TemplateRef,
   viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { DragStateService } from '../services/drag-state.service';
+import { OverlayContainerService } from '../services/overlay-container.service';
 
 /**
  * Context provided to the drag preview template.
@@ -27,8 +30,9 @@ export interface DragPreviewContext<T = unknown> {
 /**
  * Renders a preview of the dragged item that follows the cursor.
  *
- * This component should be placed at the root of your application (or at least
- * outside of any scrollable containers) to ensure the preview is always visible.
+ * The component automatically teleports itself into a body-level overlay container,
+ * so it works correctly even inside ancestors with CSS `transform` (e.g. Ionic pages).
+ * It can be placed anywhere in the component tree.
  *
  * @example
  * ```html
@@ -94,8 +98,10 @@ export interface DragPreviewContext<T = unknown> {
     }
   `,
 })
-export class DragPreviewComponent<T = unknown> {
+export class DragPreviewComponent<T = unknown> implements OnDestroy {
   protected readonly dragState = inject(DragStateService);
+  readonly #overlayContainer = inject(OverlayContainerService);
+  readonly #elementRef = inject(ElementRef<HTMLElement>);
 
   /** Optional custom template for the preview */
   previewTemplate = input<TemplateRef<DragPreviewContext<T>>>();
@@ -115,6 +121,15 @@ export class DragPreviewComponent<T = unknown> {
   });
 
   constructor() {
+    // Teleport host element into the body-level overlay container after first render.
+    // This escapes any ancestor CSS transforms that would break position: fixed.
+    afterNextRender(() => {
+      const container = this.#overlayContainer.getContainerElement();
+      if (container) {
+        container.appendChild(this.#elementRef.nativeElement);
+      }
+    });
+
     // Effect to insert the cloned element into the container
     effect(() => {
       const container = this.cloneContainer()?.nativeElement;
@@ -131,6 +146,10 @@ export class DragPreviewComponent<T = unknown> {
         container.appendChild(clone);
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    this.#elementRef.nativeElement.remove();
   }
 
   /** Whether the preview is visible */

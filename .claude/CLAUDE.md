@@ -39,37 +39,38 @@ These rules prevent common mistakes that cause hard-to-debug issues:
 
 ### Services
 
-| Service | Path | Purpose |
-|---------|------|---------|
-| DragStateService | `lib/services/drag-state.service.ts` | Central signals-based drag state |
-| PositionCalculatorService | `lib/services/position-calculator.service.ts` | DOM hit-testing, drop index calculation |
-| AutoScrollService | `lib/services/auto-scroll.service.ts` | RAF-based edge scrolling |
-| ElementCloneService | `lib/services/element-clone.service.ts` | Clone elements for drag preview |
-| KeyboardDragService | `lib/services/keyboard-drag.service.ts` | Keyboard drag state management |
+| Service                    | Path                                            | Purpose                                    |
+| -------------------------- | ----------------------------------------------- | ------------------------------------------ |
+| DragStateService           | `lib/services/drag-state.service.ts`            | Central signals-based drag state           |
+| PositionCalculatorService  | `lib/services/position-calculator.service.ts`   | DOM hit-testing, drop index calculation    |
+| AutoScrollService          | `lib/services/auto-scroll.service.ts`           | RAF-based edge scrolling                   |
+| ElementCloneService        | `lib/services/element-clone.service.ts`         | Clone elements for drag preview            |
+| KeyboardDragService        | `lib/services/keyboard-drag.service.ts`         | Keyboard drag state management             |
 | DragIndexCalculatorService | `lib/services/drag-index-calculator.service.ts` | Placeholder index with virtual scroll math |
+| OverlayContainerService    | `lib/services/overlay-container.service.ts`     | Body-level container for overlay elements  |
 
-*All paths relative to `/projects/ngx-virtual-dnd/src/`*
+_All paths relative to `/projects/ngx-virtual-dnd/src/`_
 
 ### Directives
 
-| Directive | Selector | Key Inputs |
-|-----------|----------|------------|
-| DraggableDirective | `vdndDraggable` | ID (required), group, data, disabled |
-| DroppableDirective | `vdndDroppable` | ID (required), group, data, autoScrollConfig, disabled |
-| DroppableGroupDirective | `vdndGroup` | group name (required) |
-| ScrollableDirective | `vdndScrollable` | scrollContainerId, autoScrollEnabled, autoScrollConfig |
-| VirtualForDirective | `*vdndVirtualFor` | items, itemHeight, trackBy |
+| Directive               | Selector          | Key Inputs                                             |
+| ----------------------- | ----------------- | ------------------------------------------------------ |
+| DraggableDirective      | `vdndDraggable`   | ID (required), group, data, disabled                   |
+| DroppableDirective      | `vdndDroppable`   | ID (required), group, data, autoScrollConfig, disabled |
+| DroppableGroupDirective | `vdndGroup`       | group name (required)                                  |
+| ScrollableDirective     | `vdndScrollable`  | scrollContainerId, autoScrollEnabled, autoScrollConfig |
+| VirtualForDirective     | `*vdndVirtualFor` | items, itemHeight, trackBy                             |
 
 ### Components
 
-| Component | Purpose |
-|-----------|---------|
-| VirtualScrollContainerComponent | High-level virtual scroll + auto-sticky |
-| VirtualSortableListComponent | Combines droppable + virtual scroll + placeholder |
-| VirtualViewportComponent | Self-contained viewport with GPU-accelerated positioning |
-| VirtualContentComponent | Virtual content within external scroll container |
-| DragPreviewComponent | Preview following cursor (place at root) |
-| PlaceholderComponent | Drop position indicator |
+| Component                       | Purpose                                                   |
+| ------------------------------- | --------------------------------------------------------- |
+| VirtualScrollContainerComponent | High-level virtual scroll + auto-sticky                   |
+| VirtualSortableListComponent    | Combines droppable + virtual scroll + placeholder         |
+| VirtualViewportComponent        | Self-contained viewport with GPU-accelerated positioning  |
+| VirtualContentComponent         | Virtual content within external scroll container          |
+| DragPreviewComponent            | Preview following cursor (auto-teleports to body overlay) |
+| PlaceholderComponent            | Drop position indicator                                   |
 
 ### Service Dependencies
 
@@ -82,31 +83,32 @@ DraggableDirective
 ├── KeyboardDragService
 └── DragIndexCalculatorService
 
+DragPreviewComponent → OverlayContainerService
 DragIndexCalculatorService → PositionCalculatorService
 AutoScrollService → DragStateService, PositionCalculatorService
 ```
 
 ### Data Attributes
 
-| Attribute | Set By | Used For |
-|-----------|--------|----------|
-| `data-draggable-id` | DraggableDirective | Identify draggable elements |
-| `data-droppable-id` | DroppableDirective | Identify drop targets |
-| `data-droppable-group` | DroppableDirective | Group membership for cross-list drag |
-| `data-item-height` | VirtualForDirective | Virtual scroll item height |
+| Attribute              | Set By              | Used For                             |
+| ---------------------- | ------------------- | ------------------------------------ |
+| `data-draggable-id`    | DraggableDirective  | Identify draggable elements          |
+| `data-droppable-id`    | DroppableDirective  | Identify drop targets                |
+| `data-droppable-group` | DroppableDirective  | Group membership for cross-list drag |
+| `data-item-height`     | VirtualForDirective | Virtual scroll item height           |
 
 ### Test Files
 
-| Source Area | Unit Test | E2E Tests |
-|-------------|-----------|-----------|
-| DraggableDirective | `draggable.directive.spec.ts` | `drag-drop.spec.ts`, `keyboard-drag/*.spec.ts` |
-| DroppableDirective | `droppable.directive.spec.ts` | `drop-accuracy.spec.ts` |
-| DragStateService | `drag-state.service.spec.ts` | - |
-| AutoScrollService | `auto-scroll.service.spec.ts` | `auto-scroll.spec.ts`, `autoscroll-drift.spec.ts` |
-| Placeholder logic | - | `placeholder-behavior.spec.ts`, `placeholder-integrity.spec.ts` |
-| Keyboard drag | - | `keyboard-drag/*.spec.ts` (6 files) |
-| Page scroll | - | `page-scroll.spec.ts` |
-| Mobile touch | - | `touch-scroll.mobile.spec.ts` |
+| Source Area        | Unit Test                     | E2E Tests                                                       |
+| ------------------ | ----------------------------- | --------------------------------------------------------------- |
+| DraggableDirective | `draggable.directive.spec.ts` | `drag-drop.spec.ts`, `keyboard-drag/*.spec.ts`                  |
+| DroppableDirective | `droppable.directive.spec.ts` | `drop-accuracy.spec.ts`                                         |
+| DragStateService   | `drag-state.service.spec.ts`  | -                                                               |
+| AutoScrollService  | `auto-scroll.service.spec.ts` | `auto-scroll.spec.ts`, `autoscroll-drift.spec.ts`               |
+| Placeholder logic  | -                             | `placeholder-behavior.spec.ts`, `placeholder-integrity.spec.ts` |
+| Keyboard drag      | -                             | `keyboard-drag/*.spec.ts` (6 files)                             |
+| Page scroll        | -                             | `page-scroll.spec.ts`                                           |
+| Mobile touch       | -                             | `touch-scroll.mobile.spec.ts`                                   |
 
 ### Public API (from public-api.ts)
 
@@ -254,6 +256,8 @@ effect(() => {
 
 6. **Gap prevention**: Dragged item hidden with `display: none`. Virtual scroll's `totalHeight` subtracts 1 during drag.
 
+7. **Overlay container for drag preview**: `DragPreviewComponent` teleports its host element into a body-level `<div class="vdnd-overlay-container">` via `afterNextRender`. This escapes ancestor CSS `transform`/`perspective`/`filter` that create new containing blocks for `position: fixed` (e.g. Ionic's `ion-page`). Angular change detection works on the logical component tree, so signals/effects/bindings keep working after the DOM move. Unit tests must use `document.querySelector()` instead of `fixture.debugElement.query()` to find the teleported preview.
+
 ### Safari Autoscroll
 
 **Problem:** Cumulative drift during autoscroll.
@@ -284,22 +288,24 @@ See `.claude/history/safari-autoscroll.md` for failed approaches and detailed in
 
 Load these ONLY when working on specific areas:
 
-| Doc | When to Load |
-|-----|--------------|
-| `.ai/E2E.md` | Before writing/modifying Playwright tests |
-| `.claude/demo/DESIGN_SYSTEM.md` | Before styling demo pages |
-| `.claude/history/safari-autoscroll.md` | If debugging Safari scroll drift |
+| Doc                                    | When to Load                              |
+| -------------------------------------- | ----------------------------------------- |
+| `.ai/E2E.md`                           | Before writing/modifying Playwright tests |
+| `.claude/demo/DESIGN_SYSTEM.md`        | Before styling demo pages                 |
+| `.claude/history/safari-autoscroll.md` | If debugging Safari scroll drift          |
 
 ## Troubleshooting
 
-| Error/Symptom | Cause | Fix |
-|---------------|-------|-----|
-| `elementFromPoint` returns null | Target outside viewport | `scrollIntoViewIfNeeded()` first |
-| Placeholder not appearing | Group mismatch | Check `vdndDroppableGroup` matches |
-| Drag preview stuck | Listener cleanup missed | Check `ngOnDestroy` removes listeners |
-| Safari drift during scroll | Using `scrollBy()` | Use direct `scrollTop +=` |
-| Changes not appearing in demo | Library not rebuilt | Run `ng build ngx-virtual-dnd` |
-| Signal write error in effect | Using deprecated option | Remove `allowSignalWrites: true` |
+| Error/Symptom                                      | Cause                                             | Fix                                                                      |
+| -------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------ |
+| `elementFromPoint` returns null                    | Target outside viewport                           | `scrollIntoViewIfNeeded()` first                                         |
+| Placeholder not appearing                          | Group mismatch                                    | Check `vdndDroppableGroup` matches                                       |
+| Drag preview stuck                                 | Listener cleanup missed                           | Check `ngOnDestroy` removes listeners                                    |
+| Safari drift during scroll                         | Using `scrollBy()`                                | Use direct `scrollTop +=`                                                |
+| Changes not appearing in demo                      | Library not rebuilt                               | Run `ng build ngx-virtual-dnd`                                           |
+| Signal write error in effect                       | Using deprecated option                           | Remove `allowSignalWrites: true`                                         |
+| Drag preview offset in Ionic/transformed container | Ancestor CSS `transform` breaks `position: fixed` | Already fixed — `OverlayContainerService` teleports preview to body      |
+| Unit test can't find drag preview element          | Preview teleported to overlay container           | Use `document.querySelector()` instead of `fixture.debugElement.query()` |
 
 ## Common Tasks
 

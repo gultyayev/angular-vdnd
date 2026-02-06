@@ -14,6 +14,7 @@ export { AutoScrollService } from './services/auto-scroll.service';
 export type { AutoScrollConfig } from './services/auto-scroll.service';
 export { ElementCloneService } from './services/element-clone.service';
 export { KeyboardDragService } from './services/keyboard-drag.service';
+export { OverlayContainerService } from './services/overlay-container.service';
 
 // Components
 export { VirtualScrollContainerComponent } from './components/virtual-scroll-container.component';

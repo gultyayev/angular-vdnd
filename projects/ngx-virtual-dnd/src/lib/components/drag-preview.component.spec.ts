@@ -1,8 +1,8 @@
 import { Component, TemplateRef, viewChild } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { By } from '@angular/platform-browser';
 import { DragPreviewComponent, DragPreviewContext } from './drag-preview.component';
 import { DragStateService } from '../services/drag-state.service';
+import { OverlayContainerService } from '../services/overlay-container.service';
 import { CursorPosition, DraggedItem, GrabOffset } from '../models/drag-drop.models';
 
 interface TestItemData {
@@ -60,9 +60,14 @@ describe('DragPreviewComponent', () => {
     };
   };
 
+  /** Query the preview inside the overlay container (outside the fixture DOM). */
+  const queryPreview = (selector: string): HTMLElement | null =>
+    document.querySelector(`.vdnd-overlay-container ${selector}`);
+
   describe('with default template', () => {
     let fixture: ComponentFixture<DefaultTestHostComponent>;
     let dragStateService: DragStateService;
+    let overlayContainerService: OverlayContainerService;
 
     beforeEach(() => {
       TestBed.configureTestingModule({
@@ -72,6 +77,7 @@ describe('DragPreviewComponent', () => {
 
       fixture = TestBed.createComponent(DefaultTestHostComponent);
       dragStateService = TestBed.inject(DragStateService);
+      overlayContainerService = TestBed.inject(OverlayContainerService);
       fixture.detectChanges();
       fixture.detectChanges();
     });
@@ -79,11 +85,22 @@ describe('DragPreviewComponent', () => {
     afterEach(() => {
       dragStateService.endDrag();
       fixture.destroy();
+      overlayContainerService.ngOnDestroy();
+    });
+
+    describe('overlay teleport', () => {
+      it('should teleport host element into the overlay container', () => {
+        const overlayContainer = document.querySelector('.vdnd-overlay-container');
+        expect(overlayContainer).not.toBeNull();
+
+        const host = overlayContainer!.querySelector('vdnd-drag-preview');
+        expect(host).not.toBeNull();
+      });
     });
 
     describe('visibility', () => {
       it('should not be visible when not dragging', () => {
-        const preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
+        const preview = queryPreview('.vdnd-drag-preview');
         expect(preview).toBeNull();
       });
 
@@ -93,7 +110,7 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
         fixture.detectChanges();
 
-        const preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
+        const preview = queryPreview('.vdnd-drag-preview');
         expect(preview).not.toBeNull();
       });
 
@@ -103,7 +120,7 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
         fixture.detectChanges();
 
-        const preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
+        const preview = queryPreview('.vdnd-drag-preview');
         expect(preview).toBeNull();
       });
 
@@ -113,14 +130,14 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
         fixture.detectChanges();
 
-        let preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
+        let preview = queryPreview('.vdnd-drag-preview');
         expect(preview).not.toBeNull();
 
         dragStateService.endDrag();
         fixture.detectChanges();
         fixture.detectChanges();
 
-        preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
+        preview = queryPreview('.vdnd-drag-preview');
         expect(preview).toBeNull();
       });
     });
@@ -135,8 +152,8 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
         fixture.detectChanges();
 
-        const preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
-        expect(preview.nativeElement.style.transform).toBe('translate3d(140px, 180px, 0)');
+        const preview = queryPreview('.vdnd-drag-preview');
+        expect(preview!.style.transform).toBe('translate3d(140px, 180px, 0)');
       });
 
       it('should use default cursorOffset when no grab offset', () => {
@@ -146,9 +163,9 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
         fixture.detectChanges();
 
-        const preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
+        const preview = queryPreview('.vdnd-drag-preview');
         // Should use default cursorOffset input: (100-8, 100-8) = (92, 92)
-        expect(preview.nativeElement.style.transform).toBe('translate3d(92px, 92px, 0)');
+        expect(preview!.style.transform).toBe('translate3d(92px, 92px, 0)');
       });
 
       it('should update position when cursor moves', () => {
@@ -157,8 +174,8 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
         fixture.detectChanges();
 
-        let preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
-        expect(preview.nativeElement.style.transform).toBe('translate3d(100px, 100px, 0)');
+        let preview = queryPreview('.vdnd-drag-preview');
+        expect(preview!.style.transform).toBe('translate3d(100px, 100px, 0)');
 
         dragStateService.updateDragPosition({
           cursorPosition: { x: 200, y: 200 },
@@ -169,8 +186,8 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
         fixture.detectChanges();
 
-        preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
-        expect(preview.nativeElement.style.transform).toBe('translate3d(200px, 200px, 0)');
+        preview = queryPreview('.vdnd-drag-preview');
+        expect(preview!.style.transform).toBe('translate3d(200px, 200px, 0)');
       });
     });
 
@@ -193,8 +210,8 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
         fixture.detectChanges();
 
-        const preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
-        expect(preview.nativeElement.style.transform).toBe('translate3d(100px, 200px, 0)');
+        const preview = queryPreview('.vdnd-drag-preview');
+        expect(preview!.style.transform).toBe('translate3d(100px, 200px, 0)');
       });
 
       it('should lock y axis when configured', () => {
@@ -215,8 +232,8 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
         fixture.detectChanges();
 
-        const preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
-        expect(preview.nativeElement.style.transform).toBe('translate3d(200px, 100px, 0)');
+        const preview = queryPreview('.vdnd-drag-preview');
+        expect(preview!.style.transform).toBe('translate3d(200px, 100px, 0)');
       });
     });
 
@@ -227,9 +244,9 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
         fixture.detectChanges();
 
-        const preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
-        expect(preview.nativeElement.style.width).toBe('250px');
-        expect(preview.nativeElement.style.height).toBe('75px');
+        const preview = queryPreview('.vdnd-drag-preview');
+        expect(preview!.style.width).toBe('250px');
+        expect(preview!.style.height).toBe('75px');
       });
     });
 
@@ -240,8 +257,8 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
         fixture.detectChanges();
 
-        const preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
-        expect(preview.nativeElement.style.position).toBe('fixed');
+        const preview = queryPreview('.vdnd-drag-preview');
+        expect(preview!.style.position).toBe('fixed');
       });
 
       it('should have pointer-events none', () => {
@@ -250,8 +267,8 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
         fixture.detectChanges();
 
-        const preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
-        expect(preview.nativeElement.style.pointerEvents).toBe('none');
+        const preview = queryPreview('.vdnd-drag-preview');
+        expect(preview!.style.pointerEvents).toBe('none');
       });
 
       it('should have high z-index', () => {
@@ -260,8 +277,8 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
         fixture.detectChanges();
 
-        const preview = fixture.debugElement.query(By.css('.vdnd-drag-preview'));
-        expect(preview.nativeElement.style.zIndex).toBe('1000');
+        const preview = queryPreview('.vdnd-drag-preview');
+        expect(preview!.style.zIndex).toBe('1000');
       });
     });
 
@@ -272,7 +289,7 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
         fixture.detectChanges();
 
-        const cloneContainer = fixture.debugElement.query(By.css('.vdnd-drag-preview-clone'));
+        const cloneContainer = queryPreview('.vdnd-drag-preview-clone');
         expect(cloneContainer).not.toBeNull();
       });
     });
@@ -284,9 +301,9 @@ describe('DragPreviewComponent', () => {
         fixture.detectChanges();
         fixture.detectChanges();
 
-        const defaultPreview = fixture.debugElement.query(By.css('.vdnd-drag-preview-default'));
+        const defaultPreview = queryPreview('.vdnd-drag-preview-default');
         expect(defaultPreview).not.toBeNull();
-        expect(defaultPreview.nativeElement.textContent.trim()).toContain('item-1');
+        expect(defaultPreview!.textContent!.trim()).toContain('item-1');
       });
     });
   });
@@ -294,6 +311,7 @@ describe('DragPreviewComponent', () => {
   describe('with custom template', () => {
     let fixture: ComponentFixture<CustomTemplateTestHostComponent>;
     let dragStateService: DragStateService;
+    let overlayContainerService: OverlayContainerService;
 
     beforeEach(() => {
       TestBed.configureTestingModule({
@@ -303,6 +321,7 @@ describe('DragPreviewComponent', () => {
 
       fixture = TestBed.createComponent(CustomTemplateTestHostComponent);
       dragStateService = TestBed.inject(DragStateService);
+      overlayContainerService = TestBed.inject(OverlayContainerService);
       fixture.detectChanges();
       fixture.detectChanges();
     });
@@ -310,6 +329,7 @@ describe('DragPreviewComponent', () => {
     afterEach(() => {
       dragStateService.endDrag();
       fixture.destroy();
+      overlayContainerService.ngOnDestroy();
     });
 
     it('should render custom template when provided', () => {
@@ -318,7 +338,7 @@ describe('DragPreviewComponent', () => {
       fixture.detectChanges();
       fixture.detectChanges();
 
-      const customPreview = fixture.debugElement.query(By.css('.custom-preview'));
+      const customPreview = queryPreview('.custom-preview');
       expect(customPreview).not.toBeNull();
     });
 
@@ -331,11 +351,11 @@ describe('DragPreviewComponent', () => {
       fixture.detectChanges();
       fixture.detectChanges();
 
-      const previewName = fixture.debugElement.query(By.css('.preview-name'));
-      const previewId = fixture.debugElement.query(By.css('.preview-id'));
+      const previewName = queryPreview('.preview-name');
+      const previewId = queryPreview('.preview-id');
 
-      expect(previewName.nativeElement.textContent).toBe('My Item');
-      expect(previewId.nativeElement.textContent).toBe('test-id');
+      expect(previewName!.textContent).toBe('My Item');
+      expect(previewId!.textContent).toBe('test-id');
     });
 
     it('should use custom template instead of cloned element', () => {
@@ -344,8 +364,8 @@ describe('DragPreviewComponent', () => {
       fixture.detectChanges();
       fixture.detectChanges();
 
-      const cloneContainer = fixture.debugElement.query(By.css('.vdnd-drag-preview-clone'));
-      const customPreview = fixture.debugElement.query(By.css('.custom-preview'));
+      const cloneContainer = queryPreview('.vdnd-drag-preview-clone');
+      const customPreview = queryPreview('.custom-preview');
 
       expect(cloneContainer).toBeNull();
       expect(customPreview).not.toBeNull();
