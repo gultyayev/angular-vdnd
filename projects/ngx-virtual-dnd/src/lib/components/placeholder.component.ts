@@ -38,7 +38,6 @@ export interface PlaceholderContext {
   imports: [NgTemplateOutlet],
   host: {
     class: 'vdnd-placeholder',
-    'data-testid': 'vdnd-placeholder',
     '[style.height.px]': 'height()',
     '[attr.data-draggable-id]': '"placeholder"',
   },

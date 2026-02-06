@@ -205,8 +205,10 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
 
     // Move to target position
     await page.mouse.move(targetX, targetY, { steps: 10 });
-    // Wait for placeholder to appear using auto-waiting assertion
+    // Wait for hit-testing to resolve (placeholder proves drop target is identified)
     await expect(demoPage.placeholder).toBeVisible({ timeout: 2000 });
+    // Ensure rAF-throttled position update has finalized
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
 
     // Drop and wait for drag to complete
     await page.mouse.up();
@@ -241,10 +243,11 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
     // Get the text of the source item
     const sourceItemText = await demoPage.getItemText('list1', 0);
 
-    // Scroll list2 down before dragging
-    await demoPage.scrollList('list2', scrollAmount);
-    // Wait for scroll to be applied
+    // Scroll list2 down before dragging.
+    // Retry both write and read: if virtual scroll hasn't computed content height yet,
+    // scrollTop clips to 0 and must be re-applied after initialization completes.
     await expect(async () => {
+      await demoPage.scrollList('list2', scrollAmount);
       const scrollTop = await demoPage.getScrollTop('list2');
       expect(scrollTop).toBe(scrollAmount);
     }).toPass({ timeout: 2000 });
@@ -274,8 +277,10 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
 
     // Move to target position
     await page.mouse.move(targetX, targetY, { steps: 10 });
-    // Wait for placeholder to appear
+    // Wait for hit-testing to resolve (placeholder proves drop target is identified)
     await expect(demoPage.placeholder).toBeVisible({ timeout: 2000 });
+    // Ensure rAF-throttled position update has finalized
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
 
     // Drop and wait for drag to complete
     await page.mouse.up();
@@ -322,7 +327,8 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
 
     const secondItemText = await demoPage.getItemText('list2', 1);
 
-    // Get container bounds for edge detection
+    // Get container bounds for edge detection (scroll into view first per E2E best practices)
+    await demoPage.list2VirtualScroll.scrollIntoViewIfNeeded();
     const containerBox = await demoPage.list2VirtualScroll.boundingBox();
     if (!containerBox) {
       throw new Error('Could not get container bounding box');

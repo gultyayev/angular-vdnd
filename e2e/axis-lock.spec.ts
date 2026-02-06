@@ -23,6 +23,8 @@ test.describe('Axis Lock', () => {
     // Get initial preview position (wait for preview to be visible)
     await page.mouse.move(sourceBox.x + 10, sourceBox.y + 10, { steps: 2 });
     await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    // Wait one frame for rAF-throttled position update to apply the transform
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     const initialPreviewBox = await demoPage.dragPreview.boundingBox();
     if (!initialPreviewBox) throw new Error('Could not get initial preview bounding box');
 
@@ -58,6 +60,8 @@ test.describe('Axis Lock', () => {
     // Get initial preview position (wait for preview to be visible)
     await page.mouse.move(sourceBox.x + 10, sourceBox.y + 10, { steps: 2 });
     await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    // Wait one frame for rAF-throttled position update to apply the transform
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     const initialPreviewBox = await demoPage.dragPreview.boundingBox();
     if (!initialPreviewBox) throw new Error('Could not get initial preview bounding box');
 
@@ -128,6 +132,8 @@ test.describe('Axis Lock', () => {
     // Get initial preview position (wait for preview to be visible)
     await page.mouse.move(sourceBox.x + 10, sourceBox.y + 10, { steps: 2 });
     await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    // Wait one frame for rAF-throttled position update to apply the transform
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     const initialPreviewBox = await demoPage.dragPreview.boundingBox();
     if (!initialPreviewBox) throw new Error('Could not get initial preview bounding box');
 

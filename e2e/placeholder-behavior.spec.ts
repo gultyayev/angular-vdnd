@@ -24,11 +24,13 @@ test.describe('Placeholder Behavior During Drag', () => {
     // Wait for drag preview to appear (indicates drag state is active)
     await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
 
-    // Count visible placeholders in the DOM - there should be exactly 1
-    const placeholders = await demoPage.list2Container
-      .locator('.vdnd-drag-placeholder-visible')
-      .count();
-    expect(placeholders).toBe(1);
+    // Placeholder appears after a rAF-throttled position update; use retrying assertion
+    await expect(async () => {
+      const placeholders = await demoPage.list2Container
+        .locator('.vdnd-drag-placeholder-visible')
+        .count();
+      expect(placeholders).toBe(1);
+    }).toPass({ timeout: 2000 });
 
     // Verify no ghost elements exist (empty .item divs without text)
     const ghostCount = await demoPage.countGhostElements('list2');
@@ -57,11 +59,13 @@ test.describe('Placeholder Behavior During Drag', () => {
     // Wait for drag preview to appear
     await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
 
-    // Count visible placeholders in list2 - there should be exactly 1
-    const list2Placeholders = await demoPage.list2Container
-      .locator('.vdnd-drag-placeholder-visible')
-      .count();
-    expect(list2Placeholders).toBe(1);
+    // Placeholder appears after a rAF-throttled position update; use retrying assertion
+    await expect(async () => {
+      const list2Placeholders = await demoPage.list2Container
+        .locator('.vdnd-drag-placeholder-visible')
+        .count();
+      expect(list2Placeholders).toBe(1);
+    }).toPass({ timeout: 2000 });
 
     // List1 should have no visible placeholders
     const list1Placeholders = await demoPage.list1Container

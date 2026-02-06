@@ -30,10 +30,8 @@ export class DemoPage {
     this.list2Wrapper = page.locator('.list-card').nth(1);
     this.lockAxisSelect = page.getByTestId('lock-axis-select');
     this.keyboardInstructions = page.locator('#vdnd-keyboard-instructions');
-    // Placeholder uses data-testid and visible class for accurate selection
-    this.placeholder = page
-      .getByTestId('vdnd-placeholder')
-      .and(page.locator('.vdnd-drag-placeholder-visible'));
+    // Placeholder visible class is a documented public API for styling, making it a stable selector
+    this.placeholder = page.locator('.vdnd-drag-placeholder-visible');
   }
 
   async goto(): Promise<void> {
@@ -54,8 +52,17 @@ export class DemoPage {
 
   async enableSimplifiedApi(): Promise<void> {
     await this.page.getByTestId('simplified-api-checkbox').click();
-    // Wait for the list to re-render with new API using auto-waiting assertion
+    // Wait for items to render in the new component tree
     await expect(this.list1Items.first()).toBeVisible();
+    // The @if template swap destroys and recreates scroll containers.
+    // Items can be visible before the virtual scroll computes its content height.
+    // Verify BOTH scroll areas are ready (scrollHeight > containerHeight of 400px).
+    await expect(async () => {
+      const h1 = await this.list1VirtualScroll.evaluate((el) => el.scrollHeight);
+      const h2 = await this.list2VirtualScroll.evaluate((el) => el.scrollHeight);
+      expect(h1).toBeGreaterThan(400);
+      expect(h2).toBeGreaterThan(400);
+    }).toPass({ timeout: 2000 });
   }
 
   async getItemCount(list: 'list1' | 'list2'): Promise<number> {
@@ -123,8 +130,8 @@ export class DemoPage {
 
     // Move to target with more steps for smoother movement
     await this.page.mouse.move(targetX, targetY, { steps: 15 });
-    // Wait for placeholder to appear at target (WebKit needs more time for same-list drags)
-    await expect(this.placeholder).toBeVisible({ timeout: 2000 });
+    // Drag position updates are rAF-throttled; wait one frame for the final position to process
+    await this.page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     await this.page.mouse.up();
     // Wait for drag to complete (preview should disappear)
     await expect(this.dragPreview).not.toBeVisible({ timeout: 2000 });
