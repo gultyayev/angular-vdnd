@@ -1,4 +1,4 @@
-import { WritableSignal } from '@angular/core';
+import { isDevMode, type WritableSignal } from '@angular/core';
 import { DropEvent } from '../models/drag-drop.models';
 
 /**
@@ -27,9 +27,11 @@ export function moveItem<T>(event: DropEvent, lists: Record<string, WritableSign
   const destList = lists[event.destination.droppableId];
 
   if (!sourceList || !destList) {
-    console.warn(
-      `[moveItem] Could not find list for droppable "${event.source.droppableId}" or "${event.destination.droppableId}"`,
-    );
+    if (isDevMode()) {
+      console.warn(
+        `[ngx-virtual-dnd] [moveItem] Could not find list for droppable "${event.source.droppableId}" or "${event.destination.droppableId}"`,
+      );
+    }
     return;
   }
 
@@ -47,7 +49,9 @@ export function moveItem<T>(event: DropEvent, lists: Record<string, WritableSign
   const item = sourceItems[sourceIndex];
 
   if (item === undefined) {
-    console.warn(`[moveItem] Could not find item at index ${sourceIndex}`);
+    if (isDevMode()) {
+      console.warn(`[ngx-virtual-dnd] [moveItem] Could not find item at index ${sourceIndex}`);
+    }
     return;
   }
 
