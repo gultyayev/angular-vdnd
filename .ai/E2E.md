@@ -131,6 +131,130 @@ This directly targets `DraggableDirective` touch-delay logic.
 
 ---
 
+## Timing & Synchronization Patterns
+
+This library uses `requestAnimationFrame` to throttle drag position updates
+(`draggable.directive.ts`). This creates specific synchronization requirements
+that differ from typical Playwright tests.
+
+### rAF Wait After Mouse Moves
+
+After any `page.mouse.move()` during a drag, the position hasn't been processed
+until the next animation frame. Always wait one frame before asserting position
+or dropping:
+
+```typescript
+await page.mouse.move(targetX, targetY, { steps: 10 });
+// Position update is rAF-throttled — wait one frame
+await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+await page.mouse.up();
+```
+
+For inline drag code where you know the target list has items, combine
+placeholder visibility (proves hit-testing resolved) with rAF wait (ensures
+final position):
+
+```typescript
+await page.mouse.move(targetX, targetY, { steps: 10 });
+await expect(demoPage.placeholder).toBeVisible({ timeout: 2000 });
+await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+await page.mouse.up();
+```
+
+### Initial Position Capture
+
+When capturing a baseline `boundingBox()` for position comparison, the
+rAF-throttled transform may not have been applied yet. Wait one frame between
+`toBeVisible()` and the capture:
+
+```typescript
+await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+// Wait for rAF to apply the initial transform
+await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+const initialBox = await demoPage.dragPreview.boundingBox();
+```
+
+### One-Shot vs Retrying Assertions
+
+`locator.count()` is a **one-shot** call — it returns immediately without
+retrying. For state that depends on rAF-throttled updates, wrap in `toPass`:
+
+```typescript
+// WRONG — count() may return 0 if rAF hasn't fired yet
+const count = await page.locator('.vdnd-drag-placeholder-visible').count();
+expect(count).toBe(1);
+
+// CORRECT — retries until rAF-dependent state settles
+await expect(async () => {
+  const count = await page.locator('.vdnd-drag-placeholder-visible').count();
+  expect(count).toBe(1);
+}).toPass({ timeout: 2000 });
+```
+
+### Empty List Drops
+
+Generic drag helpers (like `dragItemToList`) must NOT wait for placeholder
+visibility — empty list targets don't produce placeholders. Use rAF wait
+instead. Only wait for placeholder in inline test code where you know the
+target list has items.
+
+---
+
+## Component Gotchas
+
+### Two Placeholder Components
+
+The library has **two different** placeholder-related components:
+
+| Component                  | Selector                | Key Class                        |
+| -------------------------- | ----------------------- | -------------------------------- |
+| `DragPlaceholderComponent` | `vdnd-drag-placeholder` | `.vdnd-drag-placeholder-visible` |
+| `PlaceholderComponent`     | `vdnd-placeholder`      | _(none relevant for tests)_      |
+
+Tests should use `.vdnd-drag-placeholder-visible` (documented public API) to
+locate the visible placeholder. Never mix selectors between these components.
+
+### Angular `@if` Component Tree Swaps
+
+When `@if` destroys and recreates entire component trees (e.g., toggling
+simplified API mode), items can be **visible** before the virtual scroll
+container computes its content height. `toBeVisible()` alone is insufficient.
+
+Verify functional readiness by checking `scrollHeight`:
+
+```typescript
+await expect(this.list1Items.first()).toBeVisible();
+// Items visible but virtual scroll may not have computed content height yet
+await expect(async () => {
+  const h1 = await list1VirtualScroll.evaluate((el) => el.scrollHeight);
+  const h2 = await list2VirtualScroll.evaluate((el) => el.scrollHeight);
+  expect(h1).toBeGreaterThan(400);
+  expect(h2).toBeGreaterThan(400);
+}).toPass({ timeout: 2000 });
+```
+
+### Scroll Commands Before Content Height Is Ready
+
+If `scrollTop` is set when `scrollHeight` is still 0 (content not rendered),
+the value clips to 0 permanently — a later retry of the **read** alone won't
+help. Put both the scroll **write** and **read** inside `toPass`:
+
+```typescript
+// WRONG — scroll clips to 0, then toPass only re-reads the clipped value
+await scrollList('list2', 1000);
+await expect(async () => {
+  expect(await getScrollTop('list2')).toBe(1000);
+}).toPass({ timeout: 2000 });
+
+// CORRECT — re-applies the scroll on each retry
+await expect(async () => {
+  await scrollList('list2', 1000);
+  expect(await getScrollTop('list2')).toBe(1000);
+}).toPass({ timeout: 2000 });
+```
+
+---
+
 ## Debugging & Diagnostics
 
 - Prefer `testInfo.attach()` for structured debug output over `console.log`.

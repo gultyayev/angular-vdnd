@@ -47,6 +47,7 @@ export interface DragPreviewContext<T = unknown> {
     @if (isVisible()) {
       <div
         class="vdnd-drag-preview"
+        data-testid="vdnd-drag-preview"
         [style.position]="'fixed'"
         [style.left.px]="0"
         [style.top.px]="0"

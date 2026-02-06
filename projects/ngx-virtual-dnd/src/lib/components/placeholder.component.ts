@@ -44,7 +44,8 @@ export interface PlaceholderContext {
   template: `
     @if (template()) {
       <ng-container
-        *ngTemplateOutlet="template()!; context: { $implicit: height(), height: height() }">
+        *ngTemplateOutlet="template()!; context: { $implicit: height(), height: height() }"
+      >
       </ng-container>
     }
   `,
