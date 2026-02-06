@@ -61,7 +61,6 @@ export interface DragPreviewContext<T = unknown> {
         [style.height.px]="dimensions().height"
         [style.pointer-events]="'none'"
         [style.z-index]="1000"
-        [style.opacity]="0.9"
       >
         @if (previewTemplate()) {
           <ng-container *ngTemplateOutlet="previewTemplate()!; context: templateContext()">
@@ -84,17 +83,7 @@ export interface DragPreviewContext<T = unknown> {
     .vdnd-drag-preview-clone {
       width: 100%;
       height: 100%;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      border-radius: 4px;
       overflow: hidden;
-    }
-
-    .vdnd-drag-preview-default {
-      padding: 8px;
-      background: white;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     }
   `,
 })

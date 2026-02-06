@@ -133,13 +133,10 @@ export class ElementCloneService {
         placeholder.style.cssText = `
           width: 100%;
           height: 100%;
-          background: #333;
           display: flex;
           align-items: center;
           justify-content: center;
-          color: #666;
         `;
-        placeholder.textContent = 'Video';
         video.replaceWith(placeholder);
       }
     });
@@ -151,13 +148,9 @@ export class ElementCloneService {
       const iframeStyles = window.getComputedStyle(iframe);
       placeholder.style.width = iframeStyles.width;
       placeholder.style.height = iframeStyles.height;
-      placeholder.style.background = '#f0f0f0';
-      placeholder.style.border = '1px solid #ddd';
       placeholder.style.display = 'flex';
       placeholder.style.alignItems = 'center';
       placeholder.style.justifyContent = 'center';
-      placeholder.style.color = '#999';
-      placeholder.textContent = 'Embedded content';
       iframe.replaceWith(placeholder);
     });
   }
@@ -173,7 +166,7 @@ export class ElementCloneService {
 
     // Remove Angular-specific attributes
     const angularAttrs = Array.from(clone.attributes).filter(
-      (attr) => attr.name.startsWith('ng-') || attr.name.startsWith('_ng')
+      (attr) => attr.name.startsWith('ng-') || attr.name.startsWith('_ng'),
     );
     angularAttrs.forEach((attr) => clone.removeAttribute(attr.name));
 
@@ -203,7 +196,7 @@ export class ElementCloneService {
 
     // Disable interactive elements
     const interactiveElements = clone.querySelectorAll(
-      'button, input, textarea, select, a, [contenteditable]'
+      'button, input, textarea, select, a, [contenteditable]',
     );
     interactiveElements.forEach((el) => {
       if (el instanceof HTMLElement) {
