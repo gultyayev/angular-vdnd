@@ -419,7 +419,8 @@ test.describe('Page Scroll Demo', () => {
     }
 
     const maxDrift = Math.max(...driftSamples);
-    const alignmentTolerance = initialItemHeight * 0.5;
+    // WebKit can differ by a pixel or two due to font/layout rounding under continuous scroll.
+    const alignmentTolerance = initialItemHeight * 0.5 + 2;
     const debugMetrics = await page.evaluate(() => {
       const container = document.querySelector('.scroll-container') as HTMLElement | null;
       const virtualContent = document.querySelector('vdnd-virtual-content') as HTMLElement | null;

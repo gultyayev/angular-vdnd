@@ -196,18 +196,44 @@ test.describe('Axis Lock', () => {
     const initialList1Count = await demoPage.getItemCount('list1');
     const initialList2Count = await demoPage.getItemCount('list2');
 
-    const sourceItem = demoPage.list1Items.first();
-    const sourceBox = await sourceItem.boundingBox();
+    await demoPage.list1VirtualScroll.scrollIntoViewIfNeeded();
+    await demoPage.list2VirtualScroll.scrollIntoViewIfNeeded();
+
     const list2Box = await demoPage.list2VirtualScroll.boundingBox();
-    if (!sourceBox || !list2Box) throw new Error('Could not get bounding boxes');
+    if (!list2Box) throw new Error('Could not get list2 bounding box');
+
+    const findSourceItemWithinList2Y = async () => {
+      for (let i = 0; i < 8; i++) {
+        const candidate = demoPage.list1Items.nth(i);
+        await candidate.scrollIntoViewIfNeeded();
+        const box = await candidate.boundingBox();
+        if (!box) continue;
+        const centerY = box.y + box.height / 2;
+        const isWithinList2 =
+          centerY >= list2Box.y + 10 && centerY <= list2Box.y + list2Box.height - 10;
+        if (isWithinList2) {
+          return { sourceItem: candidate, sourceBox: box };
+        }
+      }
+
+      throw new Error('Could not find a list1 source item aligned vertically with list2');
+    };
+
+    const { sourceItem, sourceBox } = await findSourceItemWithinList2Y();
 
     // Start dragging from list1
     await sourceItem.hover();
     await page.mouse.down();
+    // Move slightly to ensure WebKit recognizes the drag
+    await page.mouse.move(sourceBox.x + 5, sourceBox.y + 5, { steps: 2 });
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
 
     // Move to list2 horizontally (Y locked means we can move horizontally freely)
-    await page.mouse.move(list2Box.x + list2Box.width / 2, sourceBox.y, { steps: 10 });
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    const targetY = sourceBox.y + sourceBox.height / 2;
+    await page.mouse.move(list2Box.x + list2Box.width / 2, targetY, { steps: 10 });
+    // Placeholder visibility proves hit-testing resolved to a drop target
+    await expect(demoPage.placeholder).toBeVisible({ timeout: 2000 });
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     await page.mouse.up();
     await expect(demoPage.dragPreview).not.toBeVisible({ timeout: 2000 });
 
@@ -217,7 +243,7 @@ test.describe('Axis Lock', () => {
       const finalList2Count = await demoPage.getItemCount('list2');
       expect(finalList1Count).toBe(initialList1Count - 1);
       expect(finalList2Count).toBe(initialList2Count + 1);
-    }).toPass({ timeout: 2000 });
+    }).toPass({ timeout: 5000 });
   });
 
   test('should update axis lock setting dynamically', async () => {

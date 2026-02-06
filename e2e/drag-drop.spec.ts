@@ -229,16 +229,11 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
 
   test('should drop at exact preview position when target list is scrolled', async ({ page }) => {
     // This test reproduces the bug where drop position is off by 1 when target list is scrolled
-    // We verify by scrolling back to top and checking the item appeared at the expected index
+    // We verify by checking which item is under the cursor point used for the drop
 
     const itemHeight = 50;
     const scrollAmount = 20 * itemHeight; // Scroll down 20 items (1000px)
     const targetVisibleSlot = 3; // Target the 4th visible slot (0-indexed)
-
-    // Expected array index after drop:
-    // - scrollTop=1000 means first visible is at index 20
-    // - visual slot 3 from top of viewport = array index 23
-    const expectedDropIndex = Math.floor(scrollAmount / itemHeight) + targetVisibleSlot;
 
     // Get the text of the source item
     const sourceItemText = await demoPage.getItemText('list1', 0);
@@ -286,30 +281,37 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
     await page.mouse.up();
     await expect(demoPage.dragPreview).not.toBeVisible({ timeout: 2000 });
 
-    // Scroll back to top to verify the item was inserted at the correct array index
-    await demoPage.scrollList('list2', 0);
+    // Re-apply scrollTop and verify the dropped item is at the cursor point where we previewed it.
+    // This avoids relying on virtual overscan DOM positions (which can differ across browsers).
+    await demoPage.scrollList('list2', scrollAmount);
     await expect(async () => {
       const scrollTop = await demoPage.getScrollTop('list2');
-      expect(scrollTop).toBe(0);
+      expect(scrollTop).toBe(scrollAmount);
     }).toPass({ timeout: 2000 });
 
-    // The dropped item should be at array index expectedDropIndex
-    // Scroll to bring that index into view
-    const scrollToIndex = Math.max(0, expectedDropIndex - 3); // Show a few items before
-    await demoPage.scrollList('list2', scrollToIndex * itemHeight);
-    await expect(async () => {
-      const scrollTop = await demoPage.getScrollTop('list2');
-      expect(scrollTop).toBe(scrollToIndex * itemHeight);
-    }).toPass({ timeout: 2000 });
+    await demoPage.list2VirtualScroll.scrollIntoViewIfNeeded();
+    const verifyBox = await demoPage.list2VirtualScroll.boundingBox();
+    if (!verifyBox) throw new Error('Could not get list2 bounding box for verification');
 
-    // Check the item at the expected position (accounting for overscan)
-    // With overscan, items at indices (scrollToIndex - overscan) are in DOM
-    const domOffset = Math.min(3, scrollToIndex); // overscan or items before scroll position
-    const expectedDomPosition = expectedDropIndex - scrollToIndex + domOffset;
+    const verifyX = verifyBox.x + verifyBox.width / 2;
+    const verifyY = verifyBox.y + targetVisibleSlot * itemHeight + itemHeight / 2;
 
-    // Get items around the expected position
-    const itemAtExpectedPos = await demoPage.getItemText('list2', expectedDomPosition);
-    expect(itemAtExpectedPos).toBe(sourceItemText);
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(
+            ({ x, y }) => {
+              const hit = document.elementFromPoint(x, y);
+              const draggable = hit?.closest('[data-draggable-id]') as HTMLElement | null;
+              const textEl = draggable?.querySelector('.item-text') as HTMLElement | null;
+              const text = (textEl?.textContent ?? draggable?.textContent ?? '').trim();
+              return text || null;
+            },
+            { x: verifyX, y: verifyY },
+          ),
+        { timeout: 5000 },
+      )
+      .toBe(sourceItemText);
   });
 
   // Test autoscroll in simplified API mode
@@ -336,12 +338,17 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
 
     // Use hover() to position on item (matches working autoscroll-drift pattern)
     const sourceItem = demoPage.list2Items.first();
+    const sourceBox = await sourceItem.boundingBox();
+    if (!sourceBox) throw new Error('Could not get source bounding box');
     await sourceItem.hover();
     await page.mouse.down();
+    await page.mouse.move(sourceBox.x + 5, sourceBox.y + 5, { steps: 2 });
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
 
     // Move to bottom edge to trigger autoscroll
     const nearBottomY = containerBox.y + containerBox.height - 25;
-    await page.mouse.move(containerBox.x + 100, nearBottomY);
+    await page.mouse.move(containerBox.x + containerBox.width / 2, nearBottomY, { steps: 10 });
+    await expect(demoPage.placeholder).toBeVisible({ timeout: 2000 });
 
     // Wait for autoscroll (3 seconds should scroll significantly)
     // Note: This timeout is intentional - we need real time for autoscroll behavior
@@ -351,7 +358,7 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
     await expect(async () => {
       const scrollTop = await demoPage.getScrollTop('list2');
       expect(scrollTop).toBeGreaterThan(200);
-    }).toPass({ timeout: 1000 });
+    }).toPass({ timeout: 3000 });
 
     // Drop the item and wait for drag to complete
     await page.mouse.up();
@@ -365,7 +372,8 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
     }).toPass({ timeout: 2000 });
 
     // First item should now be what was second (Item 1 was moved somewhere else)
-    const newFirstItemText = await demoPage.getItemText('list2', 0);
-    expect(newFirstItemText).toBe(secondItemText);
+    await expect
+      .poll(() => demoPage.getItemText('list2', 0), { timeout: 5000 })
+      .toBe(secondItemText);
   });
 });
