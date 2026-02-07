@@ -1,5 +1,4 @@
 import {
-  afterNextRender,
   computed,
   Directive,
   ElementRef,
@@ -27,6 +26,8 @@ import {
 } from '../models/drag-drop.models';
 import { VDND_GROUP_TOKEN } from './droppable-group.directive';
 import { createEffectiveGroupSignal } from '../utils/group-resolution';
+import { KeyboardDragHandler } from '../handlers/keyboard-drag.handler';
+import { PointerDragHandler } from '../handlers/pointer-drag.handler';
 
 /**
  * Makes an element draggable within the virtual scroll drag-and-drop system.
@@ -64,10 +65,10 @@ import { createEffectiveGroupSignal } from '../utils/group-resolution';
     '(touchstart)': 'onPointerDown($event, true)',
     '(keydown.space)': 'onKeyboardActivate($event)',
     '(keydown.enter)': 'onEnterKey($event)',
-    '(keydown.arrowup)': 'onArrowUp($event)',
-    '(keydown.arrowdown)': 'onArrowDown($event)',
-    '(keydown.arrowleft)': 'onArrowLeft($event)',
-    '(keydown.arrowright)': 'onArrowRight($event)',
+    '(keydown.arrowup)': 'onArrowKey($event)',
+    '(keydown.arrowdown)': 'onArrowKey($event)',
+    '(keydown.arrowleft)': 'onArrowKey($event)',
+    '(keydown.arrowright)': 'onArrowKey($event)',
     '(keydown.escape)': 'onEscape()',
   },
 })
@@ -147,26 +148,8 @@ export class DraggableDirective implements OnInit, OnDestroy {
     return draggedItem?.draggableId === this.vdndDraggable();
   });
 
-  /** Starting position of the drag */
-  #startPosition: CursorPosition | null = null;
-
-  /** Whether we're currently tracking a potential drag */
-  #isTracking = false;
-
-  /** Bound event handlers for cleanup */
-  #boundPointerMove: ((e: MouseEvent | TouchEvent) => void) | null = null;
-  #boundPointerUp: ((e: MouseEvent | TouchEvent) => void) | null = null;
-  #boundKeyDown: ((e: KeyboardEvent) => void) | null = null;
-  #boundKeyboardDragKeyDown: ((e: KeyboardEvent) => void) | null = null;
-
-  /** Request animation frame ID for drag updates */
-  #rafId: number | null = null;
-
-  /** Timer ID for drag delay */
-  #delayTimerId: ReturnType<typeof setTimeout> | null = null;
-
-  /** Whether the delay has been satisfied (user held long enough) */
-  #delayReady = false;
+  #keyboardHandler!: KeyboardDragHandler;
+  #pointerHandler!: PointerDragHandler;
 
   /**
    * Update the pending state and emit the change event.
@@ -179,11 +162,46 @@ export class DraggableDirective implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // Set up event listeners
-    this.#boundPointerMove = this.#onPointerMove.bind(this);
-    this.#boundPointerUp = this.#onPointerUp.bind(this);
-    this.#boundKeyDown = this.#onKeyDown.bind(this);
-    this.#boundKeyboardDragKeyDown = this.#onKeyboardDragKeyDown.bind(this);
+    this.#keyboardHandler = new KeyboardDragHandler({
+      dragState: this.#dragState,
+      keyboardDrag: this.#keyboardDrag,
+      positionCalculator: this.#positionCalculator,
+      dragIndexCalculator: this.#dragIndexCalculator,
+      elementClone: this.#elementClone,
+      ngZone: this.#ngZone,
+      envInjector: this.#envInjector,
+      callbacks: {
+        onDragStart: (event) => this.dragStart.emit(event),
+        onDragEnd: (event) => this.dragEnd.emit(event),
+        getParentDroppableId: () => this.#getParentDroppableId(),
+        calculateSourceIndex: (el, droppable) => this.#calculateSourceIndex(el, droppable),
+      },
+      getContext: () => ({
+        element: this.#elementRef.nativeElement,
+        draggableId: this.vdndDraggable(),
+        groupName: this.#effectiveGroup(),
+        data: this.vdndDraggableData(),
+      }),
+    });
+
+    this.#pointerHandler = new PointerDragHandler({
+      ngZone: this.#ngZone,
+      callbacks: {
+        onDragStart: (position) => this.#startDrag(position),
+        onDragMove: (position) => this.#updateDrag(position),
+        onDragEnd: (cancelled) => this.#endDrag(cancelled),
+        onPendingChange: (pending) => this.#setPending(pending),
+        isDragging: () => this.isDragging(),
+      },
+      getContext: () => ({
+        element: this.#elementRef.nativeElement,
+        groupName: this.#effectiveGroup(),
+        disabled: this.disabled(),
+        dragHandle: this.dragHandle(),
+        dragThreshold: this.dragThreshold(),
+        dragDelay: this.dragDelay(),
+      }),
+    });
   }
 
   ngOnDestroy(): void {
@@ -191,168 +209,15 @@ export class DraggableDirective implements OnInit, OnDestroy {
     if (this.isDragging()) {
       this.#endDrag(true);
     }
-    this.#cleanup();
-    this.#cleanupKeyboardDragListeners();
+    this.#pointerHandler.destroy();
+    this.#keyboardHandler.destroy();
   }
 
   /**
    * Handle pointer down (mouse or touch).
    */
   protected onPointerDown(event: MouseEvent | TouchEvent, isTouch: boolean): void {
-    if (this.disabled()) {
-      return;
-    }
-
-    // Without a group, this draggable can't participate in DnD (fail gracefully).
-    if (!this.#effectiveGroup()) {
-      return;
-    }
-
-    // Check for left mouse button only
-    if (!isTouch && (event as MouseEvent).button !== 0) {
-      return;
-    }
-
-    // Check if click is on drag handle (if specified)
-    const handle = this.dragHandle();
-    if (handle) {
-      const target = event.target as HTMLElement;
-      if (!target.closest(handle)) {
-        return;
-      }
-    }
-
-    // Check for elements that should not trigger drag
-    const target = event.target as HTMLElement;
-    if (
-      target.closest('button, input, textarea, select, [contenteditable]') ||
-      target.classList.contains('no-drag')
-    ) {
-      return;
-    }
-
-    const delay = this.dragDelay();
-
-    // For touch events with a delay configured, DON'T call preventDefault() on touchstart.
-    // This allows native scrolling to work if the user swipes before the delay fires.
-    // For mouse events or touch without delay, prevent default immediately to avoid
-    // text selection and other default behaviors.
-    if (!isTouch || delay === 0) {
-      event.preventDefault();
-    }
-    event.stopPropagation();
-
-    this.#isTracking = true;
-    this.#startPosition = this.#getPosition(event);
-
-    // Handle drag delay
-    if (delay > 0) {
-      this.#delayReady = false;
-      this.#delayTimerId = setTimeout(() => {
-        this.#delayReady = true;
-        this.#setPending(true); // Emit ready state when delay passes
-        this.#delayTimerId = null;
-      }, delay);
-    } else {
-      this.#delayReady = true;
-    }
-
-    // Add document-level event listeners
-    this.#ngZone.runOutsideAngular(() => {
-      if (isTouch) {
-        document.addEventListener('touchmove', this.#boundPointerMove!, { passive: false });
-        document.addEventListener('touchend', this.#boundPointerUp!);
-        document.addEventListener('touchcancel', this.#boundPointerUp!);
-      } else {
-        document.addEventListener('mousemove', this.#boundPointerMove!);
-        document.addEventListener('mouseup', this.#boundPointerUp!);
-      }
-      // Listen for Escape key on document to cancel drag
-      document.addEventListener('keydown', this.#boundKeyDown!);
-    });
-  }
-
-  /**
-   * Handle pointer move (mouse or touch).
-   */
-  #onPointerMove(event: MouseEvent | TouchEvent): void {
-    if (!this.#isTracking) {
-      return;
-    }
-
-    const position = this.#getPosition(event);
-
-    // Check if we've moved past the threshold
-    if (!this.isDragging() && this.#startPosition) {
-      const distance = Math.sqrt(
-        Math.pow(position.x - this.#startPosition.x, 2) +
-          Math.pow(position.y - this.#startPosition.y, 2),
-      );
-
-      if (distance < this.dragThreshold()) {
-        return;
-      }
-
-      // If delay is configured and not yet ready, cancel the drag attempt
-      // (user moved before the delay was satisfied).
-      // DON'T call preventDefault() here - let native scrolling take over.
-      if (!this.#delayReady) {
-        this.#cancelDelayTimer();
-        this.#cleanup();
-        return;
-      }
-
-      // Start the drag - now we can prevent default
-      event.preventDefault();
-      this.#startDrag(position);
-    } else if (this.isDragging()) {
-      // Already dragging - prevent default to stop scrolling
-      event.preventDefault();
-    }
-
-    // Only update drag if we're actually dragging
-    if (!this.isDragging()) {
-      return;
-    }
-
-    // Throttle drag updates with requestAnimationFrame
-    if (this.#rafId !== null) {
-      cancelAnimationFrame(this.#rafId);
-    }
-
-    this.#rafId = requestAnimationFrame(() => {
-      this.#updateDrag(position);
-      this.#rafId = null;
-    });
-  }
-
-  /**
-   * Cancel the delay timer if active.
-   */
-  #cancelDelayTimer(): void {
-    if (this.#delayTimerId !== null) {
-      clearTimeout(this.#delayTimerId);
-      this.#delayTimerId = null;
-    }
-    this.#delayReady = false;
-  }
-
-  /**
-   * Handle pointer up (mouse or touch).
-   */
-  #onPointerUp(event: MouseEvent | TouchEvent): void {
-    if (!this.#isTracking) {
-      return;
-    }
-
-    // Only prevent default if we were actually dragging
-    // Otherwise, allow native touch behavior (like scroll momentum) to complete
-    if (this.isDragging()) {
-      event.preventDefault();
-      this.#endDrag(false);
-    }
-
-    this.#cleanup();
+    this.#pointerHandler.onPointerDown(event, isTouch);
   }
 
   /**
@@ -368,8 +233,8 @@ export class DraggableDirective implements OnInit, OnDestroy {
     event.stopPropagation(); // Prevent document listener from receiving this event
 
     // If we're in a keyboard drag, Space drops the item
-    if (this.#keyboardDrag.isActive()) {
-      this.#completeKeyboardDrag();
+    if (this.#keyboardHandler.isActive()) {
+      this.#keyboardHandler.complete();
       return;
     }
 
@@ -379,313 +244,42 @@ export class DraggableDirective implements OnInit, OnDestroy {
     }
 
     // Start keyboard drag
-    this.#startKeyboardDrag();
+    this.#keyboardHandler.activate();
   }
 
   /**
    * Handle Enter key (alternative to Space for dropping during keyboard drag).
    */
   protected onEnterKey(event: Event): void {
-    if (this.#keyboardDrag.isActive()) {
+    if (this.#keyboardHandler.isActive()) {
       event.preventDefault();
-      this.#completeKeyboardDrag();
+      this.#keyboardHandler.complete();
     }
   }
 
   /**
-   * Handle ArrowUp key during keyboard drag.
+   * Handle arrow keys during keyboard drag.
    */
-  protected onArrowUp(event: Event): void {
-    if (!this.#keyboardDrag.isActive()) {
-      return;
+  protected onArrowKey(event: Event): void {
+    if (this.#keyboardHandler.isActive()) {
+      this.#keyboardHandler.handleKey(event as KeyboardEvent);
     }
-    event.preventDefault();
-    this.#keyboardDrag.moveUp();
-  }
-
-  /**
-   * Handle ArrowDown key during keyboard drag.
-   */
-  protected onArrowDown(event: Event): void {
-    if (!this.#keyboardDrag.isActive()) {
-      return;
-    }
-    event.preventDefault();
-    this.#keyboardDrag.moveDown();
-  }
-
-  /**
-   * Handle ArrowLeft key during keyboard drag (cross-list movement).
-   */
-  protected onArrowLeft(event: Event): void {
-    if (!this.#keyboardDrag.isActive()) {
-      return;
-    }
-    event.preventDefault();
-    this.#moveToAdjacentDroppable('left');
-  }
-
-  /**
-   * Handle ArrowRight key during keyboard drag (cross-list movement).
-   */
-  protected onArrowRight(event: Event): void {
-    if (!this.#keyboardDrag.isActive()) {
-      return;
-    }
-    event.preventDefault();
-    this.#moveToAdjacentDroppable('right');
-  }
-
-  /**
-   * Move to an adjacent droppable in the specified direction.
-   */
-  #moveToAdjacentDroppable(direction: 'left' | 'right'): void {
-    const currentDroppableId = this.#dragState.activeDroppableId();
-    if (!currentDroppableId) {
-      return;
-    }
-
-    const groupName = this.#effectiveGroup();
-    if (!groupName) {
-      return;
-    }
-    const adjacent = this.#positionCalculator.findAdjacentDroppable(
-      currentDroppableId,
-      direction,
-      groupName,
-    );
-
-    if (!adjacent) {
-      return;
-    }
-
-    // Maintain the current target index (clamped to the new list's size)
-    const currentTargetIndex = this.#keyboardDrag.targetIndex() ?? 0;
-    const targetIndex = Math.min(currentTargetIndex, adjacent.itemCount);
-
-    this.#keyboardDrag.moveToDroppable(adjacent.id, targetIndex, adjacent.itemCount);
   }
 
   /**
    * Handle escape key to cancel drag (host binding, fires before element is hidden).
    */
   protected onEscape(): boolean {
-    if (this.#keyboardDrag.isActive()) {
-      this.#cancelKeyboardDrag();
+    if (this.#keyboardHandler.isActive()) {
+      this.#keyboardHandler.cancel();
       return false;
     }
     if (this.isDragging()) {
       this.#endDrag(true);
-      this.#cleanup();
+      this.#pointerHandler.cleanup();
       return false; // Prevents default
     }
     return true;
-  }
-
-  /**
-   * Start a keyboard drag operation.
-   */
-  #startKeyboardDrag(): void {
-    const element = this.#elementRef.nativeElement;
-    const rect = element.getBoundingClientRect();
-    const groupName = this.#effectiveGroup();
-    if (!groupName) {
-      return;
-    }
-
-    // Find the parent droppable
-    const droppableElement = this.#positionCalculator.getDroppableParent(element, groupName);
-    if (!droppableElement) {
-      return;
-    }
-
-    const droppableId = this.#positionCalculator.getDroppableId(droppableElement);
-    if (!droppableId) {
-      return;
-    }
-
-    // Calculate source index
-    const sourceIndex = this.#calculateSourceIndex(element, droppableElement);
-
-    // Get total item count from the droppable
-    const totalItemCount = this.#dragIndexCalculator.getTotalItemCount({
-      droppableElement,
-      isSameList: false,
-      draggedItemHeight: rect.height,
-    });
-
-    // Clone element BEFORE updating drag state
-    const clonedElement = this.#elementClone.cloneElement(element);
-
-    // Start keyboard drag
-    this.#keyboardDrag.startKeyboardDrag(
-      {
-        draggableId: this.vdndDraggable(),
-        droppableId,
-        element,
-        clonedElement,
-        height: rect.height,
-        width: rect.width,
-        data: this.vdndDraggableData(),
-      },
-      sourceIndex,
-      totalItemCount,
-      droppableId,
-    );
-
-    // Add document-level keyboard listener (since element is hidden with display:none)
-    this.#ngZone.runOutsideAngular(() => {
-      document.addEventListener('keydown', this.#boundKeyboardDragKeyDown!);
-    });
-
-    // Emit drag start event
-    this.dragStart.emit({
-      draggableId: this.vdndDraggable(),
-      droppableId,
-      data: this.vdndDraggableData(),
-      position: { x: rect.left, y: rect.top },
-      sourceIndex,
-    });
-  }
-
-  /**
-   * Complete a keyboard drag operation (drop the item).
-   */
-  #completeKeyboardDrag(): void {
-    const draggableId = this.vdndDraggable();
-    const sourceIndex = this.#dragState.sourceIndex() ?? 0;
-    const destinationIndex = this.#dragState.placeholderIndex();
-
-    // Remove document listener
-    this.#cleanupKeyboardDragListeners();
-
-    // Emit drag end event
-    this.dragEnd.emit({
-      draggableId,
-      droppableId: this.#getParentDroppableId() ?? '',
-      cancelled: false,
-      data: this.vdndDraggableData(),
-      sourceIndex,
-      destinationIndex,
-    });
-
-    this.#keyboardDrag.completeKeyboardDrag();
-
-    // Restore focus to the moved element after state updates
-    this.#restoreFocusAfterKeyboardDrag(draggableId);
-  }
-
-  /**
-   * Cancel a keyboard drag operation.
-   */
-  #cancelKeyboardDrag(): void {
-    const draggableId = this.vdndDraggable();
-    const sourceIndex = this.#dragState.sourceIndex() ?? 0;
-
-    // Remove document listener
-    this.#cleanupKeyboardDragListeners();
-
-    // Emit drag end event
-    this.dragEnd.emit({
-      draggableId,
-      droppableId: this.#getParentDroppableId() ?? '',
-      cancelled: true,
-      data: this.vdndDraggableData(),
-      sourceIndex,
-      destinationIndex: null,
-    });
-
-    this.#keyboardDrag.cancelKeyboardDrag();
-
-    // Restore focus to the original element after state updates
-    this.#restoreFocusAfterKeyboardDrag(draggableId);
-  }
-
-  /**
-   * Restore focus to the dragged element after keyboard drag ends.
-   * Uses afterNextRender to ensure Angular has finished updating the DOM
-   * (element is no longer hidden after isDragging() becomes false).
-   *
-   * Uses EnvironmentInjector to ensure callback runs even if this directive
-   * is destroyed during cross-list moves.
-   */
-  #restoreFocusAfterKeyboardDrag(draggableId: string): void {
-    // Capture the destination droppable BEFORE scheduling afterNextRender
-    // (this directive may be destroyed during cross-list moves)
-    const destinationDroppableId = this.#dragState.activeDroppableId();
-
-    afterNextRender(
-      () => {
-        const element = document.querySelector(
-          `[data-draggable-id="${draggableId}"]`,
-        ) as HTMLElement | null;
-
-        if (element) {
-          element.focus();
-        } else if (destinationDroppableId) {
-          // Fallback: focus the first draggable in the destination container
-          const firstDraggable = document.querySelector(
-            `[data-droppable-id="${destinationDroppableId}"] [data-draggable-id]`,
-          ) as HTMLElement | null;
-          firstDraggable?.focus();
-        }
-      },
-      { injector: this.#envInjector },
-    );
-  }
-
-  /**
-   * Clean up keyboard drag document listeners.
-   */
-  #cleanupKeyboardDragListeners(): void {
-    if (this.#boundKeyboardDragKeyDown) {
-      document.removeEventListener('keydown', this.#boundKeyboardDragKeyDown);
-    }
-  }
-
-  /**
-   * Handle keydown events during keyboard drag (document-level).
-   */
-  #onKeyboardDragKeyDown(event: KeyboardEvent): void {
-    if (!this.#keyboardDrag.isActive()) {
-      return;
-    }
-
-    switch (event.key) {
-      case ' ': // Space
-        event.preventDefault();
-        this.#completeKeyboardDrag();
-        break;
-      case 'Enter':
-        event.preventDefault();
-        this.#completeKeyboardDrag();
-        break;
-      case 'Escape':
-        event.preventDefault();
-        this.#cancelKeyboardDrag();
-        break;
-      case 'ArrowUp':
-        event.preventDefault();
-        this.#keyboardDrag.moveUp();
-        break;
-      case 'ArrowDown':
-        event.preventDefault();
-        this.#keyboardDrag.moveDown();
-        break;
-      case 'ArrowLeft':
-        event.preventDefault();
-        this.#moveToAdjacentDroppable('left');
-        break;
-      case 'ArrowRight':
-        event.preventDefault();
-        this.#moveToAdjacentDroppable('right');
-        break;
-      case 'Tab':
-        // Cancel drag on Tab
-        event.preventDefault();
-        this.#cancelKeyboardDrag();
-        break;
-    }
   }
 
   /**
@@ -701,7 +295,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
     // Calculate grab offset using the START position (where user initially pressed down)
     // NOT the current position (where drag threshold was exceeded)
     // This ensures the preview maintains its position relative to where the user grabbed it
-    const startPos = this.#startPosition ?? position;
+    const startPos = this.#pointerHandler.getStartPosition() ?? position;
     const grabOffset: GrabOffset = {
       x: startPos.x - rect.left,
       y: startPos.y - rect.top,
@@ -717,7 +311,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
     const groupName = this.#effectiveGroup();
     if (!groupName) {
       // Misconfigured - cancel tracking and don't start drag.
-      this.#cleanup();
+      this.#pointerHandler.cleanup();
       return;
     }
     const droppableElement = this.#positionCalculator.findDroppableAtPoint(
@@ -836,19 +430,20 @@ export class DraggableDirective implements OnInit, OnDestroy {
     if (!groupName) {
       // Group became unavailable mid-drag; cancel to avoid inconsistent state.
       this.#endDrag(true);
-      this.#cleanup();
+      this.#pointerHandler.cleanup();
       return;
     }
 
     // Apply axis locking to effective position for droppable detection
     // When axis is locked, use the start position for the locked axis
     const axisLock = this.lockAxis();
+    const startPos = this.#pointerHandler.getStartPosition();
     let effectivePosition = position;
 
-    if (axisLock && this.#startPosition) {
+    if (axisLock && startPos) {
       effectivePosition = {
-        x: axisLock === 'x' ? this.#startPosition.x : position.x,
-        y: axisLock === 'y' ? this.#startPosition.y : position.y,
+        x: axisLock === 'x' ? startPos.x : position.x,
+        y: axisLock === 'y' ? startPos.y : position.y,
       };
     }
 
@@ -962,56 +557,5 @@ export class DraggableDirective implements OnInit, OnDestroy {
     );
 
     return droppable ? this.#positionCalculator.getDroppableId(droppable) : null;
-  }
-
-  /**
-   * Get position from mouse or touch event.
-   */
-  #getPosition(event: MouseEvent | TouchEvent): CursorPosition {
-    if ('touches' in event) {
-      const touch = event.touches[0] ?? event.changedTouches[0];
-      return { x: touch.clientX, y: touch.clientY };
-    }
-    return { x: event.clientX, y: event.clientY };
-  }
-
-  /**
-   * Clean up event listeners and state.
-   */
-  #cleanup(): void {
-    this.#isTracking = false;
-    this.#startPosition = null;
-    this.#setPending(false); // Clear pending state on cleanup
-    this.#cancelDelayTimer();
-
-    if (this.#rafId !== null) {
-      cancelAnimationFrame(this.#rafId);
-      this.#rafId = null;
-    }
-
-    // Remove event listeners
-    if (this.#boundPointerMove) {
-      document.removeEventListener('mousemove', this.#boundPointerMove);
-      document.removeEventListener('touchmove', this.#boundPointerMove);
-    }
-    if (this.#boundPointerUp) {
-      document.removeEventListener('mouseup', this.#boundPointerUp);
-      document.removeEventListener('touchend', this.#boundPointerUp);
-      document.removeEventListener('touchcancel', this.#boundPointerUp);
-    }
-    if (this.#boundKeyDown) {
-      document.removeEventListener('keydown', this.#boundKeyDown);
-    }
-  }
-
-  /**
-   * Handle keydown events on document to cancel drag with Escape.
-   */
-  #onKeyDown(event: KeyboardEvent): void {
-    if (event.key === 'Escape' && this.isDragging()) {
-      // No ngZone.run() needed - #endDrag uses signals which work outside zone
-      this.#endDrag(true);
-      this.#cleanup();
-    }
   }
 }

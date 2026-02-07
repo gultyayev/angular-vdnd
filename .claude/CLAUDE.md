@@ -51,6 +51,15 @@ These rules prevent common mistakes that cause hard-to-debug issues:
 
 _All paths relative to `/projects/ngx-virtual-dnd/src/`_
 
+### Handlers
+
+| Handler             | Path                                    | Purpose                                    |
+| ------------------- | --------------------------------------- | ------------------------------------------ |
+| KeyboardDragHandler | `lib/handlers/keyboard-drag.handler.ts` | Keyboard drag lifecycle + key dispatch     |
+| PointerDragHandler  | `lib/handlers/pointer-drag.handler.ts`  | Pointer (mouse/touch) drag lifecycle + RAF |
+
+_Plain classes (non-injectable), instantiated by DraggableDirective._
+
 ### Directives
 
 | Directive               | Selector          | Key Inputs                                             |
@@ -76,11 +85,17 @@ _All paths relative to `/projects/ngx-virtual-dnd/src/`_
 
 ```
 DraggableDirective
+├── KeyboardDragHandler (plain class)
+│   ├── DragStateService
+│   ├── KeyboardDragService
+│   ├── PositionCalculatorService
+│   ├── DragIndexCalculatorService
+│   └── ElementCloneService
+├── PointerDragHandler (plain class)
 ├── DragStateService
 ├── PositionCalculatorService
 ├── AutoScrollService
 ├── ElementCloneService
-├── KeyboardDragService
 └── DragIndexCalculatorService
 
 DragPreviewComponent → OverlayContainerService
@@ -99,16 +114,18 @@ AutoScrollService → DragStateService, PositionCalculatorService
 
 ### Test Files
 
-| Source Area        | Unit Test                     | E2E Tests                                                       |
-| ------------------ | ----------------------------- | --------------------------------------------------------------- |
-| DraggableDirective | `draggable.directive.spec.ts` | `drag-drop.spec.ts`, `keyboard-drag/*.spec.ts`                  |
-| DroppableDirective | `droppable.directive.spec.ts` | `drop-accuracy.spec.ts`                                         |
-| DragStateService   | `drag-state.service.spec.ts`  | -                                                               |
-| AutoScrollService  | `auto-scroll.service.spec.ts` | `auto-scroll.spec.ts`, `autoscroll-drift.spec.ts`               |
-| Placeholder logic  | -                             | `placeholder-behavior.spec.ts`, `placeholder-integrity.spec.ts` |
-| Keyboard drag      | -                             | `keyboard-drag/*.spec.ts` (6 files)                             |
-| Page scroll        | -                             | `page-scroll.spec.ts`                                           |
-| Mobile touch       | -                             | `touch-scroll.mobile.spec.ts`                                   |
+| Source Area         | Unit Test                       | E2E Tests                                                       |
+| ------------------- | ------------------------------- | --------------------------------------------------------------- |
+| DraggableDirective  | `draggable.directive.spec.ts`   | `drag-drop.spec.ts`, `keyboard-drag/*.spec.ts`                  |
+| KeyboardDragHandler | `keyboard-drag.handler.spec.ts` | -                                                               |
+| PointerDragHandler  | `pointer-drag.handler.spec.ts`  | -                                                               |
+| DroppableDirective  | `droppable.directive.spec.ts`   | `drop-accuracy.spec.ts`                                         |
+| DragStateService    | `drag-state.service.spec.ts`    | -                                                               |
+| AutoScrollService   | `auto-scroll.service.spec.ts`   | `auto-scroll.spec.ts`, `autoscroll-drift.spec.ts`               |
+| Placeholder logic   | -                               | `placeholder-behavior.spec.ts`, `placeholder-integrity.spec.ts` |
+| Keyboard drag       | -                               | `keyboard-drag/*.spec.ts` (6 files)                             |
+| Page scroll         | -                               | `page-scroll.spec.ts`                                           |
+| Mobile touch        | -                               | `touch-scroll.mobile.spec.ts`                                   |
 
 ### Public API (from public-api.ts)
 
