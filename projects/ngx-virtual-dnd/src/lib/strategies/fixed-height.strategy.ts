@@ -37,6 +37,9 @@ export class FixedHeightStrategy implements VirtualScrollStrategy {
   }
 
   getOffsetForIndex(index: number): number {
+    if (this.#excludedIndex >= 0 && index > this.#excludedIndex) {
+      return (index - 1) * this.#itemHeight;
+    }
     return index * this.#itemHeight;
   }
 
@@ -61,6 +64,12 @@ export class FixedHeightStrategy implements VirtualScrollStrategy {
 
   findIndexAtOffset(offset: number): number {
     if (this.#itemHeight <= 0) return 0;
-    return Math.floor(offset / this.#itemHeight);
+    const visualIndex = Math.floor(offset / this.#itemHeight);
+    // When an item is excluded (same-list drag), visual indices at or past
+    // the excluded position map to logical index + 1
+    if (this.#excludedIndex >= 0 && visualIndex >= this.#excludedIndex) {
+      return visualIndex + 1;
+    }
+    return visualIndex;
   }
 }

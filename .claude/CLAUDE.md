@@ -136,6 +136,7 @@ AutoScrollService → DragStateService, PositionCalculatorService
 | Keyboard drag       | -                               | `keyboard-drag/*.spec.ts` (6 files)                             |
 | Page scroll         | -                               | `page-scroll.spec.ts`                                           |
 | Mobile touch        | -                               | `touch-scroll.mobile.spec.ts`                                   |
+| Dynamic height      | -                               | `dynamic-height.spec.ts`                                        |
 
 ### Public API (from public-api.ts)
 

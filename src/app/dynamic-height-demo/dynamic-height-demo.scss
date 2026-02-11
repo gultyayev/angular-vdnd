@@ -1,0 +1,218 @@
+/* stylelint-disable */
+
+:host {
+  --color-primary: #3b82f6;
+  --color-accent: #60a5fa;
+  --color-bg: #f5f7fa;
+  --color-surface: #fff;
+  --color-border: #e2e8f0;
+  --color-text: #1e293b;
+  --color-text-muted: #64748b;
+  --color-text-subtle: #94a3b8;
+  --color-primary-light: #eff6ff;
+
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+ion-header {
+  flex-shrink: 0;
+  box-shadow:
+    0 1px 3px 0 rgb(0 0 0 / 0.1),
+    0 1px 2px -1px rgb(0 0 0 / 0.1);
+
+  ion-toolbar {
+    --background: var(--color-primary);
+    --color: white;
+
+    ion-title {
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+  }
+}
+
+ion-content {
+  --background: var(--color-bg);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+ion-content::part(scroll) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.scroll-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.page-header {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  color: white;
+  padding: 16px;
+}
+
+.welcome-banner {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.welcome-banner h2 {
+  margin: 0 0 8px;
+  font-size: 1.5rem;
+}
+
+.welcome-banner p {
+  margin: 0;
+  opacity: 0.9;
+}
+
+.welcome-banner .close-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  --background: rgba(255, 255, 255, 0.2);
+  --background-hover: rgba(255, 255, 255, 0.35);
+  --color: white;
+  --color-hover: white;
+  --border-radius: 50%;
+  --padding-start: 0;
+  --padding-end: 0;
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  font-size: 18px;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+.section-title {
+  margin: 16px 0 12px;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.category-chips {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  padding: 12px 16px;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.category-chips ion-chip {
+  --background: rgba(255, 255, 255, 0.15);
+  --color: rgba(255, 255, 255, 0.9);
+  flex-shrink: 0;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+
+  &:hover {
+    --background: rgba(255, 255, 255, 0.25);
+    --border-color: rgba(255, 255, 255, 0.5);
+  }
+}
+
+.category-chips ion-chip.active {
+  --background: white;
+  --color: var(--color-primary);
+  --border-color: white;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.virtual-list-wrapper {
+  position: relative;
+}
+
+.task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  min-height: 48px;
+  box-sizing: border-box;
+  cursor: grab;
+  transition: background 150ms ease;
+}
+
+.task-item:hover {
+  background: var(--color-bg);
+}
+
+.task-item:active {
+  cursor: grabbing;
+}
+
+.task-item .drag-handle {
+  color: var(--color-text-subtle);
+  font-size: 24px;
+  margin-top: 2px;
+}
+
+.task-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.task-item .task-title {
+  flex: 1;
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.task-item .task-title.done {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.task-description {
+  margin: 4px 0 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.add-task-footer {
+  padding: 16px;
+  background: var(--color-bg);
+}
+
+.add-task-footer ion-button {
+  --background: var(--color-primary);
+}
+
+/* Drag preview styling */
+:host ::ng-deep .vdnd-drag-preview .task-item {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  transform: rotate(2deg);
+}
+
+.back-button {
+  --color: white;
+}

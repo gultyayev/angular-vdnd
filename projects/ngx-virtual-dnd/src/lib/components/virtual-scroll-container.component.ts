@@ -19,6 +19,7 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import { DragStateService } from '../services/drag-state.service';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
+import { DragIndexCalculatorService } from '../services/drag-index-calculator.service';
 import { DragPlaceholderComponent } from './drag-placeholder.component';
 import {
   bindRafThrottledScrollTopSignal,
@@ -95,6 +96,7 @@ export interface VisibleRangeChange {
     '[style.overflow]': '"auto"',
     '[style.position]': '"relative"',
     '[attr.data-item-height]': 'itemHeight()',
+    '[attr.data-total-items]': 'items().length',
   },
   template: `
     <div class="vdnd-virtual-scroll-content">
@@ -161,6 +163,7 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   readonly #dragState = inject(DragStateService);
   readonly #elementRef = inject(ElementRef<HTMLElement>);
   readonly #autoScrollService = inject(AutoScrollService);
+  readonly #dragIndexCalculator = inject(DragIndexCalculatorService);
   readonly #ngZone = inject(NgZone);
   readonly #injector = inject(Injector);
 
@@ -607,6 +610,27 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
 
       this.#previousDraggedId = currentDraggedId;
     });
+
+    // Clamp scrollTop during drag when totalHeight shrinks
+    // When a dragged item is hidden, totalHeight decreases. If we're near the bottom,
+    // scrollTop can exceed the new max, causing blank space (background reveal).
+    effect(() => {
+      const isDragging = this.#dragState.isDragging();
+      const totalHeight = this.totalHeight();
+      const element = this.#elementRef.nativeElement;
+
+      if (isDragging) {
+        const containerHeight = this.effectiveHeight();
+        const maxScroll = Math.max(0, totalHeight - containerHeight);
+        const currentScrollTop = element.scrollTop;
+
+        // Clamp scrollTop to valid range
+        if (currentScrollTop > maxScroll) {
+          element.scrollTop = maxScroll;
+          this.#scrollTop.set(maxScroll);
+        }
+      }
+    });
   }
 
   ngOnInit(): void {
@@ -618,6 +642,11 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
         this.#elementRef.nativeElement,
         this.autoScrollConfig(),
       );
+    }
+
+    // Register strategy with drag index calculator for accurate drag calculations
+    if (this.droppableId()) {
+      this.#dragIndexCalculator.registerStrategy(this.droppableId()!, this.#strategy());
     }
 
     // Set up ResizeObserver for dynamic height measurement
@@ -658,6 +687,11 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
     this.#scrollCleanup?.();
     this.#resizeCleanup?.();
     this.#itemResizeObserver?.disconnect();
+
+    // Unregister strategy from drag index calculator
+    if (this.droppableId()) {
+      this.#dragIndexCalculator.unregisterStrategy(this.droppableId()!);
+    }
 
     // Unregister from auto-scroll service
     const id = this.scrollContainerId() ?? this.#generatedScrollId;

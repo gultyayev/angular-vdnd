@@ -16,6 +16,7 @@ import {
 import { VDND_SCROLL_CONTAINER } from '../tokens/scroll-container.token';
 import { VDND_VIRTUAL_VIEWPORT } from '../tokens/virtual-viewport.token';
 import { DragStateService } from '../services/drag-state.service';
+import { DragIndexCalculatorService } from '../services/drag-index-calculator.service';
 import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
 import { FixedHeightStrategy } from '../strategies/fixed-height.strategy';
 import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
@@ -89,6 +90,7 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   readonly #injector = inject(Injector);
   readonly #ngZone = inject(NgZone);
   readonly #dragState = inject(DragStateService);
+  readonly #dragIndexCalculator = inject(DragIndexCalculatorService);
 
   /**
    * Optional viewport component that provides wrapper-based positioning.
@@ -252,6 +254,36 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
       this.#strategy().setItemKeys(keys);
     });
 
+    // Register strategy with drag index calculator for accurate position lookups
+    effect((onCleanup) => {
+      const droppableId = this.vdndVirtualForDroppableId();
+      const strategy = this.#strategy();
+      if (droppableId) {
+        this.#dragIndexCalculator.registerStrategy(droppableId, strategy);
+        onCleanup(() => this.#dragIndexCalculator.unregisterStrategy(droppableId));
+      }
+    });
+
+    // Set excluded index persistently during same-list drag.
+    // This ensures ALL strategy methods (getTotalHeight, getOffsetForIndex, etc.)
+    // correctly skip the hidden item — not just findIndexAtOffset.
+    effect(() => {
+      const strategy = this.#strategy();
+      const draggedIndex = this.#draggedItemIndex();
+      const droppableId = this.vdndVirtualForDroppableId();
+      const sourceDroppableId = this.#dragState.sourceDroppableId();
+      const isDragging = this.#dragState.isDragging();
+
+      const isSourceList =
+        isDragging && droppableId !== undefined && droppableId === sourceDroppableId;
+
+      if (isSourceList && draggedIndex >= 0) {
+        strategy.setExcludedIndex(draggedIndex);
+      } else {
+        strategy.setExcludedIndex(null);
+      }
+    });
+
     // React to changes and update views
     effect(() => {
       this.#updateViews();
@@ -400,7 +432,7 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
       draggedIndex < items.length;
 
     // Notify viewport of render start index for wrapper positioning
-    this.#notifyViewportRenderStart(start, isSourceList, draggedIndex);
+    this.#notifyViewportRenderStart(start);
 
     // 1. Build the list of items to render
     const itemsToRender = this.#calculateItemsToRender({
@@ -425,16 +457,11 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
 
   /**
    * Notify viewport of render start index for wrapper positioning.
-   * Adjusts when the dragged item is above the rendered range.
+   * With persistent excluded index, getOffsetForIndex already accounts for hidden items.
    */
-  #notifyViewportRenderStart(start: number, isSourceList: boolean, draggedIndex: number): void {
+  #notifyViewportRenderStart(start: number): void {
     if (!this.#useViewportPositioning) return;
-
-    const shouldAdjustRenderStart =
-      this.#dragState.isDragging() && isSourceList && draggedIndex >= 0 && draggedIndex < start;
-
-    const renderStartIndex = shouldAdjustRenderStart ? Math.max(0, start - 1) : start;
-    this.#viewport?.setRenderStartIndex(renderStartIndex);
+    this.#viewport?.setRenderStartIndex(start);
   }
 
   /**

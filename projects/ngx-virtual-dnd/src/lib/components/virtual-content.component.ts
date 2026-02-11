@@ -55,8 +55,10 @@ import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
     class: 'vdnd-virtual-content',
     '[style.display]': '"block"',
     '[style.position]': '"relative"',
+    '[style.height.px]': 'totalHeight()',
     '[attr.data-content-offset]': 'contentOffset()',
     '[attr.data-item-height]': 'itemHeight()',
+    '[attr.data-total-items]': 'totalItems()',
   },
   template: `
     <!-- Spacer maintains scroll height for the virtual list portion -->

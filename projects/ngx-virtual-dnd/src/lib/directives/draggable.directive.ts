@@ -387,6 +387,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
   /**
    * Calculate the source index of the dragged element BEFORE it's hidden.
    * This must be called before startDrag updates the state (which triggers display:none).
+   * Uses strategy-based lookup when available for accurate handling of variable heights.
    */
   #calculateSourceIndex(element: HTMLElement, droppableElement: HTMLElement | null): number {
     if (!droppableElement) {
@@ -399,10 +400,21 @@ export class DraggableDirective implements OnInit, OnDestroy {
     const containerRect = scrollableElement.getBoundingClientRect();
     const scrollTop = scrollableElement.scrollTop;
 
-    // Get item height from the element itself
-    const itemHeight = rect.height || 50;
+    // Try to use registered strategy for accurate offset-based lookup
+    const droppableId = this.#positionCalculator.getDroppableId(droppableElement);
+    if (droppableId) {
+      // Access the drag index calculator's strategy map via a method call
+      // We need to look up the strategy that was registered
+      const strategy = this.#dragIndexCalculator.getStrategyForDroppable(droppableId);
+      if (strategy) {
+        // Calculate the logical index based on the element's position
+        const relativeY = rect.top - containerRect.top + scrollTop;
+        return strategy.findIndexAtOffset(relativeY);
+      }
+    }
 
-    // Calculate the logical index based on the element's position
+    // Fallback: Use fixed-height math if no strategy available
+    const itemHeight = rect.height || 50;
     const relativeY = rect.top - containerRect.top + scrollTop;
     return Math.round(relativeY / itemHeight);
   }
