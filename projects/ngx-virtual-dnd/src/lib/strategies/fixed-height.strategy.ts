@@ -1,4 +1,4 @@
-import { signal, type Signal } from '@angular/core';
+import { signal } from '@angular/core';
 import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
 
 /**
@@ -14,8 +14,9 @@ export class FixedHeightStrategy implements VirtualScrollStrategy {
   /** Excluded index during same-list drag (-1 = none) */
   #excludedIndex = -1;
 
-  /** Version signal — fixed strategy never changes, so it's always 0 */
-  readonly version: Signal<number> = signal(0);
+  /** Version signal — bumps when exclusion changes */
+  readonly #version = signal(0);
+  readonly version = this.#version.asReadonly();
 
   constructor(itemHeight: number) {
     this.#itemHeight = itemHeight;
@@ -59,7 +60,11 @@ export class FixedHeightStrategy implements VirtualScrollStrategy {
   }
 
   setExcludedIndex(index: number | null): void {
-    this.#excludedIndex = index ?? -1;
+    const newIndex = index ?? -1;
+    if (this.#excludedIndex !== newIndex) {
+      this.#excludedIndex = newIndex;
+      this.#version.update((v) => v + 1);
+    }
   }
 
   findIndexAtOffset(offset: number): number {

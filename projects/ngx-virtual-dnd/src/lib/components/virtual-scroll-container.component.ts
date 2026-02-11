@@ -317,22 +317,8 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   /** Total height of all items (for scrollbar) */
   protected readonly totalHeight = computed(() => {
     const count = this.items().length;
-    const draggedId = this.draggedItemId();
     const strategy = this.#strategy();
     strategy.version();
-
-    // Only exclude the dragged item if it belongs to THIS list (is in our items array).
-    // Cross-list drags shouldn't affect the target list's height.
-    const isDraggedItemInThisList = draggedId !== null && this.#itemIndexMap().has(draggedId);
-
-    // Let the strategy handle exclusion via setExcludedIndex — pass the full count
-    if (isDraggedItemInThisList) {
-      const draggedIndex = this.#itemIndexMap().get(draggedId)!;
-      strategy.setExcludedIndex(draggedIndex);
-    } else {
-      strategy.setExcludedIndex(null);
-    }
-
     return strategy.getTotalHeight(count);
   });
 
@@ -367,14 +353,10 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   /** Transform offset for content wrapper (position of first rendered item) */
   protected readonly contentTransform = computed(() => {
     const { start } = this.#renderRange();
-    const draggedIndex = this.#draggedItemIndex();
     const strategy = this.#strategy();
     strategy.version();
 
-    // If dragged item is in the unrendered top section, subtract 1 (it's position:absolute)
-    const adjustment = draggedIndex >= 0 && draggedIndex < start ? 1 : 0;
-    const adjustedStart = Math.max(0, start - adjustment);
-    const offset = strategy.getOffsetForIndex(adjustedStart);
+    const offset = strategy.getOffsetForIndex(start);
     return `translateY(${offset}px)`;
   });
 
@@ -516,6 +498,9 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   /** Track previous dragged ID to detect drag end */
   #previousDraggedId: string | null = null;
 
+  /** Track previous total height to detect if we were at bottom before drag ended */
+  #previousTotalHeight = 0;
+
   constructor() {
     // Keep strategy item keys in sync
     effect(() => {
@@ -523,6 +508,23 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
       const idFn = this.itemIdFn();
       const keys = items.map((item) => idFn(item));
       this.#strategy().setItemKeys(keys);
+    });
+
+    // Register strategy with drag index calculator for accurate drag calculations
+    effect((onCleanup) => {
+      const droppableId = this.droppableId();
+      const strategy = this.#strategy();
+      if (droppableId) {
+        this.#dragIndexCalculator.registerStrategy(droppableId, strategy);
+        onCleanup(() => this.#dragIndexCalculator.unregisterStrategy(droppableId));
+      }
+    });
+
+    // Set excluded index persistently during same-list drag.
+    effect(() => {
+      const strategy = this.#strategy();
+      const draggedIndex = this.#draggedItemIndex();
+      strategy.setExcludedIndex(draggedIndex >= 0 ? draggedIndex : null);
     });
 
     // Emit visible range changes
@@ -575,6 +577,7 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
     // When drag ends, totalHeight increases - we need to adjust scroll if we were at bottom
     effect(() => {
       const currentDraggedId = this.draggedItemId();
+      const currentTotalHeight = this.totalHeight();
       const element = this.#elementRef.nativeElement;
 
       // Detect drag end (was dragging, now not)
@@ -584,11 +587,10 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
         strategy.version();
         const height = this.effectiveHeight();
         const totalItems = this.items().length;
-        const itemHeight = this.itemHeight();
 
         // Calculate if we were at/near bottom (within 10px tolerance)
-        // During drag, max scroll was (totalItems - 1) * itemHeight - height
-        const dragReducedMaxScroll = (totalItems - 1) * itemHeight - height;
+        // using the height FROM THE PREVIOUS CYCLE (when dragging was active)
+        const dragReducedMaxScroll = Math.max(0, this.#previousTotalHeight - height);
         const wasAtBottom = currentScrollTop >= dragReducedMaxScroll - 10;
 
         if (wasAtBottom && dragReducedMaxScroll > 0) {
@@ -609,6 +611,7 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
       }
 
       this.#previousDraggedId = currentDraggedId;
+      this.#previousTotalHeight = currentTotalHeight;
     });
 
     // Clamp scrollTop during drag when totalHeight shrinks
@@ -642,11 +645,6 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
         this.#elementRef.nativeElement,
         this.autoScrollConfig(),
       );
-    }
-
-    // Register strategy with drag index calculator for accurate drag calculations
-    if (this.droppableId()) {
-      this.#dragIndexCalculator.registerStrategy(this.droppableId()!, this.#strategy());
     }
 
     // Set up ResizeObserver for dynamic height measurement
@@ -687,11 +685,6 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
     this.#scrollCleanup?.();
     this.#resizeCleanup?.();
     this.#itemResizeObserver?.disconnect();
-
-    // Unregister strategy from drag index calculator
-    if (this.droppableId()) {
-      this.#dragIndexCalculator.unregisterStrategy(this.droppableId()!);
-    }
 
     // Unregister from auto-scroll service
     const id = this.scrollContainerId() ?? this.#generatedScrollId;

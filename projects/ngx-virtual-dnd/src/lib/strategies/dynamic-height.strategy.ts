@@ -62,6 +62,7 @@ export class DynamicHeightStrategy implements VirtualScrollStrategy {
 
   setExcludedIndex(index: number | null): void {
     this.#cache.setExcludedIndex(index);
+    this.#version.update((v) => v + 1);
   }
 
   findIndexAtOffset(offset: number): number {

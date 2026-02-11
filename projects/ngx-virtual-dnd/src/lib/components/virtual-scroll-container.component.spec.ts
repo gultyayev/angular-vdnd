@@ -544,4 +544,79 @@ describe('VirtualScrollContainerComponent', () => {
       expect(virtualScrollComponent.getScrollHeight()).toBe(heightBefore);
     });
   });
+
+  describe('regressions', () => {
+    it('should have correct contentTransform when dragged item is above visible range (Issue 5)', async () => {
+      // 1. Scroll down so item 0-10 are out of view
+      virtualScrollEl.scrollTop = 1000;
+      virtualScrollEl.dispatchEvent(new Event('scroll'));
+      await nextAnimationFrame();
+      fixture.detectChanges();
+
+      const firstItemBeforeDrag = fixture.debugElement.query(By.css('.item'));
+      const start = parseInt(firstItemBeforeDrag.nativeElement.getAttribute('data-index'), 10);
+      expect(start).toBeGreaterThan(5);
+
+      // 2. Drag item 2 (which is above visible range)
+      const item: DraggedItem = {
+        draggableId: 'item-2',
+        droppableId: 'test-scroll',
+        element: document.createElement('div'),
+        height: 50,
+        width: 200,
+      };
+
+      dragStateService.startDrag(item);
+      fixture.detectChanges();
+
+      // 3. Verify content transform
+      // It should be strategy.getOffsetForIndex(start)
+      // Since item-2 is excluded, offset for 'start' should be (start - 1) * 50
+      const wrapper = fixture.debugElement.query(By.css('.vdnd-virtual-scroll-content-wrapper'));
+      const expectedOffset = (start - 1) * 50;
+      expect(wrapper.nativeElement.style.transform).toBe(`translateY(${expectedOffset}px)`);
+
+      dragStateService.endDrag();
+    });
+
+    it('should correctly adjust scroll at bottom on drag end (Issue 4)', async () => {
+      // Use fewer items to reach bottom easily
+      component.items.set(generateItems(20)); // 1000px total height
+      fixture.detectChanges();
+
+      // 1. Scroll to bottom
+      const maxScroll = 1000 - 300;
+      virtualScrollEl.scrollTop = maxScroll;
+      virtualScrollEl.dispatchEvent(new Event('scroll'));
+      await nextAnimationFrame();
+      fixture.detectChanges();
+
+      // 2. Start drag of an item
+      const item: DraggedItem = {
+        draggableId: 'item-10',
+        droppableId: 'test-scroll',
+        element: document.createElement('div'),
+        height: 50,
+        width: 200,
+      };
+      dragStateService.startDrag(item);
+      fixture.detectChanges();
+
+      // During drag, total height is 950px. Max scroll is 650px.
+      // Scroll should have been clamped to 650px by the effect.
+      expect(virtualScrollEl.scrollTop).toBe(650);
+
+      // 3. End drag
+      dragStateService.endDrag();
+      fixture.detectChanges();
+
+      // Wait for afterNextRender
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      fixture.detectChanges();
+
+      // Total height is back to 1000px. Max scroll is 700px.
+      // Scroll should have been adjusted to 700px.
+      expect(virtualScrollEl.scrollTop).toBe(700);
+    });
+  });
 });
