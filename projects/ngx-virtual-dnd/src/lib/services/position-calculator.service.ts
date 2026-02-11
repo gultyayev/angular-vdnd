@@ -273,12 +273,11 @@ export class PositionCalculatorService {
 
   /**
    * Get the total item count in a droppable.
-   * Uses virtual scroll data attribute if available, otherwise counts DOM elements.
+   * Uses spacer height and data attributes if available, otherwise counts DOM elements.
    */
   #getDroppableItemCount(droppableElement: HTMLElement): number {
     const virtualScroll = droppableElement.querySelector('vdnd-virtual-scroll');
     if (virtualScroll) {
-      const scrollHeight = (virtualScroll as HTMLElement).scrollHeight;
       const configuredHeight = virtualScroll.getAttribute('data-item-height');
 
       if (!configuredHeight) {
@@ -292,8 +291,16 @@ export class PositionCalculatorService {
         return 0;
       }
 
+      // Prefer spacer height over scrollHeight for accuracy
+      const spacer = virtualScroll.querySelector(
+        '.vdnd-virtual-scroll-spacer',
+      ) as HTMLElement | null;
+      const totalHeight = spacer
+        ? parseFloat(spacer.style.height) || 0
+        : (virtualScroll as HTMLElement).scrollHeight;
+
       const itemHeight = parseInt(configuredHeight, 10);
-      return Math.floor(scrollHeight / itemHeight);
+      return Math.floor(totalHeight / itemHeight);
     }
     // Fallback for non-virtual scroll: DOM count is valid
     return droppableElement.querySelectorAll(`[${this.#DRAGGABLE_ID_ATTR}]`).length;

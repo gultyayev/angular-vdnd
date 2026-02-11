@@ -7,6 +7,7 @@ import {
   inject,
   Injector,
   input,
+  NgZone,
   OnDestroy,
   OnInit,
   TemplateRef,
@@ -15,6 +16,9 @@ import {
 import { VDND_SCROLL_CONTAINER } from '../tokens/scroll-container.token';
 import { VDND_VIRTUAL_VIEWPORT } from '../tokens/virtual-viewport.token';
 import { DragStateService } from '../services/drag-state.service';
+import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
+import { FixedHeightStrategy } from '../strategies/fixed-height.strategy';
+import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
 
 /**
  * Context provided to the template for each virtual item.
@@ -65,13 +69,13 @@ interface RenderEntry<T> {
  * ```
  *
  * @example
- * With Ionic ion-content:
+ * With dynamic item heights:
  * ```html
- * <ion-content vdndScrollable class="ion-content-scroll-host">
- *   <ng-container *vdndVirtualFor="let item of items(); itemHeight: 50; trackBy: trackById">
- *     <div class="item">{{ item.name }}</div>
+ * <div vdndScrollable style="overflow: auto; height: 400px">
+ *   <ng-container *vdndVirtualFor="let item of items(); itemHeight: 50; dynamicItemHeight: true; trackBy: trackById">
+ *     <div class="item" style="height: auto">{{ item.description }}</div>
  *   </ng-container>
- * </ion-content>
+ * </div>
  * ```
  */
 @Directive({
@@ -83,6 +87,7 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   readonly #elementRef = inject(ElementRef<Comment>);
   readonly #scrollContainer = inject(VDND_SCROLL_CONTAINER);
   readonly #injector = inject(Injector);
+  readonly #ngZone = inject(NgZone);
   readonly #dragState = inject(DragStateService);
 
   /**
@@ -110,12 +115,18 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   /** Whether placeholder is currently in the DOM */
   #placeholderInDom = false;
 
+  /** ResizeObserver for dynamic height measurement */
+  #resizeObserver: ResizeObserver | null = null;
+
+  /** Map from observed HTMLElement to its trackBy key */
+  readonly #observedElements = new WeakMap<HTMLElement, unknown>();
+
   // ========== Inputs ==========
 
   /** The array of items to iterate over */
   vdndVirtualForOf = input.required<T[]>();
 
-  /** Height of each item in pixels */
+  /** Height of each item in pixels (used as estimate in dynamic mode) */
   vdndVirtualForItemHeight = input.required<number>();
 
   /** Track-by function for efficient updates */
@@ -129,6 +140,31 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
    * Required for placeholder positioning during drag operations.
    */
   vdndVirtualForDroppableId = input<string>();
+
+  /**
+   * Enable dynamic item height mode.
+   * When true, items are auto-measured via ResizeObserver and `itemHeight`
+   * serves as the initial estimate for unmeasured items.
+   */
+  vdndVirtualForDynamicItemHeight = input<boolean>(false);
+
+  // ========== Strategy ==========
+
+  /**
+   * The virtual scroll strategy.
+   * If inside a viewport that has a strategy, use that. Otherwise create our own.
+   */
+  readonly #strategy = computed<VirtualScrollStrategy>(() => {
+    // If viewport provides a strategy, use it (shared state for drag-drop)
+    const viewportStrategy = this.#viewport?.strategy;
+    if (viewportStrategy) return viewportStrategy;
+
+    // Create our own strategy
+    const height = this.vdndVirtualForItemHeight();
+    return this.vdndVirtualForDynamicItemHeight()
+      ? new DynamicHeightStrategy(height)
+      : new FixedHeightStrategy(height);
+  });
 
   // ========== Placeholder Computed Values ==========
 
@@ -150,17 +186,19 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
 
   /** First visible item index */
   readonly #firstVisibleIndex = computed(() => {
-    const itemHeight = this.vdndVirtualForItemHeight();
-    if (itemHeight <= 0) return 0;
-    return Math.floor(this.#scrollContainer.scrollTop() / itemHeight);
+    const strategy = this.#strategy();
+    // Read version to subscribe to dynamic height changes
+    strategy.version();
+    return strategy.getFirstVisibleIndex(this.#scrollContainer.scrollTop());
   });
 
   /** Number of visible items */
   readonly #visibleCount = computed(() => {
     const height = this.#scrollContainer.containerHeight();
-    const itemHeight = this.vdndVirtualForItemHeight();
-    if (height <= 0 || itemHeight <= 0) return 0;
-    return Math.ceil(height / itemHeight);
+    const strategy = this.#strategy();
+    strategy.version();
+    const startIndex = this.#firstVisibleIndex();
+    return strategy.getVisibleCount(startIndex, height);
   });
 
   /** Range of items to render */
@@ -206,6 +244,14 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   });
 
   constructor() {
+    // Keep strategy item keys in sync
+    effect(() => {
+      const items = this.vdndVirtualForOf();
+      const trackByFn = this.vdndVirtualForTrackBy();
+      const keys = items.map((item, i) => trackByFn(i, item));
+      this.#strategy().setItemKeys(keys);
+    });
+
     // React to changes and update views
     effect(() => {
       this.#updateViews();
@@ -221,6 +267,11 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
 
     // Create placeholder element for drag operations
     this.#createPlaceholder();
+
+    // Set up ResizeObserver for dynamic height mode
+    if (this.vdndVirtualForDynamicItemHeight()) {
+      this.#setupResizeObserver();
+    }
   }
 
   ngOnDestroy(): void {
@@ -232,6 +283,9 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
 
     // Clean up placeholder element
     this.#placeholder?.remove();
+
+    // Clean up ResizeObserver
+    this.#resizeObserver?.disconnect();
   }
 
   /**
@@ -264,14 +318,64 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
     // Must pass injector since we're outside constructor
     effect(
       () => {
-        const itemHeight = this.vdndVirtualForItemHeight();
         const total = this.vdndVirtualForOf().length;
+        const strategy = this.#strategy();
+        strategy.version();
 
         // Single spacer with full content height
-        spacer.style.height = `${total * itemHeight}px`;
+        spacer.style.height = `${strategy.getTotalHeight(total)}px`;
       },
       { injector: this.#injector },
     );
+  }
+
+  /**
+   * Set up ResizeObserver for dynamic height measurement.
+   */
+  #setupResizeObserver(): void {
+    this.#ngZone.runOutsideAngular(() => {
+      this.#resizeObserver = new ResizeObserver((entries) => {
+        const strategy = this.#strategy();
+        for (const entry of entries) {
+          const element = entry.target as HTMLElement;
+          const key = this.#observedElements.get(element);
+          if (key === undefined) continue;
+
+          const height = entry.borderBoxSize?.[0]?.blockSize ?? element.offsetHeight;
+          if (height > 0) {
+            strategy.setMeasuredHeight(key, height);
+          }
+        }
+      });
+    });
+  }
+
+  /**
+   * Observe an element's root nodes for height changes.
+   */
+  #observeViewElements(view: EmbeddedViewRef<VirtualForContext<T>>, key: unknown): void {
+    if (!this.#resizeObserver) return;
+
+    for (const node of view.rootNodes) {
+      if (node instanceof HTMLElement) {
+        this.#observedElements.set(node, key);
+        this.#resizeObserver.observe(node);
+      }
+    }
+  }
+
+  /**
+   * Stop observing an element's root nodes.
+   */
+  #unobserveViewElements(view: EmbeddedViewRef<VirtualForContext<T>>): void {
+    if (!this.#resizeObserver) return;
+
+    for (const node of view.rootNodes) {
+      if (node instanceof HTMLElement) {
+        this.#observedElements.delete(node);
+        this.#resizeObserver.unobserve(node);
+      }
+    }
   }
 
   /**
@@ -281,7 +385,8 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   #updateViews(): void {
     const items = this.vdndVirtualForOf();
     const { start, end } = this.#renderRange();
-    const itemHeight = this.vdndVirtualForItemHeight();
+    const strategy = this.#strategy();
+    strategy.version();
     const placeholderIndex = this.#placeholderIndex();
     const showPlaceholder = this.#shouldShowPlaceholder();
     const draggedIndex = this.#draggedItemIndex();
@@ -309,10 +414,10 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
     });
 
     // 2. Reconcile views with the DOM
-    const placeholderDomPosition = this.#reconcileViews(itemsToRender, showPlaceholder, itemHeight);
+    const placeholderDomPosition = this.#reconcileViews(itemsToRender, showPlaceholder, strategy);
 
     // 3. Position placeholder in DOM
-    this.#positionPlaceholder(showPlaceholder, placeholderDomPosition, itemHeight);
+    this.#positionPlaceholder(showPlaceholder, placeholderDomPosition, strategy, placeholderIndex);
 
     // 4. Trim view pool to prevent memory bloat
     this.#trimViewPool();
@@ -436,7 +541,7 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   #reconcileViews(
     itemsToRender: RenderEntry<T>[],
     showPlaceholder: boolean,
-    itemHeight: number,
+    strategy: VirtualScrollStrategy,
   ): number {
     // Determine which keys we need
     const neededKeys = new Set(
@@ -450,6 +555,7 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
         if (index >= 0) {
           this.#viewContainer.detach(index);
         }
+        this.#unobserveViewElements(view);
         this.#viewPool.push(view);
         this.#activeViews.delete(key);
       }
@@ -485,7 +591,13 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
 
       // Apply absolute positioning when not using viewport wrapper
       if (!this.#useViewportPositioning) {
-        this.#applyAbsolutePositioning(view, entry.visualIndex * itemHeight);
+        const offset = strategy.getOffsetForIndex(entry.visualIndex);
+        this.#applyAbsolutePositioning(view, offset);
+      }
+
+      // Observe for dynamic height measurement
+      if (this.#resizeObserver) {
+        this.#observeViewElements(view, entry.key);
       }
 
       viewContainerIndex++;
@@ -542,13 +654,17 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   #positionPlaceholder(
     showPlaceholder: boolean,
     placeholderDomPosition: number,
-    itemHeight: number,
+    strategy: VirtualScrollStrategy,
+    placeholderIndex: number,
   ): void {
     if (!showPlaceholder || !this.#placeholder || placeholderDomPosition < 0) {
       return;
     }
 
-    this.#placeholder.style.height = `${itemHeight}px`;
+    // Use the dragged item's height if available, otherwise use strategy height
+    const draggedItemHeight = this.#dragState.draggedItem()?.height;
+    const height = draggedItemHeight ?? strategy.getItemHeight(placeholderIndex);
+    this.#placeholder.style.height = `${height}px`;
 
     const container = this.#viewContainer.element.nativeElement.parentElement;
     if (!container) return;

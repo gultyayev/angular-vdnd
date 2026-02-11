@@ -1,12 +1,31 @@
 import { inject, Injectable } from '@angular/core';
 import { type CursorPosition, END_OF_LIST, type GrabOffset } from '../models/drag-drop.models';
 import { PositionCalculatorService } from './position-calculator.service';
+import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
 
 @Injectable({
   providedIn: 'root',
 })
 export class DragIndexCalculatorService {
   readonly #positionCalculator = inject(PositionCalculatorService);
+
+  /** Registered strategies by droppable ID */
+  readonly #strategies = new Map<string, VirtualScrollStrategy>();
+
+  /**
+   * Register a virtual scroll strategy for a droppable.
+   * Used by virtual scroll components to provide dynamic height lookups.
+   */
+  registerStrategy(droppableId: string, strategy: VirtualScrollStrategy): void {
+    this.#strategies.set(droppableId, strategy);
+  }
+
+  /**
+   * Unregister a strategy when the droppable is destroyed.
+   */
+  unregisterStrategy(droppableId: string): void {
+    this.#strategies.delete(droppableId);
+  }
 
   getTotalItemCount(args: {
     droppableElement: HTMLElement;
@@ -73,6 +92,10 @@ export class DragIndexCalculatorService {
       currentScrollTop = container.scrollTop;
     }
 
+    // Check if a registered strategy exists for this droppable
+    const currentDroppableId = this.#positionCalculator.getDroppableId(droppableElement);
+    const strategy = currentDroppableId ? this.#strategies.get(currentDroppableId) : null;
+
     // Prefer configured item height from virtual scroll/content over actual element height.
     // This prevents drift when actual element height differs from grid spacing.
     const configuredHeight =
@@ -89,12 +112,19 @@ export class DragIndexCalculatorService {
     // Using math avoids Safari's stale getBoundingClientRect() issue during autoscroll
     const previewCenterY = position.y - (grabOffset?.y ?? 0) + itemHeight / 2;
 
-    // Convert to visual index (which slot the preview center is in)
+    // Convert to visual index
     const relativeY = previewCenterY - rect.top + currentScrollTop;
-    const visualIndex = Math.floor(relativeY / itemHeight);
+
+    let visualIndex: number;
+    if (strategy) {
+      // Use strategy's binary search for variable heights
+      visualIndex = strategy.findIndexAtOffset(relativeY);
+    } else {
+      // Fixed height: simple division
+      visualIndex = Math.floor(relativeY / itemHeight);
+    }
 
     // Check if same-list drag
-    const currentDroppableId = this.#positionCalculator.getDroppableId(droppableElement);
     const isSameList = sourceDroppableId !== null && sourceDroppableId === currentDroppableId;
 
     // Same-list adjustment: if pointing at or after source position, add 1
@@ -129,6 +159,10 @@ export class DragIndexCalculatorService {
     isSameList: boolean,
     draggedItemHeight: number,
   ): number {
+    // Check if a registered strategy exists
+    const droppableId = this.#positionCalculator.getDroppableId(droppableElement);
+    const strategy = droppableId ? this.#strategies.get(droppableId) : null;
+
     // Check for embedded virtual scroll component
     const virtualScroll = droppableElement.querySelector('vdnd-virtual-scroll');
     if (virtualScroll) {
@@ -153,6 +187,13 @@ export class DragIndexCalculatorService {
 
       // When same-list, spacer height reflects N-1 items (one is hidden)
       // Add 1 back to get true total
+      if (strategy) {
+        // For dynamic heights, we can't simply divide totalHeight by itemHeight.
+        // The spacer already accounts for variable heights. Use the item count from the DOM data.
+        const count = Math.round(totalHeight / itemHeight);
+        return isSameList ? count + 1 : count;
+      }
+
       const count = Math.floor(totalHeight / itemHeight);
       return isSameList ? count + 1 : count;
     }
