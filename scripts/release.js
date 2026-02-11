@@ -5,9 +5,12 @@
  *
  * Usage: npm run release [patch|minor|major|<version>]
  *        npm run release:dry-run [patch|minor|major]
+ *        npm run release:alpha
+ *        npm run release:alpha:dry-run
+ *        npm run release -- --pre-release [tag]   (default tag: alpha)
  *
  * Steps:
- * 1. Verify clean git working directory on master
+ * 1. Verify clean git working directory (master-only for stable releases)
  * 2. Run linting
  * 3. Run unit tests
  * 4. Build the library (needed for e2e tests)
@@ -38,11 +41,11 @@ function runWithOutput(command) {
   return execSync(command, { encoding: 'utf-8' }).trim();
 }
 
-function validateGitState() {
+function validateGitState(preRelease) {
   console.log('\n=== Validating git state ===');
 
   const branch = runWithOutput('git branch --show-current');
-  if (branch !== 'master') {
+  if (!preRelease && branch !== 'master') {
     console.error(`Error: Must be on master branch. Currently on: ${branch}`);
     process.exit(1);
   }
@@ -54,26 +57,38 @@ function validateGitState() {
     process.exit(1);
   }
 
-  console.log('Git state OK: on master, working directory clean');
+  const modeLabel = preRelease ? `pre-release (${preRelease})` : 'stable';
+  console.log(`Git state OK: on ${branch}, working directory clean, mode: ${modeLabel}`);
 }
 
 function parseArgs() {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run');
-  const releaseType = args.find((arg) => !arg.startsWith('--'));
 
-  return { dryRun, releaseType };
+  let preRelease = null;
+  const preReleaseIndex = args.indexOf('--pre-release');
+  if (preReleaseIndex !== -1) {
+    const nextArg = args[preReleaseIndex + 1];
+    preRelease = nextArg && !nextArg.startsWith('--') ? nextArg : 'alpha';
+  }
+
+  const releaseType = args.find((arg) => !arg.startsWith('--') && arg !== preRelease);
+
+  return { dryRun, releaseType, preRelease };
 }
 
 function main() {
-  const { dryRun, releaseType } = parseArgs();
+  const { dryRun, releaseType, preRelease } = parseArgs();
 
   if (dryRun) {
     console.log('\n*** DRY RUN MODE - No publish or push will occur ***\n');
   }
+  if (preRelease) {
+    console.log(`\n*** PRE-RELEASE MODE (${preRelease}) - Will publish to "next" npm tag ***\n`);
+  }
 
   // Step 1: Validate git state
-  validateGitState();
+  validateGitState(preRelease);
 
   // Step 2: Run linting
   console.log('\n=== Running linting ===');
@@ -104,6 +119,10 @@ function main() {
     ? `npx commit-and-tag-version --release-as ${releaseType}`
     : 'npx commit-and-tag-version';
 
+  if (preRelease) {
+    versionCmd += ` --prerelease ${preRelease}`;
+  }
+
   if (dryRun) {
     versionCmd += ' --dry-run';
   }
@@ -129,7 +148,8 @@ function main() {
 
   // Step 8: Push to origin
   console.log('\n=== Pushing to origin ===');
-  run('git push --follow-tags origin master');
+  const branch = runWithOutput('git branch --show-current');
+  run(`git push --follow-tags origin ${branch}`);
 
   // Step 9: npm login (tokens are short-lived)
   console.log('\n=== Logging in to npm ===');
@@ -137,7 +157,10 @@ function main() {
 
   // Step 10: Publish to npm
   console.log('\n=== Publishing to npm ===');
-  run('npm publish --access public', { cwd: distPath });
+  const publishCmd = preRelease
+    ? 'npm publish --access public --tag next'
+    : 'npm publish --access public';
+  run(publishCmd, { cwd: distPath });
 
   console.log('\n=== Release complete! ===');
 }
