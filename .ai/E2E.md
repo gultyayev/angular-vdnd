@@ -200,6 +200,35 @@ visibility — empty list targets don't produce placeholders. Use rAF wait
 instead. Only wait for placeholder in inline test code where you know the
 target list has items.
 
+### Content Offset and Cross-Browser Precision
+
+Firefox and WebKit round `borderBoxSize.blockSize` (via `ResizeObserver`) and
+`translateY` sub-pixel values differently than Chromium. This produces ~6-8px
+of additional drift during continuous autoscroll.
+
+For drift tolerance in alignment tests:
+
+- Use `itemHeight * 0.65 + 4` as baseline (not `itemHeight * 0.5 + 2`)
+- This still catches real regressions (off by >= 1 full item)
+- Attach `driftSamples` array to test artifacts for debugging
+
+### Scrolled Drag Tests (External Scroll Container)
+
+When testing drag-and-drop after programmatic scroll:
+
+1. **Wrap scroll in `toPass()`** — both the scroll write and read, so the scroll
+   re-applies if content height wasn't ready yet
+2. **Don't use `.task-item:first()` after scrolling** — virtual scroll renders
+   overscan items above the viewport. `.first()` matches an overscan item, and
+   `hover()` scrolls it into view, potentially placing items behind sticky headers
+   where `elementFromPoint()` misses the droppable. Instead, pick items by viewport
+   position (e.g., find the item at the scroll container's vertical center via
+   `page.evaluate`)
+3. **After drag starts, get fresh `boundingBox()`** of target items — positions
+   shift when the dragged item hides (`display: none`) and virtual scroll re-renders
+4. **Use rAF wait** instead of fixed `waitForTimeout()` after mouse moves
+5. **Firefox: follow up stepped moves with direct moves** (E2E.md Rule #6)
+
 ---
 
 ## Component Gotchas

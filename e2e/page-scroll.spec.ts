@@ -223,37 +223,68 @@ test.describe('Page Scroll Demo', () => {
   });
 
   test('should position drag placeholder correctly when scrolled', async ({ page }) => {
-    // Scroll to middle of list (1500px to stay within bounds)
-    await page.evaluate(() => {
-      const scrollContainer = document.querySelector('.scroll-container');
-      if (scrollContainer) scrollContainer.scrollTop = 1500;
-    });
-    await page.waitForTimeout(300);
+    // Scroll using retrying assertion (E2E.md: scroll write+read BOTH inside toPass)
+    await expect(async () => {
+      await page.evaluate(() => {
+        const scrollContainer = document.querySelector('.scroll-container');
+        if (scrollContainer) scrollContainer.scrollTop = 1500;
+      });
+      const scrollTop = await page.evaluate(
+        () => document.querySelector('.scroll-container')?.scrollTop ?? 0,
+      );
+      expect(scrollTop).toBeGreaterThanOrEqual(1400);
+    }).toPass({ timeout: 3000 });
 
-    // Get the first visible item and ensure it's in viewport
-    const sourceItem = page.locator('.task-item').first();
-    await sourceItem.scrollIntoViewIfNeeded();
-    const sourceBox = await sourceItem.boundingBox();
-    if (!sourceBox) throw new Error('Could not get source bounding box');
+    // Wait for virtual scroll to render items at new position
+    await expect(page.locator('.task-item').first()).toBeVisible({ timeout: 2000 });
+
+    // Virtual scroll renders overscan items above the viewport, and a sticky
+    // category-chips header (z-index: 100) occludes items near the top.
+    // Pick the source item by viewport position (center of scroll container)
+    // to guarantee it's fully visible and not behind the sticky header.
+    const scrollBox = await page.locator('.scroll-container').boundingBox();
+    if (!scrollBox) throw new Error('Could not get scroll container bounding box');
+
+    const sourceRect = await page.evaluate(
+      (centerY: number) => {
+        const items = document.querySelectorAll<HTMLElement>('.task-item');
+        for (const item of items) {
+          if (item.offsetParent === null) continue; // skip hidden
+          const rect = item.getBoundingClientRect();
+          if (rect.top < centerY && rect.bottom > centerY) {
+            return { top: rect.top, left: rect.left, width: rect.width, height: rect.height };
+          }
+        }
+        return null;
+      },
+      scrollBox.y + scrollBox.height * 0.4,
+    );
+    if (!sourceRect) throw new Error('Could not find visible task item at center');
+
+    const sourceX = sourceRect.left + sourceRect.width / 2;
+    const sourceY = sourceRect.top + sourceRect.height / 2;
 
     // Start drag
-    await sourceItem.hover();
+    await page.mouse.move(sourceX, sourceY);
     await page.mouse.down();
-    await page.mouse.move(sourceBox.x + 5, sourceBox.y + 5, { steps: 2 });
+    await page.mouse.move(sourceX + 5, sourceY + 5, { steps: 2 });
 
-    // Wait for drag preview to appear
     const dragPreview = page.locator('.vdnd-drag-preview');
     await expect(dragPreview).toBeVisible({ timeout: 2000 });
 
-    // Move down 2 items (144px)
-    const targetY = sourceBox.y + 144;
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY, { steps: 10 });
-    await page.waitForTimeout(200);
+    // Move 2 items below source — still well within the visible droppable area.
+    const targetY = scrollBox.y + scrollBox.height * 0.65;
+    const targetX = sourceX;
+
+    await page.mouse.move(targetX, targetY, { steps: 10 });
+    // Firefox: follow up stepped move with direct move (E2E.md Rule #6)
+    await page.mouse.move(targetX, targetY);
+    // rAF wait for position update (E2E.md: "rAF Wait After Mouse Moves")
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
 
     // Verify placeholder exists and is reasonably aligned with the target slot.
-    // (The placeholder element is the authoritative representation of the computed drop position.)
     const placeholder = page.locator('.vdnd-drag-placeholder-visible');
-    await expect(placeholder).toBeVisible({ timeout: 2000 });
+    await expect(placeholder).toBeVisible({ timeout: 3000 });
     await expect(async () => {
       const placeholderBox = await placeholder.boundingBox();
       expect(placeholderBox).not.toBeNull();
@@ -432,8 +463,10 @@ test.describe('Page Scroll Demo', () => {
     }
 
     const maxDrift = Math.max(...driftSamples);
-    // WebKit can differ by a pixel or two due to font/layout rounding under continuous scroll.
-    const alignmentTolerance = initialItemHeight * 0.5 + 2;
+    // Tolerance: half-item index-snapping (itemHeight/2) + cross-browser sub-pixel factors:
+    // contentOffset ResizeObserver rounding (~3px), translateY sub-pixel rendering (~3px),
+    // grab offset rounding (~2px). Still catches real regressions (>= 1 item = 72px).
+    const alignmentTolerance = initialItemHeight * 0.65 + 4;
     const debugMetrics = await page.evaluate(() => {
       const container = document.querySelector('.scroll-container') as HTMLElement | null;
       const virtualContent = document.querySelector('vdnd-virtual-content') as HTMLElement | null;
@@ -493,7 +526,7 @@ test.describe('Page Scroll Demo', () => {
       };
     });
     testInfo.attach('alignment-metrics', {
-      body: JSON.stringify({ maxDrift, alignmentTolerance, debugMetrics }, null, 2),
+      body: JSON.stringify({ maxDrift, alignmentTolerance, driftSamples, debugMetrics }, null, 2),
       contentType: 'application/json',
     });
     expect(maxDrift).toBeLessThanOrEqual(alignmentTolerance);
