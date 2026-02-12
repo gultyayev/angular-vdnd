@@ -62,8 +62,10 @@ If a helper cannot start the drag (no preview), it should **fail** (don’t swal
 
 Autoscroll is time-based; assertions must tolerate variability:
 
-- Move pointer near the edge, then `expect.poll(scrollTop).toBeGreaterThan(...)`
-- Prefer “scroll changed” and “preview + placeholder stayed aligned” over pixel-perfect checks
+- **Use a consistent edge offset**: A 25px offset from the container edge is the sweet spot for all browsers (deep enough to trigger autoscroll reliably, but safe from the edge). Avoid browser-specific offsets (like 10px vs 20px).
+- **Ensure stable mouse position**: Firefox sometimes fails to register the final position after a stepped `page.mouse.move()`. Always follow up a stepped move with a direct move to the same coordinates: `await page.mouse.move(x, y, { steps: 15 }); await page.mouse.move(x, y);`.
+- **Prefer `toPass()` with descriptive errors**: Wrap autoscroll assertions in `toPass()` with a generous timeout (e.g., 10-15s for long scrolls) and include a custom error message for better CI debugging.
+- Prefer “scroll changed” and “preview + placeholder stayed aligned” over pixel-perfect checks.
 
 ### 7) Long-running “stress” tests should be isolated
 
@@ -197,6 +199,87 @@ Generic drag helpers (like `dragItemToList`) must NOT wait for placeholder
 visibility — empty list targets don't produce placeholders. Use rAF wait
 instead. Only wait for placeholder in inline test code where you know the
 target list has items.
+
+### Content Offset and Cross-Browser Precision
+
+Firefox and WebKit round `borderBoxSize.blockSize` (via `ResizeObserver`) and
+`translateY` sub-pixel values differently than Chromium. This produces ~6-8px
+of additional drift during continuous autoscroll.
+
+For drift tolerance in alignment tests:
+
+- Use `itemHeight * 0.65 + 4` as baseline (not `itemHeight * 0.5 + 2`)
+- This still catches real regressions (off by >= 1 full item)
+- Attach `driftSamples` array to test artifacts for debugging
+
+### Scrolled Drag Tests (External Scroll Container)
+
+When testing drag-and-drop after programmatic scroll:
+
+1. **Wrap scroll in `toPass()`** — both the scroll write and read, so the scroll
+   re-applies if content height wasn't ready yet
+2. **Don't use `.task-item:first()` after scrolling** — virtual scroll renders
+   overscan items above the viewport. `.first()` matches an overscan item, and
+   `hover()` scrolls it into view, potentially placing items behind sticky headers
+   where `elementFromPoint()` misses the droppable. Instead, pick items by viewport
+   position (e.g., find the item at the scroll container's vertical center via
+   `page.evaluate`)
+3. **After drag starts, get fresh `boundingBox()`** of target items — positions
+   shift when the dragged item hides (`display: none`) and virtual scroll re-renders
+4. **Use rAF wait** instead of fixed `waitForTimeout()` after mouse moves
+5. **Firefox: follow up stepped moves with direct moves** (E2E.md Rule #6)
+6. **Avoid `locator.nth(...).hover()` as drag source selection after scroll** —
+   virtual DOM churn can detach or move that node between selection and hover
+   (seen as WebKit `locator.hover` timeout). Prefer atomic source-box selection in
+   `page.evaluate()` and drag by coordinates.
+
+#### Deterministic Source Selection Pattern (Virtual Scroll)
+
+```typescript
+let sourceBox: { x: number; y: number; width: number; height: number } | null = null;
+
+await expect(async () => {
+  sourceBox = await page.evaluate(() => {
+    const container = document.querySelector('.scroll-container') as HTMLElement | null;
+    if (!container) return null;
+
+    const containerRect = container.getBoundingClientRect();
+    const targetY = containerRect.top + containerRect.height * 0.65;
+    const candidates = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-draggable-id], .task-item'),
+    )
+      .map((el) => {
+        const rect = el.getBoundingClientRect();
+        return {
+          centerY: rect.top + rect.height / 2,
+          visible:
+            rect.bottom > containerRect.top + 12 &&
+            rect.top < containerRect.bottom - 12 &&
+            rect.height > 0 &&
+            rect.width > 0,
+          box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+        };
+      })
+      .filter((item) => item.visible)
+      .sort((a, b) => Math.abs(a.centerY - targetY) - Math.abs(b.centerY - targetY));
+
+    return candidates[0]?.box ?? null;
+  });
+
+  expect(sourceBox).not.toBeNull();
+}).toPass({ timeout: 3000 });
+
+if (!sourceBox) throw new Error('Could not get source box');
+
+await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
+await page.mouse.down();
+```
+
+Why this works:
+
+- Captures geometry atomically in one browser evaluation.
+- Uses viewport-visible candidates only (not overscan assumptions).
+- Retries until content is ready (`toPass`) instead of relying on timing sleeps.
 
 ---
 

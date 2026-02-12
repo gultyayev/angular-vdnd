@@ -60,15 +60,25 @@ _All paths relative to `/projects/ngx-virtual-dnd/src/`_
 
 _Plain classes (non-injectable), instantiated by DraggableDirective._
 
+### Strategies
+
+| Strategy              | Path                                        | Purpose                                         |
+| --------------------- | ------------------------------------------- | ----------------------------------------------- |
+| FixedHeightStrategy   | `lib/strategies/fixed-height.strategy.ts`   | Fixed `index * itemHeight` math (zero overhead) |
+| DynamicHeightStrategy | `lib/strategies/dynamic-height.strategy.ts` | HeightCache + prefix sums + binary search       |
+
+_Plain classes implementing `VirtualScrollStrategy` interface (`lib/models/virtual-scroll-strategy.ts`)._
+_`HeightCache` utility: `lib/utils/height-cache.ts`_
+
 ### Directives
 
-| Directive               | Selector          | Key Inputs                                             |
-| ----------------------- | ----------------- | ------------------------------------------------------ |
-| DraggableDirective      | `vdndDraggable`   | ID (required), group, data, disabled                   |
-| DroppableDirective      | `vdndDroppable`   | ID (required), group, data, autoScrollConfig, disabled |
-| DroppableGroupDirective | `vdndGroup`       | group name (required)                                  |
-| ScrollableDirective     | `vdndScrollable`  | scrollContainerId, autoScrollEnabled, autoScrollConfig |
-| VirtualForDirective     | `*vdndVirtualFor` | items, itemHeight, trackBy                             |
+| Directive               | Selector          | Key Inputs                                                 |
+| ----------------------- | ----------------- | ---------------------------------------------------------- |
+| DraggableDirective      | `vdndDraggable`   | ID (required), group, data, disabled                       |
+| DroppableDirective      | `vdndDroppable`   | ID (required), group, data, autoScrollConfig, disabled     |
+| DroppableGroupDirective | `vdndGroup`       | group name (required)                                      |
+| ScrollableDirective     | `vdndScrollable`  | scrollContainerId, autoScrollEnabled, autoScrollConfig     |
+| VirtualForDirective     | `*vdndVirtualFor` | items, itemHeight, trackBy, dynamicItemHeight, droppableId |
 
 ### Components
 
@@ -126,6 +136,7 @@ AutoScrollService → DragStateService, PositionCalculatorService
 | Keyboard drag       | -                               | `keyboard-drag/*.spec.ts` (6 files)                             |
 | Page scroll         | -                               | `page-scroll.spec.ts`                                           |
 | Mobile touch        | -                               | `touch-scroll.mobile.spec.ts`                                   |
+| Dynamic height      | -                               | `dynamic-height.spec.ts`                                        |
 
 ### Public API (from public-api.ts)
 
@@ -136,6 +147,8 @@ AutoScrollService → DragStateService, PositionCalculatorService
 **Tokens:** `VDND_SCROLL_CONTAINER`, `VDND_VIRTUAL_VIEWPORT`
 
 **Constants:** `INITIAL_DRAG_STATE`, `END_OF_LIST`
+
+**Strategies:** `VirtualScrollStrategy` (interface), `FixedHeightStrategy`, `DynamicHeightStrategy`
 
 ## Code Patterns
 

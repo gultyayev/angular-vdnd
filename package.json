@@ -16,7 +16,9 @@
     "storybook": "ng run dnd:storybook",
     "build-storybook": "ng run dnd:build-storybook",
     "release": "node scripts/release.js",
-    "release:dry-run": "node scripts/release.js --dry-run"
+    "release:dry-run": "node scripts/release.js --dry-run",
+    "release:alpha": "node scripts/release.js --pre-release",
+    "release:alpha:dry-run": "node scripts/release.js --pre-release --dry-run"
   },
   "prettier": {
     "printWidth": 100,

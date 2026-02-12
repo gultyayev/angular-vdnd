@@ -1,4 +1,5 @@
 import { InjectionToken } from '@angular/core';
+import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
 
 /**
  * Interface for a virtual viewport that provides wrapper-based positioning.
@@ -30,6 +31,18 @@ export interface VdndVirtualViewport {
    * uses this to position the content wrapper correctly.
    */
   setRenderStartIndex(index: number): void;
+
+  /**
+   * Get the pixel offset for a given item index.
+   * Uses the strategy pattern to support both fixed and dynamic heights.
+   */
+  getOffsetForIndex(index: number): number;
+
+  /**
+   * The virtual scroll strategy used by this viewport.
+   * Available for drag-drop integration and external consumers.
+   */
+  readonly strategy: VirtualScrollStrategy | null;
 }
 
 /**

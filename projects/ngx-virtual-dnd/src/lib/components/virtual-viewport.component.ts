@@ -17,6 +17,9 @@ import {
   bindRafThrottledScrollTopSignal,
   bindResizeObserverHeightSignal,
 } from '../utils/dom-signal-bindings';
+import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
+import { FixedHeightStrategy } from '../strategies/fixed-height.strategy';
+import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
 
 /**
  * A virtual viewport component that provides efficient wrapper-based positioning
@@ -41,32 +44,15 @@ import {
  * ```
  *
  * @example
- * With Ionic (disable Ionic's scroll, use viewport as scroll host):
- * ```html
- * <ion-content [scrollY]="false">
- *   <vdnd-virtual-viewport
- *     class="ion-content-scroll-host"
- *     [itemHeight]="72"
- *     [totalItems]="tasks().length"
- *     style="height: 100%;">
- *     <ng-container *vdndVirtualFor="...">
- *       ...
- *     </ng-container>
- *   </vdnd-virtual-viewport>
- * </ion-content>
- * ```
- *
- * @example
- * With content offset (for headers above the list):
+ * With dynamic item heights:
  * ```html
  * <vdnd-virtual-viewport
  *   [itemHeight]="50"
  *   [totalItems]="items().length"
- *   [contentOffset]="headerHeight()"
- *   style="height: 100%;">
- *   <div class="header" [style.height.px]="headerHeight()">Header</div>
- *   <ng-container *vdndVirtualFor="...">
- *     ...
+ *   [dynamicItemHeight]="true"
+ *   style="height: 400px;">
+ *   <ng-container *vdndVirtualFor="let item of items(); itemHeight: 50; dynamicItemHeight: true; trackBy: trackById">
+ *     <div class="item">{{ item.name }}</div>
  *   </ng-container>
  * </vdnd-virtual-viewport>
  * ```
@@ -142,11 +128,18 @@ export class VirtualViewportComponent
 
   // ========== Inputs ==========
 
-  /** Height of each item in pixels */
+  /** Height of each item in pixels (used as estimate in dynamic mode) */
   itemHeight = input.required<number>();
 
   /** Total number of items */
   totalItems = input.required<number>();
+
+  /**
+   * Enable dynamic item height mode.
+   * When true, items are auto-measured via ResizeObserver and `itemHeight`
+   * serves as the initial estimate for unmeasured items.
+   */
+  dynamicItemHeight = input<boolean>(false);
 
   /** Offset for content below headers (in pixels) */
   contentOffset = input<number>(0);
@@ -160,16 +153,34 @@ export class VirtualViewportComponent
   /** Auto-scroll configuration */
   autoScrollConfig = input<Partial<AutoScrollConfig>>({});
 
+  // ========== Strategy ==========
+
+  /** The virtual scroll strategy, created based on dynamicItemHeight input */
+  readonly #strategy = computed<VirtualScrollStrategy>(() => {
+    const height = this.itemHeight();
+    return this.dynamicItemHeight()
+      ? new DynamicHeightStrategy(height)
+      : new FixedHeightStrategy(height);
+  });
+
+  get strategy(): VirtualScrollStrategy {
+    return this.#strategy();
+  }
+
   // ========== Computed Values ==========
 
   /** Total height of all items (for scroll height) */
-  readonly totalHeight = computed(() => this.totalItems() * this.itemHeight());
+  readonly totalHeight = computed(() => {
+    const s = this.#strategy();
+    return s.getTotalHeight(this.totalItems());
+  });
 
   /** Transform for content wrapper positioning */
   readonly contentTransform = computed(() => {
     const startIndex = this.#renderStartIndex();
-    const itemHeight = this.itemHeight();
-    return `translateY(${startIndex * itemHeight}px)`;
+    const s = this.#strategy();
+    const offset = s.getOffsetForIndex(startIndex);
+    return `translateY(${offset}px)`;
   });
 
   // ========== VdndVirtualViewport Implementation ==========
@@ -192,6 +203,10 @@ export class VirtualViewportComponent
    */
   setRenderStartIndex(index: number): void {
     this.#renderStartIndex.set(index);
+  }
+
+  getOffsetForIndex(index: number): number {
+    return this.#strategy().getOffsetForIndex(index);
   }
 
   // ========== VdndScrollContainer Implementation ==========

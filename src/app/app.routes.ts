@@ -11,4 +11,9 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./page-scroll-demo/page-scroll-demo').then((m) => m.PageScrollDemoComponent),
   },
+  {
+    path: 'dynamic-height',
+    loadComponent: () =>
+      import('./dynamic-height-demo/dynamic-height-demo').then((m) => m.DynamicHeightDemoComponent),
+  },
 ];

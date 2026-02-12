@@ -3,7 +3,7 @@
     <ion-button slot="start" fill="clear" class="back-button" routerLink="/">
       <ion-icon name="arrow-back" slot="icon-only"></ion-icon>
     </ion-button>
-    <ion-title>Task Manager</ion-title>
+    <ion-title>Dynamic Height Tasks</ion-title>
   </ion-toolbar>
 </ion-header>
 
@@ -18,8 +18,8 @@
           <ion-button fill="clear" class="close-btn" (click)="dismissBanner()">
             <ion-icon name="close" slot="icon-only"></ion-icon>
           </ion-button>
-          <h2>Welcome Back!</h2>
-          <p>You have {{ filteredTasks().length }} tasks to complete</p>
+          <h2>Variable Heights</h2>
+          <p>Items have different heights based on their description length</p>
         </div>
       }
 
@@ -39,7 +39,8 @@
     <div vdndGroup="tasks">
       <vdnd-virtual-content
         class="virtual-list-wrapper"
-        [itemHeight]="itemHeight"
+        [itemHeight]="estimatedItemHeight"
+        [dynamicItemHeight]="true"
         [totalItems]="filteredTasks().length"
         [contentOffset]="headerHeight()"
         vdndDroppable="tasks"
@@ -48,20 +49,24 @@
         <ng-container
           *vdndVirtualFor="
             let task of filteredTasks();
-            itemHeight: itemHeight;
+            itemHeight: estimatedItemHeight;
+            dynamicItemHeight: true;
             trackBy: trackById;
             droppableId: 'tasks'
           "
         >
           <div class="task-item" [vdndDraggable]="task.id">
             <ion-icon name="reorder-three" class="drag-handle"></ion-icon>
-            <ion-checkbox [checked]="task.done" (ionChange)="toggleTask(task)"></ion-checkbox>
-            <span class="task-title" [class.done]="task.done">
-              {{ task.title }}
-            </span>
-            <ion-badge [color]="getBadgeColor(task.category)">
-              {{ task.category }}
-            </ion-badge>
+            <div class="task-content">
+              <div class="task-header">
+                <ion-checkbox [checked]="task.done" (ionChange)="toggleTask(task)"></ion-checkbox>
+                <span class="task-title" [class.done]="task.done">{{ task.title }}</span>
+                <ion-badge [color]="getBadgeColor(task.category)">{{ task.category }}</ion-badge>
+              </div>
+              @if (task.description) {
+                <p class="task-description">{{ task.description }}</p>
+              }
+            </div>
           </div>
         </ng-container>
       </vdnd-virtual-content>
@@ -90,8 +95,10 @@
       "
     >
       <ion-icon name="reorder-three" class="drag-handle"></ion-icon>
-      <span class="task-title">{{ item.title }}</span>
-      <ion-badge [color]="getBadgeColor(item.category)">{{ item.category }}</ion-badge>
+      <div class="task-content">
+        <span class="task-title">{{ item.title }}</span>
+        <ion-badge [color]="getBadgeColor(item.category)">{{ item.category }}</ion-badge>
+      </div>
     </div>
   </ng-template>
 </vdnd-drag-preview>

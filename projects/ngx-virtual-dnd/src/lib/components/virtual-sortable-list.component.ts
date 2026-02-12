@@ -72,6 +72,7 @@ import {
       <vdnd-virtual-scroll
         [items]="items()"
         [itemHeight]="itemHeight()"
+        [dynamicItemHeight]="dynamicItemHeight()"
         [itemIdFn]="itemIdFn()"
         [trackByFn]="trackByFn()"
         [itemTemplate]="itemTemplate()"
@@ -105,8 +106,15 @@ export class VirtualSortableListComponent<T> {
   /** Array of items to render */
   items = input.required<T[]>();
 
-  /** Height of each item in pixels */
+  /** Height of each item in pixels (used as estimate in dynamic mode) */
   itemHeight = input.required<number>();
+
+  /**
+   * Enable dynamic item height mode.
+   * When true, items are auto-measured via ResizeObserver and `itemHeight`
+   * serves as the initial estimate for unmeasured items.
+   */
+  dynamicItemHeight = input<boolean>(false);
 
   /** Function to get a unique ID from an item */
   itemIdFn = input.required<(item: T) => string>();

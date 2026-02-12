@@ -19,11 +19,15 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import { DragStateService } from '../services/drag-state.service';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
+import { DragIndexCalculatorService } from '../services/drag-index-calculator.service';
 import { DragPlaceholderComponent } from './drag-placeholder.component';
 import {
   bindRafThrottledScrollTopSignal,
   bindResizeObserverHeightSignal,
 } from '../utils/dom-signal-bindings';
+import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
+import { FixedHeightStrategy } from '../strategies/fixed-height.strategy';
+import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
 
 /**
  * Context provided to the item template.
@@ -54,10 +58,11 @@ export interface VisibleRangeChange {
  * - Uses spacer divs to maintain correct scroll height
  * - Integrates with the drag-and-drop system
  * - Automatic height detection via ResizeObserver when containerHeight is not provided
+ * - Supports dynamic item heights via `dynamicItemHeight` input
  *
  * @example
  * ```html
- * <!-- With explicit height -->
+ * <!-- With fixed height items -->
  * <vdnd-virtual-scroll
  *   [items]="items()"
  *   [itemHeight]="50"
@@ -68,14 +73,15 @@ export interface VisibleRangeChange {
  *   </ng-template>
  * </vdnd-virtual-scroll>
  *
- * <!-- With CSS-based height (auto-detected) -->
+ * <!-- With dynamic height items -->
  * <vdnd-virtual-scroll
- *   style="height: 100%"
  *   [items]="items()"
  *   [itemHeight]="50"
+ *   [dynamicItemHeight]="true"
+ *   [containerHeight]="400"
  *   [trackByFn]="trackById">
  *   <ng-template let-item let-index="index">
- *     <div class="item">{{ item.name }}</div>
+ *     <div class="item">{{ item.description }}</div>
  *   </ng-template>
  * </vdnd-virtual-scroll>
  * ```
@@ -90,6 +96,7 @@ export interface VisibleRangeChange {
     '[style.overflow]': '"auto"',
     '[style.position]': '"relative"',
     '[attr.data-item-height]': 'itemHeight()',
+    '[attr.data-total-items]': 'items().length',
   },
   template: `
     <div class="vdnd-virtual-scroll-content">
@@ -100,7 +107,7 @@ export interface VisibleRangeChange {
       <div class="vdnd-virtual-scroll-content-wrapper" [style.transform]="contentTransform()">
         @for (entry of renderedItems(); track trackEntry($index, entry)) {
           @if (entry.type === 'placeholder') {
-            <vdnd-drag-placeholder [itemHeight]="itemHeight()" />
+            <vdnd-drag-placeholder [itemHeight]="placeholderHeight()" />
           } @else {
             <ng-container
               *ngTemplateOutlet="
@@ -156,12 +163,19 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   readonly #dragState = inject(DragStateService);
   readonly #elementRef = inject(ElementRef<HTMLElement>);
   readonly #autoScrollService = inject(AutoScrollService);
+  readonly #dragIndexCalculator = inject(DragIndexCalculatorService);
   readonly #ngZone = inject(NgZone);
   readonly #injector = inject(Injector);
 
   /** Cleanup function for scroll listener */
   #scrollCleanup: (() => void) | null = null;
   #resizeCleanup: (() => void) | null = null;
+
+  /** ResizeObserver for dynamic height measurement */
+  #itemResizeObserver: ResizeObserver | null = null;
+
+  /** Map from observed HTMLElement to its trackBy key */
+  readonly #observedElements = new WeakMap<HTMLElement, unknown>();
 
   /** Measured height from ResizeObserver (used when containerHeight is not provided) */
   readonly #measuredHeight = signal(0);
@@ -181,8 +195,15 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   /** Array of items to render */
   items = input.required<T[]>();
 
-  /** Height of each item in pixels */
+  /** Height of each item in pixels (used as estimate in dynamic mode) */
   itemHeight = input.required<number>();
+
+  /**
+   * Enable dynamic item height mode.
+   * When true, items are auto-measured via ResizeObserver and `itemHeight`
+   * serves as the initial estimate for unmeasured items.
+   */
+  dynamicItemHeight = input<boolean>(false);
 
   /**
    * Height of the container in pixels.
@@ -225,6 +246,16 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
    * @default true
    */
   autoStickyDraggedItem = input<boolean>(true);
+
+  // ========== Strategy ==========
+
+  /** The virtual scroll strategy, created based on dynamicItemHeight input */
+  readonly #strategy = computed<VirtualScrollStrategy>(() => {
+    const height = this.itemHeight();
+    return this.dynamicItemHeight()
+      ? new DynamicHeightStrategy(height)
+      : new FixedHeightStrategy(height);
+  });
 
   /**
    * Effective track-by function - uses provided trackByFn or derives from itemIdFn.
@@ -286,24 +317,24 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   /** Total height of all items (for scrollbar) */
   protected readonly totalHeight = computed(() => {
     const count = this.items().length;
-    const draggedId = this.draggedItemId();
-    // Only subtract 1 if the dragged item belongs to THIS list (is in our items array).
-    // Cross-list drags shouldn't affect the target list's height.
-    const isDraggedItemInThisList = draggedId !== null && this.#itemIndexMap().has(draggedId);
-    const effectiveCount = isDraggedItemInThisList ? count - 1 : count;
-    return effectiveCount * this.itemHeight();
+    const strategy = this.#strategy();
+    strategy.version();
+    return strategy.getTotalHeight(count);
   });
 
   /** First visible item index */
   readonly #firstVisibleIndex = computed(() => {
-    return Math.floor(this.#scrollTop() / this.itemHeight());
+    const strategy = this.#strategy();
+    strategy.version();
+    return strategy.getFirstVisibleIndex(this.#scrollTop());
   });
 
   /** Number of items visible in the viewport */
   readonly #visibleCount = computed(() => {
     const height = this.effectiveHeight();
-    if (height <= 0) return 0;
-    return Math.ceil(height / this.itemHeight());
+    const strategy = this.#strategy();
+    strategy.version();
+    return strategy.getVisibleCount(this.#firstVisibleIndex(), height);
   });
 
   /** Range of items to render (with overscan) */
@@ -322,10 +353,10 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   /** Transform offset for content wrapper (position of first rendered item) */
   protected readonly contentTransform = computed(() => {
     const { start } = this.#renderRange();
-    const draggedIndex = this.#draggedItemIndex();
-    // If dragged item is in the unrendered top section, subtract 1 (it's position:absolute)
-    const adjustment = draggedIndex >= 0 && draggedIndex < start ? 1 : 0;
-    const offset = Math.max(0, start - adjustment) * this.itemHeight();
+    const strategy = this.#strategy();
+    strategy.version();
+
+    const offset = strategy.getOffsetForIndex(start);
     return `translateY(${offset}px)`;
   });
 
@@ -365,6 +396,15 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   protected readonly placeholderIndex = computed(() => {
     if (!this.shouldShowPlaceholder()) return -1;
     return this.#dragState.placeholderIndex() ?? -1;
+  });
+
+  /** Height for the placeholder — use dragged item's actual height in dynamic mode */
+  protected readonly placeholderHeight = computed(() => {
+    if (this.dynamicItemHeight()) {
+      const draggedItemHeight = this.#dragState.draggedItem()?.height;
+      if (draggedItemHeight && draggedItemHeight > 0) return draggedItemHeight;
+    }
+    return this.itemHeight();
   });
 
   /** Items to render, including sticky items and placeholder */
@@ -458,7 +498,35 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   /** Track previous dragged ID to detect drag end */
   #previousDraggedId: string | null = null;
 
+  /** Track previous total height to detect if we were at bottom before drag ended */
+  #previousTotalHeight = 0;
+
   constructor() {
+    // Keep strategy item keys in sync
+    effect(() => {
+      const items = this.items();
+      const idFn = this.itemIdFn();
+      const keys = items.map((item) => idFn(item));
+      this.#strategy().setItemKeys(keys);
+    });
+
+    // Register strategy with drag index calculator for accurate drag calculations
+    effect((onCleanup) => {
+      const droppableId = this.droppableId();
+      const strategy = this.#strategy();
+      if (droppableId) {
+        this.#dragIndexCalculator.registerStrategy(droppableId, strategy);
+        onCleanup(() => this.#dragIndexCalculator.unregisterStrategy(droppableId));
+      }
+    });
+
+    // Set excluded index persistently during same-list drag.
+    effect(() => {
+      const strategy = this.#strategy();
+      const draggedIndex = this.#draggedItemIndex();
+      strategy.setExcludedIndex(draggedIndex >= 0 ? draggedIndex : null);
+    });
+
     // Emit visible range changes
     effect(() => {
       const range = this.#renderRange();
@@ -475,16 +543,17 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
       const targetIndex = this.#dragState.keyboardTargetIndex();
       if (targetIndex === null) return;
 
-      const itemHeight = this.itemHeight();
+      const strategy = this.#strategy();
+      strategy.version();
       const height = this.effectiveHeight();
       if (height <= 0) return;
 
       const element = this.#elementRef.nativeElement;
       const currentScrollTop = element.scrollTop;
 
-      // Calculate target item position
-      const targetTop = targetIndex * itemHeight;
-      const targetBottom = targetTop + itemHeight;
+      // Calculate target item position using strategy
+      const targetTop = strategy.getOffsetForIndex(targetIndex);
+      const targetBottom = targetTop + strategy.getItemHeight(targetIndex);
 
       // Calculate visible range
       const viewportTop = currentScrollTop;
@@ -503,30 +572,37 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
       }
     });
 
-    // Preserve scroll position when drag ends at bottom of list
-    // During drag, totalHeight is reduced by 1 item (dragged item is hidden)
-    // When drag ends, totalHeight increases - we need to adjust scroll if we were at bottom
+    // Preserve scroll position when drag ends at bottom of list.
+    // Safety net: totalHeight no longer shrinks during drag (getTotalHeight
+    // ignores exclusion), but this logic remains as harmless protection
+    // in case future changes reintroduce height variance.
     effect(() => {
       const currentDraggedId = this.draggedItemId();
+      const currentTotalHeight = this.totalHeight();
       const element = this.#elementRef.nativeElement;
 
       // Detect drag end (was dragging, now not)
       if (this.#previousDraggedId !== null && currentDraggedId === null) {
         const currentScrollTop = element.scrollTop;
-        const itemHeight = this.itemHeight();
+        const strategy = this.#strategy();
+        strategy.version();
         const height = this.effectiveHeight();
         const totalItems = this.items().length;
 
         // Calculate if we were at/near bottom (within 10px tolerance)
-        // During drag, max scroll was (totalItems - 1) * itemHeight - height
-        const dragReducedMaxScroll = (totalItems - 1) * itemHeight - height;
+        // using the height FROM THE PREVIOUS CYCLE (when dragging was active)
+        const dragReducedMaxScroll = Math.max(0, this.#previousTotalHeight - height);
         const wasAtBottom = currentScrollTop >= dragReducedMaxScroll - 10;
 
         if (wasAtBottom && dragReducedMaxScroll > 0) {
+          // Clear exclusion before calculating new height
+          strategy.setExcludedIndex(null);
+
           // Adjust scroll to new bottom position after totalHeight increases
           afterNextRender(
             () => {
-              const newMaxScroll = Math.max(0, totalItems * itemHeight - height);
+              const newTotalHeight = strategy.getTotalHeight(totalItems);
+              const newMaxScroll = Math.max(0, newTotalHeight - height);
               element.scrollTop = newMaxScroll;
               this.#scrollTop.set(newMaxScroll);
             },
@@ -536,6 +612,28 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
       }
 
       this.#previousDraggedId = currentDraggedId;
+      this.#previousTotalHeight = currentTotalHeight;
+    });
+
+    // Clamp scrollTop during drag if totalHeight ever shrinks.
+    // With the current fix, getTotalHeight no longer excludes the dragged item,
+    // so this is effectively a no-op. Kept as a safety net.
+    effect(() => {
+      const isDragging = this.#dragState.isDragging();
+      const totalHeight = this.totalHeight();
+      const element = this.#elementRef.nativeElement;
+
+      if (isDragging) {
+        const containerHeight = this.effectiveHeight();
+        const maxScroll = Math.max(0, totalHeight - containerHeight);
+        const currentScrollTop = element.scrollTop;
+
+        // Clamp scrollTop to valid range
+        if (currentScrollTop > maxScroll) {
+          element.scrollTop = maxScroll;
+          this.#scrollTop.set(maxScroll);
+        }
+      }
     });
   }
 
@@ -548,6 +646,11 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
         this.#elementRef.nativeElement,
         this.autoScrollConfig(),
       );
+    }
+
+    // Set up ResizeObserver for dynamic height measurement
+    if (this.dynamicItemHeight()) {
+      this.#setupItemResizeObserver();
     }
   }
 
@@ -572,15 +675,79 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
         this.scrollPositionChange.emit(newScrollTop);
       },
     });
+
+    // Observe rendered items for dynamic height measurement
+    if (this.dynamicItemHeight()) {
+      this.#observeRenderedItems();
+    }
   }
 
   ngOnDestroy(): void {
     this.#scrollCleanup?.();
     this.#resizeCleanup?.();
+    this.#itemResizeObserver?.disconnect();
 
     // Unregister from auto-scroll service
     const id = this.scrollContainerId() ?? this.#generatedScrollId;
     this.#autoScrollService.unregisterContainer(id);
+  }
+
+  /**
+   * Set up ResizeObserver for measuring individual item heights.
+   */
+  #setupItemResizeObserver(): void {
+    this.#ngZone.runOutsideAngular(() => {
+      this.#itemResizeObserver = new ResizeObserver((entries) => {
+        const strategy = this.#strategy();
+        for (const entry of entries) {
+          const element = entry.target as HTMLElement;
+          const key = this.#observedElements.get(element);
+          if (key === undefined) continue;
+
+          const height = entry.borderBoxSize?.[0]?.blockSize ?? element.offsetHeight;
+          if (height > 0) {
+            strategy.setMeasuredHeight(key, height);
+          }
+        }
+      });
+    });
+  }
+
+  /**
+   * Observe currently rendered items' DOM elements for height changes.
+   * Called after view init and on each render cycle in dynamic mode.
+   */
+  #observeRenderedItems(): void {
+    if (!this.#itemResizeObserver) return;
+
+    // Use an effect to re-observe whenever rendered items change
+    effect(
+      () => {
+        const rendered = this.renderedItems();
+        const idFn = this.itemIdFn();
+        const observer = this.#itemResizeObserver;
+        if (!observer) return;
+
+        // Find the content wrapper and observe item elements
+        const wrapper = this.#elementRef.nativeElement.querySelector(
+          '.vdnd-virtual-scroll-content-wrapper',
+        );
+        if (!wrapper) return;
+
+        for (const entry of rendered) {
+          if (entry.type !== 'item' || !entry.data) continue;
+          const key = idFn(entry.data);
+
+          // Find the DOM element for this item by its data-draggable-id
+          const el = wrapper.querySelector(`[data-draggable-id="${key}"]`) as HTMLElement | null;
+          if (el && !this.#observedElements.has(el)) {
+            this.#observedElements.set(el, key);
+            observer.observe(el);
+          }
+        }
+      },
+      { injector: this.#injector },
+    );
   }
 
   /**
@@ -595,7 +762,8 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
    * Scroll to a specific item index.
    */
   scrollToIndex(index: number): void {
-    const position = index * this.itemHeight();
+    const strategy = this.#strategy();
+    const position = strategy.getOffsetForIndex(index);
     this.scrollTo(position);
   }
 

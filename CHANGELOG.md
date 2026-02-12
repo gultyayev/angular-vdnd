@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.3.0-alpha.1](https://github.com/gultyayev/angular-vdnd/compare/v1.3.0-alpha.0...v1.3.0-alpha.1) (2026-02-12)
+
+### Bug Fixes
+
+- fix e2e ([0d9e468](https://github.com/gultyayev/angular-vdnd/commit/0d9e4684d31c27cc8daaf8f70999c8750c9ddea6))
+- fix gaps ([2b352ec](https://github.com/gultyayev/angular-vdnd/commit/2b352ec982e8e9f1c8c1de08c35b393b87c8b518))
+- fix height shrinkage ([d9030e5](https://github.com/gultyayev/angular-vdnd/commit/d9030e5a7fd5707f9db8a3ade90aa6293c8f9b68))
+
+## [1.3.0-alpha.0](https://github.com/gultyayev/angular-vdnd/compare/v1.2.3...v1.3.0-alpha.0) (2026-02-11)
+
+### Features
+
+- **lib:** add dynamic item height support for virtual scroll ([5678c3c](https://github.com/gultyayev/angular-vdnd/commit/5678c3c3fa60b5202c77a2c1c3f8b0c08528b7ae))
+
+### Bug Fixes
+
+- **lib:** don't print warnings in prod mode ([d987c96](https://github.com/gultyayev/angular-vdnd/commit/d987c96bbd98c8ae0a5d94c9668d02a6e06f7792))
+- **lib:** fix scroll with drag in dynamic height ([871f9b4](https://github.com/gultyayev/angular-vdnd/commit/871f9b4e99bfd7b1c40264506e38eb9517cbcfb2))
+
 ## [1.2.3](https://github.com/gultyayev/angular-vdnd/compare/v1.2.2...v1.2.3) (2026-02-06)
 
 ### Bug Fixes

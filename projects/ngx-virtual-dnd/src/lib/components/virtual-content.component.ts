@@ -9,6 +9,9 @@ import {
 } from '@angular/core';
 import { VDND_VIRTUAL_VIEWPORT, VdndVirtualViewport } from '../tokens/virtual-viewport.token';
 import { VDND_SCROLL_CONTAINER, VdndScrollContainer } from '../tokens/scroll-container.token';
+import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
+import { FixedHeightStrategy } from '../strategies/fixed-height.strategy';
+import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
 
 /**
  * A virtual content component that provides wrapper-based positioning
@@ -40,25 +43,6 @@ import { VDND_SCROLL_CONTAINER, VdndScrollContainer } from '../tokens/scroll-con
  *   <div class="footer">Load more</div>
  * </div>
  * ```
- *
- * @example
- * With Ionic:
- * ```html
- * <ion-content [scrollY]="false">
- *   <div class="scroll-container ion-content-scroll-host" vdndScrollable>
- *     <div class="page-header" #header>...</div>
- *
- *     <vdnd-virtual-content
- *       [itemHeight]="72"
- *       [totalItems]="tasks().length"
- *       [contentOffset]="headerHeight()">
- *       <ng-container *vdndVirtualFor="...">...</ng-container>
- *     </vdnd-virtual-content>
- *
- *     <div class="footer">...</div>
- *   </div>
- * </ion-content>
- * ```
  */
 @Component({
   selector: 'vdnd-virtual-content',
@@ -71,8 +55,10 @@ import { VDND_SCROLL_CONTAINER, VdndScrollContainer } from '../tokens/scroll-con
     class: 'vdnd-virtual-content',
     '[style.display]': '"block"',
     '[style.position]': '"relative"',
+    '[style.height.px]': 'totalHeight()',
     '[attr.data-content-offset]': 'contentOffset()',
     '[attr.data-item-height]': 'itemHeight()',
+    '[attr.data-total-items]': 'totalItems()',
   },
   template: `
     <!-- Spacer maintains scroll height for the virtual list portion -->
@@ -112,7 +98,7 @@ export class VirtualContentComponent implements VdndVirtualViewport, VdndScrollC
 
   // ========== Inputs ==========
 
-  /** Height of each item in pixels */
+  /** Height of each item in pixels (used as estimate in dynamic mode) */
   itemHeight = input.required<number>();
 
   /** Total number of items */
@@ -120,6 +106,13 @@ export class VirtualContentComponent implements VdndVirtualViewport, VdndScrollC
 
   /** Offset for content above the virtual list (e.g., header height) */
   contentOffset = input<number>(0);
+
+  /**
+   * Enable dynamic item height mode.
+   * When true, items are auto-measured via ResizeObserver and `itemHeight`
+   * serves as the initial estimate for unmeasured items.
+   */
+  dynamicItemHeight = input<boolean>(false);
 
   // ========== Internal State ==========
 
@@ -129,10 +122,27 @@ export class VirtualContentComponent implements VdndVirtualViewport, VdndScrollC
    */
   readonly #renderStartIndex = signal(0);
 
+  // ========== Strategy ==========
+
+  /** The virtual scroll strategy, created based on dynamicItemHeight input */
+  readonly #strategy = computed<VirtualScrollStrategy>(() => {
+    const height = this.itemHeight();
+    return this.dynamicItemHeight()
+      ? new DynamicHeightStrategy(height)
+      : new FixedHeightStrategy(height);
+  });
+
+  get strategy(): VirtualScrollStrategy {
+    return this.#strategy();
+  }
+
   // ========== Computed Values ==========
 
   /** Total height of all items (for scroll height) */
-  readonly totalHeight = computed(() => this.totalItems() * this.itemHeight());
+  readonly totalHeight = computed(() => {
+    const s = this.#strategy();
+    return s.getTotalHeight(this.totalItems());
+  });
 
   /**
    * Adjusted scroll position - subtracts the content offset so the virtual scroll
@@ -145,8 +155,9 @@ export class VirtualContentComponent implements VdndVirtualViewport, VdndScrollC
   /** Transform for content wrapper positioning */
   readonly contentTransform = computed(() => {
     const startIndex = this.#renderStartIndex();
-    const itemHeight = this.itemHeight();
-    return `translateY(${startIndex * itemHeight}px)`;
+    const s = this.#strategy();
+    const offset = s.getOffsetForIndex(startIndex);
+    return `translateY(${offset}px)`;
   });
 
   // ========== VdndVirtualViewport Implementation ==========
@@ -170,6 +181,10 @@ export class VirtualContentComponent implements VdndVirtualViewport, VdndScrollC
    */
   setRenderStartIndex(index: number): void {
     this.#renderStartIndex.set(index);
+  }
+
+  getOffsetForIndex(index: number): number {
+    return this.#strategy().getOffsetForIndex(index);
   }
 
   // ========== VdndScrollContainer Implementation ==========

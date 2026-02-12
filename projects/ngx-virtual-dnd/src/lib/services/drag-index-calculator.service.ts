@@ -1,12 +1,39 @@
 import { inject, Injectable } from '@angular/core';
 import { type CursorPosition, END_OF_LIST, type GrabOffset } from '../models/drag-drop.models';
 import { PositionCalculatorService } from './position-calculator.service';
+import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
 
 @Injectable({
   providedIn: 'root',
 })
 export class DragIndexCalculatorService {
   readonly #positionCalculator = inject(PositionCalculatorService);
+
+  /** Registered strategies by droppable ID */
+  readonly #strategies = new Map<string, VirtualScrollStrategy>();
+
+  /**
+   * Register a virtual scroll strategy for a droppable.
+   * Used by virtual scroll components to provide dynamic height lookups.
+   */
+  registerStrategy(droppableId: string, strategy: VirtualScrollStrategy): void {
+    this.#strategies.set(droppableId, strategy);
+  }
+
+  /**
+   * Unregister a strategy when the droppable is destroyed.
+   */
+  unregisterStrategy(droppableId: string): void {
+    this.#strategies.delete(droppableId);
+  }
+
+  /**
+   * Get the registered strategy for a droppable ID.
+   * Used by draggable to calculate source index with variable heights.
+   */
+  getStrategyForDroppable(droppableId: string): VirtualScrollStrategy | undefined {
+    return this.#strategies.get(droppableId);
+  }
 
   getTotalItemCount(args: {
     droppableElement: HTMLElement;
@@ -73,6 +100,10 @@ export class DragIndexCalculatorService {
       currentScrollTop = container.scrollTop;
     }
 
+    // Check if a registered strategy exists for this droppable
+    const currentDroppableId = this.#positionCalculator.getDroppableId(droppableElement);
+    const strategy = currentDroppableId ? this.#strategies.get(currentDroppableId) : null;
+
     // Prefer configured item height from virtual scroll/content over actual element height.
     // This prevents drift when actual element height differs from grid spacing.
     const configuredHeight =
@@ -85,23 +116,34 @@ export class DragIndexCalculatorService {
 
     // Calculate preview center position mathematically
     // The preview is positioned at: cursorPosition - grabOffset (see drag-preview.component.ts)
-    // So preview center = cursorPosition.y - grabOffset.y + itemHeight/2
+    // So preview center = cursorPosition.y - grabOffset.y + previewHeight/2
     // Using math avoids Safari's stale getBoundingClientRect() issue during autoscroll
-    const previewCenterY = position.y - (grabOffset?.y ?? 0) + itemHeight / 2;
+    // Use actual dragged item height when available (important for dynamic heights)
+    const previewHeight = this.#getDraggedItemHeightFallback(draggedItemHeight, itemHeight);
+    const previewCenterY = position.y - (grabOffset?.y ?? 0) + previewHeight / 2;
 
-    // Convert to visual index (which slot the preview center is in)
+    // Convert to visual index
     const relativeY = previewCenterY - rect.top + currentScrollTop;
-    const visualIndex = Math.floor(relativeY / itemHeight);
 
-    // Check if same-list drag
-    const currentDroppableId = this.#positionCalculator.getDroppableId(droppableElement);
+    // Determine same-list drag info before strategy branch
     const isSameList = sourceDroppableId !== null && sourceDroppableId === currentDroppableId;
-
-    // Same-list adjustment: if pointing at or after source position, add 1
-    // This accounts for the hidden item shifting everything up visually
-    let placeholderIndex = visualIndex;
     const sourceIndexValue = isSameList ? (sourceIndex ?? -1) : -1;
-    if (isSameList && sourceIndexValue >= 0 && visualIndex >= sourceIndexValue) {
+
+    let visualIndex: number;
+    if (strategy) {
+      // Excluded index is set persistently by VirtualForDirective's effect,
+      // so findIndexAtOffset already skips the hidden dragged item.
+      visualIndex = strategy.findIndexAtOffset(relativeY);
+    } else {
+      // Fixed height: simple division
+      visualIndex = Math.floor(relativeY / itemHeight);
+    }
+
+    // Same-list +1 adjustment: only for the non-strategy path.
+    // When a strategy is used, findIndexAtOffset already accounts for the
+    // hidden item via setExcludedIndex, so +1 would double-count.
+    let placeholderIndex = visualIndex;
+    if (!strategy && isSameList && sourceIndexValue >= 0 && visualIndex >= sourceIndexValue) {
       placeholderIndex = visualIndex + 1;
     }
 
@@ -129,10 +171,23 @@ export class DragIndexCalculatorService {
     isSameList: boolean,
     draggedItemHeight: number,
   ): number {
+    // Check if a registered strategy exists
+    const droppableId = this.#positionCalculator.getDroppableId(droppableElement);
+    const strategy = droppableId ? this.#strategies.get(droppableId) : null;
+
     // Check for embedded virtual scroll component
     const virtualScroll = droppableElement.querySelector('vdnd-virtual-scroll');
     if (virtualScroll) {
-      // Use the spacer's height, NOT scrollHeight, to determine item count.
+      // Use data-total-items attribute if available (always the true N)
+      const totalItemsAttr = virtualScroll.getAttribute('data-total-items');
+      if (totalItemsAttr) {
+        const count = parseInt(totalItemsAttr, 10);
+        if (Number.isFinite(count)) {
+          return count;
+        }
+      }
+
+      // Fallback: Use the spacer's height, NOT scrollHeight, to determine item count.
       // scrollHeight can be inflated by absolutely-positioned elements like the placeholder.
       const spacer = virtualScroll.querySelector(
         '.vdnd-virtual-scroll-spacer',
@@ -151,10 +206,16 @@ export class DragIndexCalculatorService {
         totalHeight = (virtualScroll as HTMLElement).scrollHeight;
       }
 
-      // When same-list, spacer height reflects N-1 items (one is hidden)
-      // Add 1 back to get true total
+      // When strategy exists, spacer height already accounts for exclusion
+      // Don't apply same-list +1 adjustment — strategy handles it
+      if (strategy) {
+        const count = Math.round(totalHeight / itemHeight);
+        return count;
+      }
+
+      // Spacer height reflects full N items (getTotalHeight no longer excludes)
       const count = Math.floor(totalHeight / itemHeight);
-      return isSameList ? count + 1 : count;
+      return count;
     }
 
     // Check for page-level scroll (vdnd-virtual-content)
@@ -162,7 +223,17 @@ export class DragIndexCalculatorService {
       ? droppableElement
       : droppableElement.closest('vdnd-virtual-content');
     if (virtualContent) {
-      // Use spacer height to determine total items
+      // Prefer explicit total items attribute (works for both fixed and dynamic heights)
+      const totalItemsAttr = (virtualContent as HTMLElement).getAttribute('data-total-items');
+      if (totalItemsAttr) {
+        const count = parseInt(totalItemsAttr, 10);
+        if (Number.isFinite(count)) {
+          // data-total-items is always the true total N (from totalItems input)
+          return count;
+        }
+      }
+
+      // Fallback: use spacer height to determine total items
       const spacer = virtualContent.querySelector('.vdnd-content-spacer') as HTMLElement | null;
       if (spacer) {
         const totalHeight = parseFloat(spacer.style.height) || 0;
@@ -170,14 +241,14 @@ export class DragIndexCalculatorService {
         const itemHeight = configuredHeight
           ? parseInt(configuredHeight, 10)
           : this.#getDraggedItemHeightFallback(draggedItemHeight, 72);
-        const count = Math.floor(totalHeight / itemHeight);
-        return isSameList ? count + 1 : count;
+        return Math.floor(totalHeight / itemHeight);
       }
     }
 
-    // Fallback for non-virtual scroll
+    // Fallback for non-virtual scroll — querySelectorAll finds all N items
+    // (including the hidden dragged item), so no adjustment needed
     const items = droppableElement.querySelectorAll('[data-draggable-id]');
-    return items.length + (isSameList ? 1 : 0);
+    return items.length;
   }
 
   #getDraggedItemHeightFallback(height: number, fallback: number): number {

@@ -7,6 +7,7 @@ Inspired by [react-virtualized-dnd](https://github.com/forecast-it/react-virtual
 ## Features
 
 - **Virtual Scrolling** - Renders only visible items plus overscan buffer
+- **Dynamic Item Heights** - Auto-measured via ResizeObserver with O(log N) lookups
 - **Smooth Drag & Drop** - 60fps with RAF throttling
 - **Cross-List Support** - Drag between multiple lists with group filtering
 - **Auto-Scroll** - Scrolls when dragging near container edges
@@ -128,7 +129,68 @@ The library exports these main pieces (use IDE completion for full details):
 - `isNoOpDrop()` - Check if drop would be a no-op
 - `insertAt()` / `removeAt()` - Low-level array helpers
 
+**Strategies:**
+
+- `VirtualScrollStrategy` - Interface for custom virtual scroll strategies
+- `FixedHeightStrategy` - Fixed `index * itemHeight` math (zero overhead)
+- `DynamicHeightStrategy` - Variable heights with auto-measurement and binary search
+
 ## Advanced Usage
+
+### Dynamic Item Heights
+
+When items have variable heights, enable `dynamicItemHeight`. Items are auto-measured via ResizeObserver — no manual height tracking needed. The `itemHeight` value serves as the initial estimate for unmeasured items.
+
+**With `VirtualSortableListComponent`:**
+
+```html
+<vdnd-sortable-list
+  droppableId="list-1"
+  group="my-group"
+  [items]="list()"
+  [itemHeight]="80"
+  [dynamicItemHeight]="true"
+  [itemIdFn]="getItemId"
+  [itemTemplate]="itemTpl"
+  (drop)="onDrop($event)"
+/>
+```
+
+**With `VirtualScrollContainerComponent`:**
+
+```html
+<vdnd-virtual-scroll
+  [items]="items()"
+  [itemHeight]="80"
+  [dynamicItemHeight]="true"
+  [itemIdFn]="getItemId"
+  [trackByFn]="trackById"
+  [itemTemplate]="itemTpl"
+/>
+```
+
+**With `VirtualForDirective`:**
+
+```html
+<ng-container
+  *vdndVirtualFor="
+    let item of items();
+    itemHeight: 80;
+    dynamicItemHeight: true;
+    trackBy: trackById;
+    droppableId: 'list-1'
+  "
+>
+  <div class="item">{{ item.description }}</div>
+</ng-container>
+```
+
+How it works:
+
+- `FixedHeightStrategy` is used by default — simple `index * itemHeight` math with zero overhead
+- Setting `dynamicItemHeight` switches to `DynamicHeightStrategy`, which uses a height cache with prefix-sum offsets and binary search for O(log N) scroll-to-index lookups
+- Heights are tracked by `trackBy` key, so they survive reordering
+- The `itemHeight` value is used as the estimate for items not yet measured
 
 ### Low-Level API
 
@@ -197,7 +259,6 @@ Use `VirtualContentComponent` with `vdndScrollable` for page-level scrolling wit
             [itemHeight]="72"
             [totalItems]="items().length"
             [contentOffset]="headerHeight()"
-            [style.height.px]="items().length * 72"
             vdndDroppable="list-1"
             (drop)="onDrop($event)"
           >
@@ -225,8 +286,9 @@ Use `VirtualContentComponent` with `vdndScrollable` for page-level scrolling wit
 export class PageComponent {
   items = signal<Item[]>([...]);
   headerHeight = signal(0);
+  header = viewChild.required<ElementRef<HTMLElement>>('header');
 
-  // Track header height with ResizeObserver
+  // Measure header height after initial render
   constructor() {
     afterNextRender(() => {
       const header = this.header().nativeElement;
@@ -239,9 +301,8 @@ export class PageComponent {
 Key points:
 
 - `vdndScrollable` marks the scroll container
-- `VirtualContentComponent` provides wrapper-based positioning
+- `VirtualContentComponent` provides wrapper-based positioning and computes its own height automatically
 - `contentOffset` accounts for content above the list (headers)
-- Set explicit height on `vdnd-virtual-content` matching total item height
 
 ### Screen Reader Announcements
 

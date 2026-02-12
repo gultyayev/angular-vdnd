@@ -1,5 +1,10 @@
 // Models
 export * from './models/drag-drop.models';
+export type { VirtualScrollStrategy } from './models/virtual-scroll-strategy';
+
+// Strategies
+export { FixedHeightStrategy } from './strategies/fixed-height.strategy';
+export { DynamicHeightStrategy } from './strategies/dynamic-height.strategy';
 
 // Tokens
 export { VDND_SCROLL_CONTAINER } from './tokens/scroll-container.token';
