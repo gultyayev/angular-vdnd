@@ -284,14 +284,23 @@ test.describe('Page Scroll Demo', () => {
     const dragPreview = page.locator('.vdnd-drag-preview');
     await expect(dragPreview).toBeVisible({ timeout: 2000 });
 
-    // Move to bottom edge to trigger autoscroll (20px from bottom)
-    const bottomEdgeY = scrollBox.y + scrollBox.height - 20;
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, bottomEdgeY, { steps: 10 });
+    // Move to bottom edge to trigger autoscroll (25px from bottom)
+    const edgeOffset = 25;
+    const bottomEdgeY = scrollBox.y + scrollBox.height - edgeOffset;
+    const targetX = scrollBox.x + scrollBox.width / 2;
+    await page.mouse.move(targetX, bottomEdgeY, { steps: 15 });
+    // Extra move for stability
+    await page.mouse.move(targetX, bottomEdgeY);
 
     // Wait for autoscroll to happen
-    await page.waitForTimeout(500);
+    await expect(async () => {
+      const scrollTop = await page.evaluate(() => {
+        const container = document.querySelector('.scroll-container');
+        return container?.scrollTop ?? 0;
+      });
+      expect(scrollTop, `ScrollTop should increase, current: ${scrollTop}`).toBeGreaterThan(0);
+    }).toPass({ timeout: 5000 });
 
-    // Get scroll position to verify autoscroll happened
     const scrollTop = await page.evaluate(() => {
       const container = document.querySelector('.scroll-container');
       return container?.scrollTop ?? 0;
@@ -344,18 +353,22 @@ test.describe('Page Scroll Demo', () => {
     const dragPreview = page.locator('.vdnd-drag-preview');
     await expect(dragPreview).toBeVisible({ timeout: 2000 });
 
-    const edgeOffset = testInfo.project.name === 'firefox' ? 10 : 20;
+    const edgeOffset = 25; // Use consistent 25px offset for all browsers (well within 50px threshold)
     const bottomEdgeY = scrollBox.y + scrollBox.height - edgeOffset;
     const targetX = scrollBox.x + scrollBox.width / 2;
-    await page.mouse.move(targetX, bottomEdgeY, { steps: 10 });
+
+    // Move to bottom edge to trigger autoscroll
+    await page.mouse.move(targetX, bottomEdgeY, { steps: 15 });
+    // Extra move without steps to ensure Firefox registers the final position correctly
+    await page.mouse.move(targetX, bottomEdgeY);
 
     await expect(async () => {
       const scrollTop = await page.evaluate(() => {
         const container = document.querySelector('.scroll-container');
         return container?.scrollTop ?? 0;
       });
-      expect(scrollTop).toBeGreaterThan(2000);
-    }).toPass({ timeout: 8000 });
+      expect(scrollTop, `Scroll should reach 2000px, current: ${scrollTop}`).toBeGreaterThan(2000);
+    }).toPass({ timeout: 15000 });
 
     const placeholder = page.locator('.vdnd-drag-placeholder');
     await expect(dragPreview).toBeVisible();

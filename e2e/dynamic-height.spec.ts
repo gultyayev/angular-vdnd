@@ -195,7 +195,7 @@ test.describe('Dynamic Height Demo', () => {
     expect(countAfter).toBeGreaterThan(countBefore - 3);
   });
 
-  test('should keep drag preview visible during autoscroll', async ({ page }, testInfo) => {
+  test('should keep drag preview visible during autoscroll', async ({ page }) => {
     const scrollContainer = page.locator('.scroll-container');
     const scrollBox = await scrollContainer.boundingBox();
     if (!scrollBox) throw new Error('Could not get scroll container bounding box');
@@ -211,17 +211,20 @@ test.describe('Dynamic Height Demo', () => {
     const dragPreview = page.locator('.vdnd-drag-preview');
     await expect(dragPreview).toBeVisible({ timeout: 2000 });
 
-    const edgeOffset = testInfo.project.name === 'firefox' ? 10 : 20;
+    const edgeOffset = 25; // Consistent 25px offset
     const bottomEdgeY = scrollBox.y + scrollBox.height - edgeOffset;
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, bottomEdgeY, { steps: 10 });
+    const targetX = sourceBox.x + sourceBox.width / 2;
+    await page.mouse.move(targetX, bottomEdgeY, { steps: 15 });
+    // Extra move for stability
+    await page.mouse.move(targetX, bottomEdgeY);
 
     await expect(async () => {
       const scrollTop = await page.evaluate(() => {
         const container = document.querySelector('.scroll-container');
         return container?.scrollTop ?? 0;
       });
-      expect(scrollTop).toBeGreaterThan(200);
-    }).toPass({ timeout: 5000 });
+      expect(scrollTop, `ScrollTop should reach 200, current: ${scrollTop}`).toBeGreaterThan(200);
+    }).toPass({ timeout: 10000 });
 
     await expect(dragPreview).toBeVisible();
     await page.mouse.up();
@@ -322,7 +325,7 @@ test.describe('Dynamic Height Demo', () => {
     expect(topTitle?.trim()).toBeTruthy();
   });
 
-  test('should correctly reorder via autoscroll drag', async ({ page }, testInfo) => {
+  test('should correctly reorder via autoscroll drag', async ({ page }) => {
     const firstItemText = await page
       .locator('.task-item')
       .first()
@@ -346,9 +349,12 @@ test.describe('Dynamic Height Demo', () => {
     await expect(dragPreview).toBeVisible({ timeout: 2000 });
 
     // Move to bottom edge to trigger autoscroll
-    const edgeOffset = testInfo.project.name === 'firefox' ? 10 : 20;
+    const edgeOffset = 25; // Consistent 25px offset
     const bottomEdgeY = scrollBox.y + scrollBox.height - edgeOffset;
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, bottomEdgeY, { steps: 10 });
+    const targetX = sourceBox.x + sourceBox.width / 2;
+    await page.mouse.move(targetX, bottomEdgeY, { steps: 15 });
+    // Extra move for stability
+    await page.mouse.move(targetX, bottomEdgeY);
 
     // Wait for autoscroll to engage
     await expect(async () => {
@@ -356,8 +362,8 @@ test.describe('Dynamic Height Demo', () => {
         const container = document.querySelector('.scroll-container');
         return container?.scrollTop ?? 0;
       });
-      expect(scrollTop).toBeGreaterThan(300);
-    }).toPass({ timeout: 5000 });
+      expect(scrollTop, `ScrollTop should reach 300, current: ${scrollTop}`).toBeGreaterThan(300);
+    }).toPass({ timeout: 10000 });
 
     // Wait one rAF before drop
     await page.waitForTimeout(50);

@@ -62,8 +62,10 @@ If a helper cannot start the drag (no preview), it should **fail** (don’t swal
 
 Autoscroll is time-based; assertions must tolerate variability:
 
-- Move pointer near the edge, then `expect.poll(scrollTop).toBeGreaterThan(...)`
-- Prefer “scroll changed” and “preview + placeholder stayed aligned” over pixel-perfect checks
+- **Use a consistent edge offset**: A 25px offset from the container edge is the sweet spot for all browsers (deep enough to trigger autoscroll reliably, but safe from the edge). Avoid browser-specific offsets (like 10px vs 20px).
+- **Ensure stable mouse position**: Firefox sometimes fails to register the final position after a stepped `page.mouse.move()`. Always follow up a stepped move with a direct move to the same coordinates: `await page.mouse.move(x, y, { steps: 15 }); await page.mouse.move(x, y);`.
+- **Prefer `toPass()` with descriptive errors**: Wrap autoscroll assertions in `toPass()` with a generous timeout (e.g., 10-15s for long scrolls) and include a custom error message for better CI debugging.
+- Prefer “scroll changed” and “preview + placeholder stayed aligned” over pixel-perfect checks.
 
 ### 7) Long-running “stress” tests should be isolated
 
