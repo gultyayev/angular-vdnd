@@ -249,7 +249,7 @@ describe('VirtualScrollContainerComponent', () => {
       expect(virtualScrollComponent.getScrollHeight()).toBe(5000);
     });
 
-    it('should reduce total height when dragging (item hidden)', () => {
+    it('should NOT reduce total height when dragging (spacer stays constant)', () => {
       const item: DraggedItem = {
         draggableId: 'item-5',
         droppableId: 'list',
@@ -262,8 +262,9 @@ describe('VirtualScrollContainerComponent', () => {
       fixture.detectChanges();
       fixture.detectChanges();
 
-      // Should be 99 items * 50px = 4950px during drag
-      expect(virtualScrollComponent.getScrollHeight()).toBe(4950);
+      // Height stays at 100 items * 50px = 5000px during drag
+      // (getTotalHeight no longer excludes dragged item)
+      expect(virtualScrollComponent.getScrollHeight()).toBe(5000);
 
       dragStateService.endDrag();
     });
@@ -295,7 +296,7 @@ describe('VirtualScrollContainerComponent', () => {
       expect(spacer.nativeElement.style.height).toBe('5000px'); // 100 items * 50px
     });
 
-    it('should reduce spacer height when dragging', () => {
+    it('should NOT reduce spacer height when dragging (stays constant)', () => {
       const item: DraggedItem = {
         draggableId: 'item-5',
         droppableId: 'list',
@@ -309,8 +310,8 @@ describe('VirtualScrollContainerComponent', () => {
       fixture.detectChanges();
 
       const spacer = fixture.debugElement.query(By.css('.vdnd-virtual-scroll-spacer'));
-      // Should be 99 items * 50px = 4950px during drag
-      expect(spacer.nativeElement.style.height).toBe('4950px');
+      // Height stays at 100 items * 50px = 5000px during drag
+      expect(spacer.nativeElement.style.height).toBe('5000px');
 
       dragStateService.endDrag();
     });
@@ -533,14 +534,14 @@ describe('VirtualScrollContainerComponent', () => {
 
       const heightDuring = virtualScrollComponent.getScrollHeight();
 
-      // Height should be reduced by one item
-      expect(heightDuring).toBe(heightBefore - 50);
+      // Height should stay the same (getTotalHeight no longer excludes dragged item)
+      expect(heightDuring).toBe(heightBefore);
 
       dragStateService.endDrag();
       fixture.detectChanges();
       fixture.detectChanges();
 
-      // Height should be restored
+      // Height stays the same after drag end
       expect(virtualScrollComponent.getScrollHeight()).toBe(heightBefore);
     });
   });
@@ -579,7 +580,7 @@ describe('VirtualScrollContainerComponent', () => {
       dragStateService.endDrag();
     });
 
-    it('should correctly adjust scroll at bottom on drag end (Issue 4)', async () => {
+    it('should keep scroll stable at bottom during drag (Issue 4)', async () => {
       // Use fewer items to reach bottom easily
       component.items.set(generateItems(20)); // 1000px total height
       fixture.detectChanges();
@@ -602,9 +603,9 @@ describe('VirtualScrollContainerComponent', () => {
       dragStateService.startDrag(item);
       fixture.detectChanges();
 
-      // During drag, total height is 950px. Max scroll is 650px.
-      // Scroll should have been clamped to 650px by the effect.
-      expect(virtualScrollEl.scrollTop).toBe(650);
+      // During drag, total height stays at 1000px (no longer shrinks).
+      // Scroll should NOT be clamped — it stays at 700px.
+      expect(virtualScrollEl.scrollTop).toBe(700);
 
       // 3. End drag
       dragStateService.endDrag();
@@ -614,8 +615,7 @@ describe('VirtualScrollContainerComponent', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
       fixture.detectChanges();
 
-      // Total height is back to 1000px. Max scroll is 700px.
-      // Scroll should have been adjusted to 700px.
+      // Scroll stays at 700px (no height change to compensate for)
       expect(virtualScrollEl.scrollTop).toBe(700);
     });
   });

@@ -384,6 +384,72 @@ test.describe('Dynamic Height Demo', () => {
     expect(itemCount).toBeGreaterThan(0);
   });
 
+  test('should not shrink container height during same-list drag', async ({ page }) => {
+    const scrollContainer = page.locator('.scroll-container');
+
+    // Scroll to bottom so the footer is visible and shift would be noticeable
+    await expect(async () => {
+      await scrollContainer.evaluate((el) => (el.scrollTop = el.scrollHeight));
+      const { scrollTop, scrollHeight, clientHeight } = await scrollContainer.evaluate((el) => ({
+        scrollTop: el.scrollTop,
+        scrollHeight: el.scrollHeight,
+        clientHeight: el.clientHeight,
+      }));
+      expect(scrollTop).toBeGreaterThan(0);
+      expect(scrollTop + clientHeight).toBeGreaterThanOrEqual(scrollHeight - 2);
+    }).toPass({ timeout: 3000 });
+
+    // Measure the virtual-content host height and footer position before drag
+    const beforeDrag = await page.evaluate(() => {
+      const virtualContent = document.querySelector('vdnd-virtual-content') as HTMLElement | null;
+      const footer = document.querySelector('.add-task-footer') as HTMLElement | null;
+      return {
+        contentHeight: virtualContent?.offsetHeight ?? 0,
+        footerTop: footer?.getBoundingClientRect().top ?? 0,
+      };
+    });
+    expect(beforeDrag.contentHeight).toBeGreaterThan(0);
+
+    // Pick a fully-visible item near the bottom (not the very last, which may be clipped)
+    const taskItems = page.locator('.task-item');
+    const itemCount = await taskItems.count();
+    const sourceItem = taskItems.nth(Math.max(0, itemCount - 3));
+    await sourceItem.hover(); // hover scrolls into view
+    const sourceBox = await sourceItem.boundingBox();
+    if (!sourceBox) throw new Error('Could not get source bounding box');
+
+    await page.mouse.down();
+    await page.mouse.move(sourceBox.x + sourceBox.width / 2 + 5, sourceBox.y + 5, { steps: 3 });
+
+    const dragPreview = page.locator('.vdnd-drag-preview');
+    await expect(dragPreview).toBeVisible({ timeout: 2000 });
+
+    // Wait one rAF for position update
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+
+    // Measure during drag — atomic measurement
+    const duringDrag = await page.evaluate(() => {
+      const virtualContent = document.querySelector('vdnd-virtual-content') as HTMLElement | null;
+      const footer = document.querySelector('.add-task-footer') as HTMLElement | null;
+      return {
+        contentHeight: virtualContent?.offsetHeight ?? 0,
+        footerTop: footer?.getBoundingClientRect().top ?? 0,
+      };
+    });
+
+    // The virtual content height should NOT shrink during drag
+    // Allow 2px tolerance for sub-pixel rounding
+    expect(duringDrag.contentHeight).toBeGreaterThanOrEqual(beforeDrag.contentHeight - 2);
+
+    // The footer should NOT shift up during drag
+    // (Positive shift = moved up = bad)
+    const footerShift = beforeDrag.footerTop - duringDrag.footerTop;
+    expect(footerShift).toBeLessThan(10);
+
+    // Clean up
+    await page.mouse.up();
+  });
+
   test('should not emit ResizeObserver errors', async ({ page }) => {
     let resizeObserverErrors = 0;
 

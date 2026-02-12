@@ -23,8 +23,7 @@ export class FixedHeightStrategy implements VirtualScrollStrategy {
   }
 
   getTotalHeight(itemCount: number): number {
-    const effectiveCount = this.#excludedIndex >= 0 ? itemCount - 1 : itemCount;
-    return effectiveCount * this.#itemHeight;
+    return itemCount * this.#itemHeight;
   }
 
   getFirstVisibleIndex(scrollTop: number): number {

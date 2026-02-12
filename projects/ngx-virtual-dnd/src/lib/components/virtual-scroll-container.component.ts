@@ -572,9 +572,10 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
       }
     });
 
-    // Preserve scroll position when drag ends at bottom of list
-    // During drag, totalHeight is reduced by 1 item (dragged item is hidden)
-    // When drag ends, totalHeight increases - we need to adjust scroll if we were at bottom
+    // Preserve scroll position when drag ends at bottom of list.
+    // Safety net: totalHeight no longer shrinks during drag (getTotalHeight
+    // ignores exclusion), but this logic remains as harmless protection
+    // in case future changes reintroduce height variance.
     effect(() => {
       const currentDraggedId = this.draggedItemId();
       const currentTotalHeight = this.totalHeight();
@@ -614,9 +615,9 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
       this.#previousTotalHeight = currentTotalHeight;
     });
 
-    // Clamp scrollTop during drag when totalHeight shrinks
-    // When a dragged item is hidden, totalHeight decreases. If we're near the bottom,
-    // scrollTop can exceed the new max, causing blank space (background reveal).
+    // Clamp scrollTop during drag if totalHeight ever shrinks.
+    // With the current fix, getTotalHeight no longer excludes the dragged item,
+    // so this is effectively a no-op. Kept as a safety net.
     effect(() => {
       const isDragging = this.#dragState.isDragging();
       const totalHeight = this.totalHeight();

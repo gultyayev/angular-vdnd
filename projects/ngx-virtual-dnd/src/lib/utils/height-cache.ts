@@ -92,17 +92,26 @@ export class HeightCache {
   }
 
   /**
-   * Get total content height, accounting for the excluded index.
+   * Get total content height for all items.
+   * Does NOT exclude the dragged item — the spacer must maintain full height
+   * during same-list drag so sibling content (footers etc.) doesn't shift.
+   * Uses O(1) prefix-sum lookup when possible.
    */
   getTotalHeight(itemCount: number): number {
     this.#rebuildIfDirty();
 
-    let total = 0;
-    for (let i = 0; i < itemCount; i++) {
-      if (i === this.#excludedIndex) continue;
-      total += this.getHeight(i);
+    if (itemCount <= 0) return 0;
+
+    const keyCount = this.#keys.length;
+    if (keyCount === 0) return itemCount * this.#estimatedHeight;
+
+    if (itemCount >= keyCount) {
+      // All known items + estimated for any extras
+      return this.#getTotalHeightRaw() + (itemCount - keyCount) * this.#estimatedHeight;
     }
-    return total;
+
+    // Partial: prefix sum up to itemCount
+    return this.#offsets[itemCount - 1] + this.getHeight(itemCount - 1);
   }
 
   /**

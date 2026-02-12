@@ -213,10 +213,9 @@ export class DragIndexCalculatorService {
         return count;
       }
 
-      // For fixed-height fallback: spacer height reflects N-1 items (one is hidden)
-      // Add 1 back to get true total
+      // Spacer height reflects full N items (getTotalHeight no longer excludes)
       const count = Math.floor(totalHeight / itemHeight);
-      return isSameList ? count + 1 : count;
+      return count;
     }
 
     // Check for page-level scroll (vdnd-virtual-content)
@@ -242,14 +241,14 @@ export class DragIndexCalculatorService {
         const itemHeight = configuredHeight
           ? parseInt(configuredHeight, 10)
           : this.#getDraggedItemHeightFallback(draggedItemHeight, 72);
-        const count = Math.floor(totalHeight / itemHeight);
-        return isSameList ? count + 1 : count;
+        return Math.floor(totalHeight / itemHeight);
       }
     }
 
-    // Fallback for non-virtual scroll
+    // Fallback for non-virtual scroll — querySelectorAll finds all N items
+    // (including the hidden dragged item), so no adjustment needed
     const items = droppableElement.querySelectorAll('[data-draggable-id]');
-    return items.length + (isSameList ? 1 : 0);
+    return items.length;
   }
 
   #getDraggedItemHeightFallback(height: number, fallback: number): number {
