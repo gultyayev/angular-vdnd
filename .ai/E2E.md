@@ -228,6 +228,58 @@ When testing drag-and-drop after programmatic scroll:
    shift when the dragged item hides (`display: none`) and virtual scroll re-renders
 4. **Use rAF wait** instead of fixed `waitForTimeout()` after mouse moves
 5. **Firefox: follow up stepped moves with direct moves** (E2E.md Rule #6)
+6. **Avoid `locator.nth(...).hover()` as drag source selection after scroll** —
+   virtual DOM churn can detach or move that node between selection and hover
+   (seen as WebKit `locator.hover` timeout). Prefer atomic source-box selection in
+   `page.evaluate()` and drag by coordinates.
+
+#### Deterministic Source Selection Pattern (Virtual Scroll)
+
+```typescript
+let sourceBox: { x: number; y: number; width: number; height: number } | null = null;
+
+await expect(async () => {
+  sourceBox = await page.evaluate(() => {
+    const container = document.querySelector('.scroll-container') as HTMLElement | null;
+    if (!container) return null;
+
+    const containerRect = container.getBoundingClientRect();
+    const targetY = containerRect.top + containerRect.height * 0.65;
+    const candidates = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-draggable-id], .task-item'),
+    )
+      .map((el) => {
+        const rect = el.getBoundingClientRect();
+        return {
+          centerY: rect.top + rect.height / 2,
+          visible:
+            rect.bottom > containerRect.top + 12 &&
+            rect.top < containerRect.bottom - 12 &&
+            rect.height > 0 &&
+            rect.width > 0,
+          box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+        };
+      })
+      .filter((item) => item.visible)
+      .sort((a, b) => Math.abs(a.centerY - targetY) - Math.abs(b.centerY - targetY));
+
+    return candidates[0]?.box ?? null;
+  });
+
+  expect(sourceBox).not.toBeNull();
+}).toPass({ timeout: 3000 });
+
+if (!sourceBox) throw new Error('Could not get source box');
+
+await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
+await page.mouse.down();
+```
+
+Why this works:
+
+- Captures geometry atomically in one browser evaluation.
+- Uses viewport-visible candidates only (not overscan assumptions).
+- Retries until content is ready (`toPass`) instead of relying on timing sleeps.
 
 ---
 

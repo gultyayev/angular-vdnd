@@ -416,14 +416,41 @@ test.describe('Dynamic Height Demo', () => {
     });
     expect(beforeDrag.contentHeight).toBeGreaterThan(0);
 
-    // Pick a fully-visible item near the bottom (not the very last, which may be clipped)
-    const taskItems = page.locator('.task-item');
-    const itemCount = await taskItems.count();
-    const sourceItem = taskItems.nth(Math.max(0, itemCount - 3));
-    await sourceItem.hover(); // hover scrolls into view
-    const sourceBox = await sourceItem.boundingBox();
+    let sourceBox: { x: number; y: number; width: number; height: number } | null = null;
+    await expect(async () => {
+      // Capture a viewport-visible draggable/task item box atomically inside the browser.
+      sourceBox = await page.evaluate(() => {
+        const container = document.querySelector('.scroll-container') as HTMLElement | null;
+        if (!container) return null;
+
+        const containerRect = container.getBoundingClientRect();
+        const targetY = containerRect.top + containerRect.height * 0.65;
+        const candidates = Array.from(
+          document.querySelectorAll<HTMLElement>('[data-draggable-id], .task-item'),
+        )
+          .map((el) => {
+            const rect = el.getBoundingClientRect();
+            return {
+              centerY: rect.top + rect.height / 2,
+              visible:
+                rect.bottom > containerRect.top + 12 &&
+                rect.top < containerRect.bottom - 12 &&
+                rect.height > 0 &&
+                rect.width > 0,
+              box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+            };
+          })
+          .filter((item) => item.visible)
+          .sort((a, b) => Math.abs(a.centerY - targetY) - Math.abs(b.centerY - targetY));
+
+        return candidates[0]?.box ?? null;
+      });
+
+      expect(sourceBox).not.toBeNull();
+    }).toPass({ timeout: 3000 });
     if (!sourceBox) throw new Error('Could not get source bounding box');
 
+    await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
     await page.mouse.down();
     await page.mouse.move(sourceBox.x + sourceBox.width / 2 + 5, sourceBox.y + 5, { steps: 3 });
     await page.mouse.move(sourceBox.x + sourceBox.width / 2 + 5, sourceBox.y + 5);
