@@ -286,8 +286,9 @@ Use `VirtualContentComponent` with `vdndScrollable` for page-level scrolling wit
 export class PageComponent {
   items = signal<Item[]>([...]);
   headerHeight = signal(0);
+  header = viewChild.required<ElementRef<HTMLElement>>('header');
 
-  // Track header height with ResizeObserver
+  // Measure header height after initial render
   constructor() {
     afterNextRender(() => {
       const header = this.header().nativeElement;
