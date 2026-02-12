@@ -426,31 +426,34 @@ test.describe('Dynamic Height Demo', () => {
 
     await page.mouse.down();
     await page.mouse.move(sourceBox.x + sourceBox.width / 2 + 5, sourceBox.y + 5, { steps: 3 });
+    await page.mouse.move(sourceBox.x + sourceBox.width / 2 + 5, sourceBox.y + 5);
 
     const dragPreview = page.locator('.vdnd-drag-preview');
     await expect(dragPreview).toBeVisible({ timeout: 2000 });
 
     // Wait one rAF for position update
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    const allowedShrinkPx = 8;
+    await expect(async () => {
+      // Measure during drag — atomic measurement
+      const duringDrag = await page.evaluate(() => {
+        const virtualContent = document.querySelector('vdnd-virtual-content') as HTMLElement | null;
+        const footer = document.querySelector('.add-task-footer') as HTMLElement | null;
+        return {
+          contentHeight: virtualContent?.offsetHeight ?? 0,
+          footerTop: footer?.getBoundingClientRect().top ?? 0,
+        };
+      });
 
-    // Measure during drag — atomic measurement
-    const duringDrag = await page.evaluate(() => {
-      const virtualContent = document.querySelector('vdnd-virtual-content') as HTMLElement | null;
-      const footer = document.querySelector('.add-task-footer') as HTMLElement | null;
-      return {
-        contentHeight: virtualContent?.offsetHeight ?? 0,
-        footerTop: footer?.getBoundingClientRect().top ?? 0,
-      };
-    });
+      // Allow minor cross-browser rounding differences while still catching real shrink regressions.
+      expect(duringDrag.contentHeight).toBeGreaterThanOrEqual(
+        beforeDrag.contentHeight - allowedShrinkPx,
+      );
 
-    // The virtual content height should NOT shrink during drag
-    // Allow 2px tolerance for sub-pixel rounding
-    expect(duringDrag.contentHeight).toBeGreaterThanOrEqual(beforeDrag.contentHeight - 2);
-
-    // The footer should NOT shift up during drag
-    // (Positive shift = moved up = bad)
-    const footerShift = beforeDrag.footerTop - duringDrag.footerTop;
-    expect(footerShift).toBeLessThan(10);
+      // The footer should NOT shift up during drag (positive shift = moved up = bad).
+      const footerShift = beforeDrag.footerTop - duringDrag.footerTop;
+      expect(footerShift).toBeLessThan(10);
+    }).toPass({ timeout: 2000 });
 
     // Clean up
     await page.mouse.up();

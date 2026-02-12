@@ -92,6 +92,7 @@ export class DemoPage {
     targetIndex: number,
   ): Promise<void> {
     const sourceItems = sourceList === 'list1' ? this.list1Items : this.list2Items;
+    const targetItems = targetList === 'list1' ? this.list1Items : this.list2Items;
     const targetContainer =
       targetList === 'list1' ? this.list1VirtualScroll : this.list2VirtualScroll;
 
@@ -105,14 +106,26 @@ export class DemoPage {
       throw new Error('Could not get bounding boxes for drag operation');
     }
 
-    // Calculate target position accounting for current scroll position
-    // Target the center of the slot
-    const itemHeight = 50; // Known from component config
-    const targetY = Math.min(
-      targetBox.y + targetIndex * itemHeight + itemHeight / 2,
-      targetBox.y + targetBox.height - 10,
-    );
-    const targetX = targetBox.x + targetBox.width / 2;
+    const targetItem = targetItems.nth(targetIndex);
+    const hasTargetItem = (await targetItem.count()) > 0;
+    let targetX = targetBox.x + targetBox.width / 2;
+    let targetY = Math.min(targetBox.y + 25, targetBox.y + targetBox.height - 10);
+
+    if (hasTargetItem) {
+      await targetItem.scrollIntoViewIfNeeded();
+      const targetItemBox = await targetItem.boundingBox();
+      if (!targetItemBox) {
+        throw new Error('Could not get target item bounding box for drag operation');
+      }
+      targetX = targetItemBox.x + targetItemBox.width / 2;
+      targetY = targetItemBox.y + targetItemBox.height / 2;
+    } else {
+      // Out-of-range index indicates "drop at end of list"; empty target uses a top-safe drop zone.
+      targetY =
+        targetIndex > 0
+          ? targetBox.y + targetBox.height - 10
+          : Math.min(targetBox.y + 50, targetBox.y + targetBox.height - 10);
+    }
 
     // Perform drag with steps for smooth movement
     await sourceItem.hover();
@@ -130,6 +143,8 @@ export class DemoPage {
 
     // Move to target with more steps for smoother movement
     await this.page.mouse.move(targetX, targetY, { steps: 15 });
+    // Firefox/WebKit can miss the final stepped position occasionally.
+    await this.page.mouse.move(targetX, targetY);
     // Drag position updates are rAF-throttled; wait one frame for the final position to process
     await this.page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     await this.page.mouse.up();
