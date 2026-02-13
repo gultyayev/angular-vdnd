@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.3.0-alpha.5](https://github.com/gultyayev/angular-vdnd/compare/v1.3.0-alpha.4...v1.3.0-alpha.5) (2026-02-13)
+
+### Bug Fixes
+
+- **lib:** harden dynamic height strategy performance and correctness ([9caac28](https://github.com/gultyayev/angular-vdnd/commit/9caac28ecd32fe8c9d41d4cd3098bd1a59a29a08))
+- **lib:** use direction-aware probing for dynamic drag index ([b6346d1](https://github.com/gultyayev/angular-vdnd/commit/b6346d1113b733dc6fd94f5cfa8e5dbf7b13152b))
+
 ## [1.3.0-alpha.4](https://github.com/gultyayev/angular-vdnd/compare/v1.3.0-alpha.3...v1.3.0-alpha.4) (2026-02-13)
 
 ### Bug Fixes
