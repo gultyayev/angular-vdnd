@@ -53,3 +53,5 @@ storybook-static
 /reference
 /playwright-report
 /test-results
+
+.codemie
