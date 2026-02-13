@@ -41,20 +41,11 @@
         class="virtual-list-wrapper"
         [itemHeight]="estimatedItemHeight"
         [dynamicItemHeight]="true"
-        [totalItems]="filteredTasks().length"
         [contentOffset]="headerHeight()"
         vdndDroppable="tasks"
         (drop)="onDrop($event)"
       >
-        <ng-container
-          *vdndVirtualFor="
-            let task of filteredTasks();
-            itemHeight: estimatedItemHeight;
-            dynamicItemHeight: true;
-            trackBy: trackById;
-            droppableId: 'tasks'
-          "
-        >
+        <ng-container *vdndVirtualFor="let task of filteredTasks(); trackBy: trackById">
           <div class="task-item" [vdndDraggable]="task.id">
             <ion-icon name="reorder-three" class="drag-handle"></ion-icon>
             <div class="task-content">

@@ -19,8 +19,8 @@ class MockResizeObserver {
 
 @Component({
   template: `
-    <vdnd-virtual-viewport [itemHeight]="50" [totalItems]="items().length" style="height: 200px;">
-      <ng-container *vdndVirtualFor="let item of items(); itemHeight: 50; trackBy: trackByFn">
+    <vdnd-virtual-viewport [itemHeight]="50" style="height: 200px;">
+      <ng-container *vdndVirtualFor="let item of items(); trackBy: trackByFn">
         <div class="item" [attr.data-id]="item.id">
           <span class="label">{{ item.label }}</span>
           <div class="parts">

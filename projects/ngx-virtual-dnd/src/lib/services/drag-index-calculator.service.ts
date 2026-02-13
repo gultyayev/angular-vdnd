@@ -217,7 +217,7 @@ export class DragIndexCalculatorService {
     // Check if a registered strategy exists
     const droppableId = this.#positionCalculator.getDroppableId(droppableElement);
     const strategy = droppableId ? this.#strategies.get(droppableId) : null;
-    const strategyItemCount = strategy?.getItemCount?.();
+    const strategyItemCount = strategy?.getItemCount();
     if (strategyItemCount !== undefined && Number.isFinite(strategyItemCount)) {
       return Math.max(0, strategyItemCount);
     }
@@ -275,7 +275,7 @@ export class DragIndexCalculatorService {
       if (totalItemsAttr) {
         const count = parseInt(totalItemsAttr, 10);
         if (Number.isFinite(count)) {
-          // data-total-items is always the true total N (from totalItems input)
+          // data-total-items is the true total N (derived from strategy item count)
           return count;
         }
       }

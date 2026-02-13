@@ -16,9 +16,6 @@ export interface VdndVirtualViewport {
   /** Height of each item in pixels */
   itemHeight(): number;
 
-  /** Total number of items */
-  totalItems(): number;
-
   /** Offset for content below headers (page-level scroll scenarios) */
   contentOffset(): number;
 

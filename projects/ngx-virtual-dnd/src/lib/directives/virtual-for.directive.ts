@@ -18,6 +18,7 @@ import { VDND_SCROLL_CONTAINER } from '../tokens/scroll-container.token';
 import { VDND_VIRTUAL_VIEWPORT } from '../tokens/virtual-viewport.token';
 import { DragStateService } from '../services/drag-state.service';
 import { DragIndexCalculatorService } from '../services/drag-index-calculator.service';
+import { DroppableDirective } from './droppable.directive';
 import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
 import { FixedHeightStrategy } from '../strategies/fixed-height.strategy';
 import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
@@ -61,21 +62,21 @@ interface RenderEntry<T> {
  * or vdnd-virtual-content) - consumers just render their items normally.
  *
  * @example
- * Basic usage:
+ * Inside a viewport component (itemHeight and droppableId inherited automatically):
+ * ```html
+ * <vdnd-virtual-viewport [itemHeight]="50" style="height: 400px">
+ *   <ng-container *vdndVirtualFor="let item of items(); trackBy: trackById">
+ *     <div class="item">{{ item.name }}</div>
+ *   </ng-container>
+ * </vdnd-virtual-viewport>
+ * ```
+ *
+ * @example
+ * Standalone usage (itemHeight required):
  * ```html
  * <div vdndScrollable style="overflow: auto; height: 400px">
  *   <ng-container *vdndVirtualFor="let item of items(); itemHeight: 50; trackBy: trackById">
  *     <div class="item">{{ item.name }}</div>
- *   </ng-container>
- * </div>
- * ```
- *
- * @example
- * With dynamic item heights:
- * ```html
- * <div vdndScrollable style="overflow: auto; height: 400px">
- *   <ng-container *vdndVirtualFor="let item of items(); itemHeight: 50; dynamicItemHeight: true; trackBy: trackById">
- *     <div class="item" style="height: auto">{{ item.description }}</div>
  *   </ng-container>
  * </div>
  * ```
@@ -99,6 +100,12 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
    * so we skip individual absolute positioning.
    */
   readonly #viewport = inject(VDND_VIRTUAL_VIEWPORT, { optional: true });
+
+  /**
+   * Optional parent droppable directive.
+   * When present, droppableId is inherited automatically.
+   */
+  readonly #droppable = inject(DroppableDirective, { optional: true });
 
   /** Whether we're inside a viewport component (use wrapper positioning) */
   readonly #useViewportPositioning = this.#viewport !== null;
@@ -129,8 +136,11 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
   /** The array of items to iterate over */
   vdndVirtualForOf = input.required<T[]>();
 
-  /** Height of each item in pixels (used as estimate in dynamic mode) */
-  vdndVirtualForItemHeight = input.required<number>();
+  /**
+   * Height of each item in pixels (used as estimate in dynamic mode).
+   * Optional when inside a viewport component — inherited from the viewport's strategy.
+   */
+  vdndVirtualForItemHeight = input<number>();
 
   /** Track-by function for efficient updates */
   vdndVirtualForTrackBy = input.required<(index: number, item: T) => unknown>();
@@ -151,6 +161,15 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
    */
   vdndVirtualForDynamicItemHeight = input<boolean>(false);
 
+  // ========== Resolved Values ==========
+
+  /**
+   * Effective droppable ID — uses explicit input or inherits from parent DroppableDirective.
+   */
+  readonly #effectiveDroppableId = computed(() => {
+    return this.vdndVirtualForDroppableId() ?? this.#droppable?.vdndDroppable() ?? undefined;
+  });
+
   // ========== Strategy ==========
 
   /**
@@ -162,8 +181,17 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
     const viewportStrategy = this.#viewport?.strategy;
     if (viewportStrategy) return viewportStrategy;
 
-    // Create our own strategy
+    // Create our own strategy (standalone mode — itemHeight is required)
     const height = this.vdndVirtualForItemHeight();
+    if (height === undefined) {
+      if (isDevMode()) {
+        console.warn(
+          '[ngx-virtual-dnd] vdndVirtualFor requires itemHeight when not inside a viewport component ' +
+            '(vdnd-virtual-viewport or vdnd-virtual-content). Falling back to 50px.',
+        );
+      }
+      return new FixedHeightStrategy(50);
+    }
     return this.vdndVirtualForDynamicItemHeight()
       ? new DynamicHeightStrategy(height)
       : new FixedHeightStrategy(height);
@@ -173,7 +201,7 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
 
   /** Whether the placeholder should be shown in this container */
   readonly #shouldShowPlaceholder = computed(() => {
-    const droppableId = this.vdndVirtualForDroppableId();
+    const droppableId = this.#effectiveDroppableId();
     if (!droppableId) return false;
     if (!this.#dragState.isDragging()) return false;
     return this.#dragState.activeDroppableId() === droppableId;
@@ -257,7 +285,7 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
 
     // Register strategy with drag index calculator for accurate position lookups
     effect((onCleanup) => {
-      const droppableId = this.vdndVirtualForDroppableId();
+      const droppableId = this.#effectiveDroppableId();
       const strategy = this.#strategy();
       if (droppableId) {
         this.#dragIndexCalculator.registerStrategy(droppableId, strategy);
@@ -271,7 +299,7 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
     effect(() => {
       const strategy = this.#strategy();
       const draggedIndex = this.#draggedItemIndex();
-      const droppableId = this.vdndVirtualForDroppableId();
+      const droppableId = this.#effectiveDroppableId();
       const sourceDroppableId = this.#dragState.sourceDroppableId();
       const isDragging = this.#dragState.isDragging();
 
@@ -301,8 +329,12 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
     // Create placeholder element for drag operations
     this.#createPlaceholder();
 
-    // Set up ResizeObserver for dynamic height mode
-    if (this.vdndVirtualForDynamicItemHeight()) {
+    // Set up ResizeObserver for dynamic height mode.
+    // Check both the directive's own input and the viewport's strategy (when inherited).
+    if (
+      this.vdndVirtualForDynamicItemHeight() ||
+      this.#strategy() instanceof DynamicHeightStrategy
+    ) {
       this.#setupResizeObserver();
     }
   }
@@ -430,7 +462,7 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
     const placeholderIndex = this.#placeholderIndex();
     const showPlaceholder = this.#shouldShowPlaceholder();
     const draggedIndex = this.#draggedItemIndex();
-    const droppableId = this.vdndVirtualForDroppableId();
+    const droppableId = this.#effectiveDroppableId();
     const sourceDroppableId = this.#dragState.sourceDroppableId();
     const isSourceList = droppableId ? droppableId === sourceDroppableId : true;
     const shouldKeepDragged =

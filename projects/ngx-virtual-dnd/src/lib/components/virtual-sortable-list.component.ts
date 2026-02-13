@@ -38,15 +38,16 @@ import {
  * </div>
  *
  * <!-- After (concise): ~8 lines -->
- * <vdnd-sortable-list
- *   droppableId="list-1"
- *   group="demo"
- *   [items]="list()"
- *   [itemHeight]="50"
- *   [itemIdFn]="getItemId"
- *   [itemTemplate]="itemTpl"
- *   (drop)="onDrop($event)">
- * </vdnd-sortable-list>
+ * <div vdndGroup="demo">
+ *   <vdnd-sortable-list
+ *     droppableId="list-1"
+ *     [items]="list()"
+ *     [itemHeight]="50"
+ *     [itemIdFn]="getItemId"
+ *     [itemTemplate]="itemTpl"
+ *     (drop)="onDrop($event)">
+ *   </vdnd-sortable-list>
+ * </div>
  * ```
  */
 @Component({
@@ -101,8 +102,11 @@ export class VirtualSortableListComponent<T> {
   /** Unique identifier for this droppable list */
   droppableId = input.required<string>();
 
-  /** Drag-and-drop group name */
-  group = input.required<string>();
+  /**
+   * Drag-and-drop group name.
+   * Optional when a parent `vdndGroup` directive provides the group context.
+   */
+  group = input<string>();
 
   /** Array of items to render */
   items = input.required<T[]>();

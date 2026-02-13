@@ -42,6 +42,6 @@ export interface VirtualScrollStrategy {
   /** Find index at a given pixel offset (for drag calculations) */
   findIndexAtOffset(offset: number): number;
 
-  /** Optional logical item count (exact total items for this strategy instance) */
-  getItemCount?(): number;
+  /** Logical item count from setItemKeys */
+  getItemCount(): number;
 }

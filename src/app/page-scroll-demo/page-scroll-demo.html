@@ -40,19 +40,11 @@
       <vdnd-virtual-content
         class="virtual-list-wrapper"
         [itemHeight]="itemHeight"
-        [totalItems]="filteredTasks().length"
         [contentOffset]="headerHeight()"
         vdndDroppable="tasks"
         (drop)="onDrop($event)"
       >
-        <ng-container
-          *vdndVirtualFor="
-            let task of filteredTasks();
-            itemHeight: itemHeight;
-            trackBy: trackById;
-            droppableId: 'tasks'
-          "
-        >
+        <ng-container *vdndVirtualFor="let task of filteredTasks(); trackBy: trackById">
           <div class="task-item" [vdndDraggable]="task.id">
             <ion-icon name="reorder-three" class="drag-handle"></ion-icon>
             <ion-checkbox [checked]="task.done" (ionChange)="toggleTask(task)"></ion-checkbox>

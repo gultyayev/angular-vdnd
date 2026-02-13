@@ -72,13 +72,13 @@ _`HeightCache` utility: `lib/utils/height-cache.ts`_
 
 ### Directives
 
-| Directive               | Selector          | Key Inputs                                                                   |
-| ----------------------- | ----------------- | ---------------------------------------------------------------------------- |
-| DraggableDirective      | `vdndDraggable`   | ID (required), group, data, disabled                                         |
-| DroppableDirective      | `vdndDroppable`   | ID (required), group, data, autoScrollConfig, constrainToContainer, disabled |
-| DroppableGroupDirective | `vdndGroup`       | group name (required)                                                        |
-| ScrollableDirective     | `vdndScrollable`  | scrollContainerId, autoScrollEnabled, autoScrollConfig                       |
-| VirtualForDirective     | `*vdndVirtualFor` | items, itemHeight, trackBy, dynamicItemHeight, droppableId                   |
+| Directive               | Selector          | Key Inputs                                                                             |
+| ----------------------- | ----------------- | -------------------------------------------------------------------------------------- |
+| DraggableDirective      | `vdndDraggable`   | ID (required), group, data, disabled                                                   |
+| DroppableDirective      | `vdndDroppable`   | ID (required), group, data, autoScrollConfig, constrainToContainer, disabled           |
+| DroppableGroupDirective | `vdndGroup`       | group name (required)                                                                  |
+| ScrollableDirective     | `vdndScrollable`  | scrollContainerId, autoScrollEnabled, autoScrollConfig                                 |
+| VirtualForDirective     | `*vdndVirtualFor` | items (required), trackBy (required), itemHeight\*, dynamicItemHeight\*, droppableId\* |
 
 ### Components
 

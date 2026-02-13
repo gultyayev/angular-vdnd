@@ -57,7 +57,11 @@ export class FixedHeightStrategy implements VirtualScrollStrategy {
   }
 
   setItemKeys(keys: unknown[]): void {
+    const prevCount = this.#itemCount;
     this.#itemCount = keys.length;
+    if (prevCount !== this.#itemCount) {
+      this.#version.update((v) => v + 1);
+    }
   }
 
   setExcludedIndex(index: number | null): void {

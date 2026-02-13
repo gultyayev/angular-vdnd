@@ -195,6 +195,7 @@ Notes:
 - Setting `dynamicItemHeight` switches to `DynamicHeightStrategy` with automatic height measurement
 - Heights are tracked by `trackBy` key, so they survive reordering
 - The `itemHeight` value is used as the initial estimate for items not yet measured
+- Inside a viewport component (`vdnd-virtual-viewport` or `vdnd-virtual-content`), `itemHeight`, `dynamicItemHeight`, and `droppableId` are inherited automatically — only `trackBy` is needed on the directive
 
 ### Drag Handles
 
@@ -383,7 +384,6 @@ Use `VirtualContentComponent` with `vdndScrollable` for page-level scrolling wit
         <div vdndGroup="tasks">
           <vdnd-virtual-content
             [itemHeight]="72"
-            [totalItems]="items().length"
             [contentOffset]="headerHeight()"
             vdndDroppable="list-1"
             (drop)="onDrop($event)"
@@ -391,9 +391,7 @@ Use `VirtualContentComponent` with `vdndScrollable` for page-level scrolling wit
             <ng-container
               *vdndVirtualFor="
                 let item of items();
-                itemHeight: 72;
-                trackBy: trackById;
-                droppableId: 'list-1'
+                trackBy: trackById
               "
             >
               <div class="item" [vdndDraggable]="item.id">{{ item.name }}</div>
@@ -427,8 +425,9 @@ export class PageComponent {
 Key points:
 
 - `vdndScrollable` marks the scroll container
-- `VirtualContentComponent` provides wrapper-based positioning and computes its own height automatically
+- `VirtualContentComponent` provides wrapper-based positioning and derives total items from the child `*vdndVirtualFor` automatically
 - `contentOffset` accounts for content above the list (headers)
+- `*vdndVirtualFor` inherits `itemHeight`, `dynamicItemHeight`, and `droppableId` from the parent viewport/droppable — only `trackBy` is required
 
 ### Screen Reader Announcements
 

@@ -32,9 +32,8 @@ import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
  *   <!-- Virtual list with wrapper positioning -->
  *   <vdnd-virtual-content
  *     [itemHeight]="50"
- *     [totalItems]="items().length"
  *     [contentOffset]="header.offsetHeight">
- *     <ng-container *vdndVirtualFor="let item of items(); itemHeight: 50; trackBy: trackById">
+ *     <ng-container *vdndVirtualFor="let item of items(); trackBy: trackById">
  *       <div class="item">{{ item.name }}</div>
  *     </ng-container>
  *   </vdnd-virtual-content>
@@ -101,9 +100,6 @@ export class VirtualContentComponent implements VdndVirtualViewport, VdndScrollC
   /** Height of each item in pixels (used as estimate in dynamic mode) */
   itemHeight = input.required<number>();
 
-  /** Total number of items */
-  totalItems = input.required<number>();
-
   /** Offset for content above the virtual list (e.g., header height) */
   contentOffset = input<number>(0);
 
@@ -138,10 +134,18 @@ export class VirtualContentComponent implements VdndVirtualViewport, VdndScrollC
 
   // ========== Computed Values ==========
 
+  /** Total item count, derived from strategy (populated by VirtualForDirective) */
+  readonly totalItems = computed(() => {
+    const s = this.#strategy();
+    s.version();
+    return s.getItemCount();
+  });
+
   /** Total height of all items (for scroll height) */
   readonly totalHeight = computed(() => {
     const s = this.#strategy();
-    return s.getTotalHeight(this.totalItems());
+    s.version();
+    return s.getTotalHeight(s.getItemCount());
   });
 
   /**

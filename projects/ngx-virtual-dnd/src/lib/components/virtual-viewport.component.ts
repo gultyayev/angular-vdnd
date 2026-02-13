@@ -33,11 +33,8 @@ import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
  * @example
  * Basic usage:
  * ```html
- * <vdnd-virtual-viewport
- *   [itemHeight]="50"
- *   [totalItems]="items().length"
- *   style="height: 400px;">
- *   <ng-container *vdndVirtualFor="let item of items(); itemHeight: 50; trackBy: trackById">
+ * <vdnd-virtual-viewport [itemHeight]="50" style="height: 400px;">
+ *   <ng-container *vdndVirtualFor="let item of items(); trackBy: trackById">
  *     <div class="item">{{ item.name }}</div>
  *   </ng-container>
  * </vdnd-virtual-viewport>
@@ -48,10 +45,9 @@ import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
  * ```html
  * <vdnd-virtual-viewport
  *   [itemHeight]="50"
- *   [totalItems]="items().length"
  *   [dynamicItemHeight]="true"
  *   style="height: 400px;">
- *   <ng-container *vdndVirtualFor="let item of items(); itemHeight: 50; dynamicItemHeight: true; trackBy: trackById">
+ *   <ng-container *vdndVirtualFor="let item of items(); trackBy: trackById">
  *     <div class="item">{{ item.name }}</div>
  *   </ng-container>
  * </vdnd-virtual-viewport>
@@ -131,9 +127,6 @@ export class VirtualViewportComponent
   /** Height of each item in pixels (used as estimate in dynamic mode) */
   itemHeight = input.required<number>();
 
-  /** Total number of items */
-  totalItems = input.required<number>();
-
   /**
    * Enable dynamic item height mode.
    * When true, items are auto-measured via ResizeObserver and `itemHeight`
@@ -169,10 +162,11 @@ export class VirtualViewportComponent
 
   // ========== Computed Values ==========
 
-  /** Total height of all items (for scroll height) */
+  /** Total height of all items (for scroll height), derived from strategy item count */
   readonly totalHeight = computed(() => {
     const s = this.#strategy();
-    return s.getTotalHeight(this.totalItems());
+    s.version();
+    return s.getTotalHeight(s.getItemCount());
   });
 
   /** Transform for content wrapper positioning */
