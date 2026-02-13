@@ -10,9 +10,13 @@ Inspired by [react-virtualized-dnd](https://github.com/forecast-it/react-virtual
 - **Dynamic Item Heights** - Auto-measured via ResizeObserver with O(log N) lookups
 - **Smooth Drag & Drop** - 60fps with RAF throttling
 - **Cross-List Support** - Drag between multiple lists with group filtering
-- **Auto-Scroll** - Scrolls when dragging near container edges
+- **Auto-Scroll** - Configurable edge scrolling with speed/threshold control
+- **Drag Handles** - Restrict drag initiation to specific elements
+- **Container Constraints** - Constrain drag preview to container boundaries
+- **Axis Locking** - Lock dragging to horizontal or vertical axis
+- **Custom Previews** - Template-based drag preview and placeholder customization
 - **Keyboard Accessible** - Space to grab, arrows to move, Escape to cancel
-- **Touch Support** - Works with mouse and touch
+- **Touch Support** - Works with mouse and touch, with configurable delay/threshold
 - **Angular 21+** - Signals, standalone components, modern patterns
 
 ## Installation
@@ -104,13 +108,13 @@ The library exports these main pieces (use IDE completion for full details):
 - `VirtualScrollContainerComponent` - Low-level virtual scroll container
 - `VirtualViewportComponent` - Self-contained virtual scroll viewport
 - `VirtualContentComponent` - Virtual content for external scroll containers (page-level scroll)
-- `DragPreviewComponent` - Renders the dragged item preview (required)
+- `DragPreviewComponent` - Renders the dragged item preview (required, supports custom templates)
 - `PlaceholderComponent` - Drop position indicator
 
 **Directives:**
 
-- `DraggableDirective` (`vdndDraggable`) - Makes an element draggable
-- `DroppableDirective` (`vdndDroppable`) - Marks a drop target
+- `DraggableDirective` (`vdndDraggable`) - Makes an element draggable (supports drag handles, axis locking, threshold/delay)
+- `DroppableDirective` (`vdndDroppable`) - Marks a drop target (supports container constraints, auto-scroll config)
 - `DroppableGroupDirective` (`vdndGroup`) - Provides group context to children
 - `ScrollableDirective` (`vdndScrollable`) - Marks external scroll container
 - `VirtualForDirective` (`*vdndVirtualFor`) - Structural directive for virtual lists
@@ -191,6 +195,128 @@ Notes:
 - Setting `dynamicItemHeight` switches to `DynamicHeightStrategy` with automatic height measurement
 - Heights are tracked by `trackBy` key, so they survive reordering
 - The `itemHeight` value is used as the initial estimate for items not yet measured
+
+### Drag Handles
+
+Use `dragHandle` with a CSS selector to restrict where users can initiate a drag:
+
+```html
+<div [vdndDraggable]="item.id" dragHandle=".handle">
+  <span class="handle">⠿</span>
+  <span>{{ item.name }}</span>
+</div>
+```
+
+Only clicks on elements matching the selector will start a drag. The rest of the element remains interactive.
+
+### Container Constraints
+
+Constrain the drag preview and placeholder to stay within the droppable container:
+
+```html
+<vdnd-sortable-list
+  droppableId="list-1"
+  group="my-group"
+  [items]="items()"
+  [itemHeight]="50"
+  [constrainToContainer]="true"
+  [itemIdFn]="getItemId"
+  [itemTemplate]="itemTpl"
+  (drop)="onDrop($event)"
+/>
+```
+
+Or on the directive directly:
+
+```html
+<div vdndDroppable="list-1" [constrainToContainer]="true">...</div>
+```
+
+The preview cannot leave the droppable area, and the placeholder snaps to the edges.
+
+### Axis Locking
+
+Lock dragging to a single axis:
+
+```html
+<div [vdndDraggable]="item.id" lockAxis="y">{{ item.name }}</div>
+```
+
+Values: `'x'` (horizontal only), `'y'` (vertical only), or omit for free movement.
+
+### Drag Threshold & Delay
+
+```html
+<div [vdndDraggable]="item.id" [dragThreshold]="10" [dragDelay]="200">{{ item.name }}</div>
+```
+
+- `dragThreshold` — minimum distance (px) before drag starts (default: `5`). Prevents accidental drags on click.
+- `dragDelay` — delay (ms) after pointer down before drag activates (default: `0`). Useful on touch devices to distinguish scrolling from dragging. Listen to `(dragReadyChange)` to show visual feedback when the delay passes.
+
+### Custom Drag Preview
+
+Provide a custom template for the drag preview:
+
+```html
+<ng-template #preview let-data let-draggableId="draggableId">
+  <div class="custom-preview">Dragging: {{ data.name }}</div>
+</ng-template>
+
+<vdnd-drag-preview [previewTemplate]="preview" [cursorOffset]="{ x: 16, y: 16 }" />
+```
+
+- `previewTemplate` — custom template for the preview. Context provides `$implicit` (the draggable's data), `draggableId`, and `droppableId`.
+- `cursorOffset` — offset from cursor in pixels (default: `{ x: 8, y: 8 }`).
+
+Without a custom template, the library clones the dragged element as the preview.
+
+### Auto-Scroll Configuration
+
+Configure auto-scroll behavior when dragging near container edges:
+
+```html
+<vdnd-sortable-list
+  droppableId="list-1"
+  group="my-group"
+  [items]="items()"
+  [itemHeight]="50"
+  [autoScrollConfig]="{ threshold: 80, maxSpeed: 20 }"
+  [itemIdFn]="getItemId"
+  [itemTemplate]="itemTpl"
+  (drop)="onDrop($event)"
+/>
+```
+
+| Option       | Default | Description                          |
+| ------------ | ------- | ------------------------------------ |
+| `threshold`  | `50`    | Distance from edge (px) to trigger   |
+| `maxSpeed`   | `15`    | Maximum scroll speed (px/frame)      |
+| `accelerate` | `true`  | Speed up based on distance from edge |
+
+Set `[autoScrollEnabled]="false"` to disable auto-scroll entirely. These options are available on `VirtualSortableListComponent`, `DroppableDirective`, and `ScrollableDirective`.
+
+### Disabling Drag & Drop
+
+Use the `disabled` input to conditionally disable draggables, droppables, or entire lists:
+
+```html
+<!-- Disable a single item -->
+<div [vdndDraggable]="item.id" [disabled]="!item.canDrag">{{ item.name }}</div>
+
+<!-- Disable an entire list -->
+<vdnd-sortable-list
+  droppableId="list-1"
+  group="my-group"
+  [items]="items()"
+  [itemHeight]="50"
+  [disabled]="isReadOnly()"
+  [itemIdFn]="getItemId"
+  [itemTemplate]="itemTpl"
+  (drop)="onDrop($event)"
+/>
+```
+
+Disabled draggables get the `vdnd-draggable-disabled` CSS class. Disabled droppables get `vdnd-droppable-disabled`.
 
 ### Low-Level API
 
@@ -361,6 +487,23 @@ ARIA attributes (`aria-grabbed`, `aria-dropeffect`, `tabindex`) are managed auto
 | `vdnd-droppable`          | Always on droppable         |
 | `vdnd-droppable-active`   | When a draggable is over it |
 | `vdnd-droppable-disabled` | When disabled               |
+
+## Events
+
+All event types are importable from `ngx-virtual-dnd`.
+
+| Output              | Event Type       | Emitted By                                           |
+| ------------------- | ---------------- | ---------------------------------------------------- |
+| `(dragStart)`       | `DragStartEvent` | `DraggableDirective`                                 |
+| `(dragMove)`        | `DragMoveEvent`  | `DraggableDirective`                                 |
+| `(dragEnd)`         | `DragEndEvent`   | `DraggableDirective`                                 |
+| `(dragReadyChange)` | `boolean`        | `DraggableDirective`                                 |
+| `(dragEnter)`       | `DragEnterEvent` | `DroppableDirective`, `VirtualSortableListComponent` |
+| `(dragLeave)`       | `DragLeaveEvent` | `DroppableDirective`, `VirtualSortableListComponent` |
+| `(dragOver)`        | `DragOverEvent`  | `DroppableDirective`, `VirtualSortableListComponent` |
+| `(drop)`            | `DropEvent`      | `DroppableDirective`, `VirtualSortableListComponent` |
+
+`DragEndEvent` includes a `cancelled` boolean to distinguish drops from cancellations.
 
 ## How It Works
 
