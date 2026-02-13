@@ -176,6 +176,8 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
 
   /** Map from observed HTMLElement to its trackBy key */
   readonly #observedElements = new WeakMap<HTMLElement, unknown>();
+  /** Stable mapping from rendered key to observed element for unobserve cleanup */
+  readonly #observedElementByKey = new Map<unknown, HTMLElement>();
 
   /** Measured height from ResizeObserver (used when containerHeight is not provided) */
   readonly #measuredHeight = signal(0);
@@ -685,6 +687,10 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   ngOnDestroy(): void {
     this.#scrollCleanup?.();
     this.#resizeCleanup?.();
+    for (const element of this.#observedElementByKey.values()) {
+      this.#itemResizeObserver?.unobserve(element);
+    }
+    this.#observedElementByKey.clear();
     this.#itemResizeObserver?.disconnect();
 
     // Unregister from auto-scroll service
@@ -734,16 +740,37 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
         );
         if (!wrapper) return;
 
+        const nextObservedByKey = new Map<unknown, HTMLElement>();
+
         for (const entry of rendered) {
           if (entry.type !== 'item' || !entry.data) continue;
           const key = idFn(entry.data);
 
           // Find the DOM element for this item by its data-draggable-id
           const el = wrapper.querySelector(`[data-draggable-id="${key}"]`) as HTMLElement | null;
-          if (el && !this.#observedElements.has(el)) {
-            this.#observedElements.set(el, key);
-            observer.observe(el);
+          if (el) {
+            nextObservedByKey.set(key, el);
           }
+        }
+
+        for (const [key, oldElement] of this.#observedElementByKey) {
+          const nextElement = nextObservedByKey.get(key);
+          if (nextElement !== oldElement) {
+            observer.unobserve(oldElement);
+          }
+        }
+
+        for (const [key, nextElement] of nextObservedByKey) {
+          const currentElement = this.#observedElementByKey.get(key);
+          if (currentElement !== nextElement) {
+            this.#observedElements.set(nextElement, key);
+            observer.observe(nextElement);
+          }
+        }
+
+        this.#observedElementByKey.clear();
+        for (const [key, element] of nextObservedByKey) {
+          this.#observedElementByKey.set(key, element);
         }
       },
       { injector: this.#injector },

@@ -8,11 +8,15 @@ import { PositionCalculatorService } from './position-calculator.service';
 class MockStrategy implements VirtualScrollStrategy {
   readonly #version = signal(0);
   readonly version = this.#version.asReadonly();
+  readonly #itemCount: number;
 
   constructor(
     private readonly offsetMap: number[],
     private readonly indexAtOffset: (offset: number) => number,
-  ) {}
+    itemCount?: number,
+  ) {
+    this.#itemCount = itemCount ?? Math.max(0, offsetMap.length - 1);
+  }
 
   getTotalHeight(itemCount: number): number {
     return itemCount * 50;
@@ -54,6 +58,10 @@ class MockStrategy implements VirtualScrollStrategy {
 
   findIndexAtOffset(offset: number): number {
     return this.indexAtOffset(offset);
+  }
+
+  getItemCount(): number {
+    return this.#itemCount;
   }
 }
 
@@ -255,5 +263,19 @@ describe('DragIndexCalculatorService', () => {
     });
 
     expect(index).toBe(1);
+  });
+
+  it('uses registered strategy item count for direct virtualized lists', () => {
+    const droppable = createDroppable('list-direct', 3);
+    const strategy = new MockStrategy([0, 50, 100, 150], (offset) => Math.floor(offset / 50), 100);
+    service.registerStrategy('list-direct', strategy);
+
+    const totalCount = service.getTotalItemCount({
+      droppableElement: droppable,
+      isSameList: false,
+      draggedItemHeight: 50,
+    });
+
+    expect(totalCount).toBe(100);
   });
 });

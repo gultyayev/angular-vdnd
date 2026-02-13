@@ -35,13 +35,36 @@ export class HeightCache {
     return this.#heightsByKey.size;
   }
 
+  /** Number of logical items in the cache */
+  get itemCount(): number {
+    return this.#keys.length;
+  }
+
   /**
    * Update the ordered list of trackBy keys.
    * This must be called whenever items change order or the array changes.
    */
-  setKeys(keys: unknown[]): void {
+  setKeys(keys: unknown[]): boolean {
+    const sameOrder =
+      keys.length === this.#keys.length &&
+      keys.every((key, index) => Object.is(key, this.#keys[index]));
+
+    const nextKeySet = new Set(keys);
+    let pruned = false;
+    for (const key of this.#heightsByKey.keys()) {
+      if (!nextKeySet.has(key)) {
+        this.#heightsByKey.delete(key);
+        pruned = true;
+      }
+    }
+
+    if (sameOrder && !pruned) {
+      return false;
+    }
+
     this.#keys = keys;
     this.#dirty = true;
+    return true;
   }
 
   /**
@@ -152,16 +175,22 @@ export class HeightCache {
     const count = this.#keys.length;
     let accumulated = 0;
     let visible = 0;
+    let stopIndex = count;
 
     for (let i = startIndex; i < count; i++) {
       if (i === this.#excludedIndex) continue;
       accumulated += this.getHeight(i);
       visible++;
-      if (accumulated >= containerHeight) break;
+      if (accumulated >= containerHeight) {
+        stopIndex = i;
+        break;
+      }
     }
 
     // Add 1 for partially visible items
-    return visible > 0 ? visible + 1 : 0;
+    if (visible === 0) return 0;
+    const hasMoreItems = stopIndex < count - 1;
+    return hasMoreItems ? visible + 1 : visible;
   }
 
   /**
@@ -174,22 +203,78 @@ export class HeightCache {
     const count = this.#keys.length;
     if (count === 0) return 0;
 
-    let accumulated = 0;
-    for (let i = 0; i < count; i++) {
-      if (i === this.#excludedIndex) continue;
-      const h = this.getHeight(i);
-      if (accumulated + h > offset) return i;
-      accumulated += h;
+    if (!Number.isFinite(offset)) {
+      return offset < 0 ? 0 : count;
     }
 
-    return count;
+    if (offset <= 0) {
+      if (this.#excludedIndex === 0) {
+        return count > 1 ? 1 : count;
+      }
+      return 0;
+    }
+
+    const excludedIndex = this.#excludedIndex;
+    if (excludedIndex < 0 || excludedIndex >= count) {
+      return this.#findFirstIndexWithBottomPastOffset(offset, 0, count - 1);
+    }
+
+    const excludedOffset = this.#offsets[excludedIndex];
+    if (offset < excludedOffset && excludedIndex > 0) {
+      return this.#findFirstIndexWithBottomPastOffset(offset, 0, excludedIndex - 1);
+    }
+
+    if (excludedIndex >= count - 1) {
+      return count;
+    }
+
+    const excludedHeight = this.getHeight(excludedIndex);
+    return this.#findFirstIndexWithBottomPastOffset(
+      offset + excludedHeight,
+      excludedIndex + 1,
+      count - 1,
+    );
   }
 
   /**
    * Set the excluded index for same-list drag.
    */
-  setExcludedIndex(index: number | null): void {
-    this.#excludedIndex = index ?? -1;
+  setExcludedIndex(index: number | null): boolean {
+    const nextIndex = index ?? -1;
+    if (this.#excludedIndex === nextIndex) {
+      return false;
+    }
+
+    this.#excludedIndex = nextIndex;
+    return true;
+  }
+
+  /**
+   * Find first logical index in [start, end] whose bottom edge is past offset.
+   * Returns one-past-end when no match is found.
+   */
+  #findFirstIndexWithBottomPastOffset(offset: number, start: number, end: number): number {
+    if (start > end) {
+      return start;
+    }
+
+    let lo = start;
+    let hi = end;
+    let result = end + 1;
+
+    while (lo <= hi) {
+      const mid = (lo + hi) >>> 1;
+      const midBottom = this.#offsets[mid] + this.getHeight(mid);
+
+      if (midBottom > offset) {
+        result = mid;
+        hi = mid - 1;
+      } else {
+        lo = mid + 1;
+      }
+    }
+
+    return result;
   }
 
   /** Raw total height without exclusion */

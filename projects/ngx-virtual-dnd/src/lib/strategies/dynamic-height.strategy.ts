@@ -56,17 +56,26 @@ export class DynamicHeightStrategy implements VirtualScrollStrategy {
   }
 
   setItemKeys(keys: unknown[]): void {
-    this.#cache.setKeys(keys);
-    this.#version.update((v) => v + 1);
+    const changed = this.#cache.setKeys(keys);
+    if (changed) {
+      this.#version.update((v) => v + 1);
+    }
   }
 
   setExcludedIndex(index: number | null): void {
-    this.#cache.setExcludedIndex(index);
-    this.#version.update((v) => v + 1);
+    const changed = this.#cache.setExcludedIndex(index);
+    if (changed) {
+      this.#version.update((v) => v + 1);
+    }
   }
 
   findIndexAtOffset(offset: number): number {
     this.#version();
     return this.#cache.findIndexAtOffset(offset);
+  }
+
+  getItemCount(): number {
+    this.#version();
+    return this.#cache.itemCount;
   }
 }

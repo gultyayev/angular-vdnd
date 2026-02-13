@@ -14,6 +14,9 @@ export class FixedHeightStrategy implements VirtualScrollStrategy {
   /** Excluded index during same-list drag (-1 = none) */
   #excludedIndex = -1;
 
+  /** Logical item count from setItemKeys (used by drag index calculator) */
+  #itemCount = 0;
+
   /** Version signal — bumps when exclusion changes */
   readonly #version = signal(0);
   readonly version = this.#version.asReadonly();
@@ -53,9 +56,8 @@ export class FixedHeightStrategy implements VirtualScrollStrategy {
     // No-op for fixed height strategy
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   setItemKeys(keys: unknown[]): void {
-    // No-op for fixed height strategy
+    this.#itemCount = keys.length;
   }
 
   setExcludedIndex(index: number | null): void {
@@ -75,5 +77,9 @@ export class FixedHeightStrategy implements VirtualScrollStrategy {
       return visualIndex + 1;
     }
     return visualIndex;
+  }
+
+  getItemCount(): number {
+    return this.#itemCount;
   }
 }

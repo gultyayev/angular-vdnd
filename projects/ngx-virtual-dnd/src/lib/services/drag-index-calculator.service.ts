@@ -243,6 +243,10 @@ export class DragIndexCalculatorService {
     // Check if a registered strategy exists
     const droppableId = this.#positionCalculator.getDroppableId(droppableElement);
     const strategy = droppableId ? this.#strategies.get(droppableId) : null;
+    const strategyItemCount = strategy?.getItemCount?.();
+    if (strategyItemCount !== undefined && Number.isFinite(strategyItemCount)) {
+      return Math.max(0, strategyItemCount);
+    }
 
     // Check for embedded virtual scroll component
     const virtualScroll = droppableElement.querySelector('vdnd-virtual-scroll');
@@ -275,8 +279,8 @@ export class DragIndexCalculatorService {
         totalHeight = (virtualScroll as HTMLElement).scrollHeight;
       }
 
-      // When strategy exists, spacer height already accounts for exclusion
-      // Don't apply same-list +1 adjustment — strategy handles it
+      // When strategy exists, spacer height already accounts for exclusion.
+      // Don't apply same-list +1 adjustment — strategy handles it.
       if (strategy) {
         const count = Math.round(totalHeight / itemHeight);
         return count;

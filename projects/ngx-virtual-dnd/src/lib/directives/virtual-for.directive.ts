@@ -391,6 +391,13 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
 
     for (const node of view.rootNodes) {
       if (node instanceof HTMLElement) {
+        const existingKey = this.#observedElements.get(node);
+        if (Object.is(existingKey, key)) {
+          continue;
+        }
+        if (existingKey !== undefined) {
+          this.#resizeObserver.unobserve(node);
+        }
         this.#observedElements.set(node, key);
         this.#resizeObserver.observe(node);
       }
