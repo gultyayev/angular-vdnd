@@ -139,12 +139,16 @@ export class DragIndexCalculatorService {
       visualIndex = Math.floor(relativeY / itemHeight);
     }
 
-    // Same-list +1 adjustment: only for the non-strategy path.
-    // When a strategy is used, findIndexAtOffset already accounts for the
-    // hidden item via setExcludedIndex, so +1 would double-count.
+    // Same-list +1 adjustment:
+    // - No strategy: always adjust when visual index is at/after source
+    // - Strategy: adjust only if exclusion has not been applied yet
+    //   (prevents an off-by-one window during early drag updates)
     let placeholderIndex = visualIndex;
-    if (!strategy && isSameList && sourceIndexValue >= 0 && visualIndex >= sourceIndexValue) {
-      placeholderIndex = visualIndex + 1;
+    if (isSameList && sourceIndexValue >= 0 && visualIndex >= sourceIndexValue) {
+      const needsAdjustment = !strategy || !this.#isSourceIndexExcluded(strategy, sourceIndexValue);
+      if (needsAdjustment) {
+        placeholderIndex = visualIndex + 1;
+      }
     }
 
     // Get total items for clamping
@@ -253,5 +257,23 @@ export class DragIndexCalculatorService {
 
   #getDraggedItemHeightFallback(height: number, fallback: number): number {
     return Number.isFinite(height) && height > 0 ? height : fallback;
+  }
+
+  /**
+   * Detect whether a strategy has already excluded the source index.
+   *
+   * With exclusion applied, the source slot collapses in visual space:
+   * offset(sourceIndex + 1) <= offset(sourceIndex). Without exclusion,
+   * the next offset is strictly greater.
+   */
+  #isSourceIndexExcluded(strategy: VirtualScrollStrategy, sourceIndex: number): boolean {
+    if (sourceIndex < 0) {
+      return false;
+    }
+
+    const sourceOffset = strategy.getOffsetForIndex(sourceIndex);
+    const nextOffset = strategy.getOffsetForIndex(sourceIndex + 1);
+
+    return nextOffset <= sourceOffset;
   }
 }
