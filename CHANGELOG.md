@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.3.0-alpha.3](https://github.com/gultyayev/angular-vdnd/compare/v1.3.0-alpha.2...v1.3.0-alpha.3) (2026-02-13)
+
+### Features
+
+- **lib:** warn of trackBy duplicates ([087f77d](https://github.com/gultyayev/angular-vdnd/commit/087f77de697854e0f7cd96431c65a4bb491f4a27))
+
 ## [1.3.0-alpha.2](https://github.com/gultyayev/angular-vdnd/compare/v1.2.3...v1.3.0-alpha.2) (2026-02-13)
 
 ### Features
