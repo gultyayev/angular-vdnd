@@ -60,6 +60,9 @@ export class DemoComponent {
   /** Whether to use the simplified API (VirtualSortableListComponent + moveItem) */
   readonly useSimplifiedApi = signal(false);
 
+  /** Constrain drag preview and placeholder to container boundaries */
+  readonly constrainToContainer = signal(false);
+
   /** Whether settings panel is expanded */
   readonly settingsExpanded = signal(true);
 
@@ -165,6 +168,12 @@ export class DemoComponent {
   toggleDragHandle(event: Event): void {
     const checkbox = event.target as HTMLInputElement;
     this.useDragHandle.set(checkbox.checked);
+  }
+
+  /** Toggle constrain to container setting */
+  toggleConstrainToContainer(event: Event): void {
+    const checkbox = event.target as HTMLInputElement;
+    this.constrainToContainer.set(checkbox.checked);
   }
 
   /** Handle drop events (verbose API) */

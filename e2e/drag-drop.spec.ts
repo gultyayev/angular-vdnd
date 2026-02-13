@@ -184,6 +184,7 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
     const sourceItem = demoPage.list1Items.first();
     const sourceBox = await sourceItem.boundingBox();
     const targetContainer = demoPage.list2VirtualScroll;
+    await targetContainer.scrollIntoViewIfNeeded();
     const targetBox = await targetContainer.boundingBox();
 
     if (!sourceBox || !targetBox) {
@@ -205,6 +206,7 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
 
     // Move to target position
     await page.mouse.move(targetX, targetY, { steps: 10 });
+    await page.mouse.move(targetX, targetY);
     // Wait for hit-testing to resolve (placeholder proves drop target is identified)
     await expect(demoPage.placeholder).toBeVisible({ timeout: 2000 });
     // Ensure rAF-throttled position update has finalized

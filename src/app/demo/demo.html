@@ -122,6 +122,16 @@
                 />
                 <span class="checkbox-text">Use drag handle</span>
               </label>
+              <label class="checkbox-label">
+                <input
+                  type="checkbox"
+                  class="checkbox"
+                  [checked]="constrainToContainer()"
+                  (change)="toggleConstrainToContainer($event)"
+                  data-testid="constrain-to-container-checkbox"
+                />
+                <span class="checkbox-text">Constrain to container</span>
+              </label>
             </div>
 
             <!-- Display Options -->
@@ -216,6 +226,7 @@
               [containerHeight]="400"
               [itemIdFn]="getItemId"
               [itemTemplate]="simplifiedItemTpl"
+              [constrainToContainer]="constrainToContainer()"
               (drop)="onDropSimplified($event)"
             />
           </div>
@@ -234,6 +245,7 @@
               [containerHeight]="400"
               [itemIdFn]="getItemId"
               [itemTemplate]="simplifiedItemTpl"
+              [constrainToContainer]="constrainToContainer()"
               (drop)="onDropSimplified($event)"
             />
           </div>
@@ -276,6 +288,7 @@
               class="list"
               vdndDroppable="list-1"
               vdndDroppableGroup="demo"
+              [constrainToContainer]="constrainToContainer()"
               (drop)="onDrop($event)"
             >
               <vdnd-virtual-scroll
@@ -300,6 +313,7 @@
               class="list"
               vdndDroppable="list-2"
               vdndDroppableGroup="demo"
+              [constrainToContainer]="constrainToContainer()"
               (drop)="onDrop($event)"
             >
               <vdnd-virtual-scroll

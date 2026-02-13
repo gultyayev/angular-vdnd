@@ -64,6 +64,7 @@ import {
       [vdndDroppableGroup]="group()"
       [vdndDroppableData]="droppableData()"
       [disabled]="disabled()"
+      [constrainToContainer]="constrainToContainer()"
       (dragEnter)="dragEnter.emit($event)"
       (dragLeave)="dragLeave.emit($event)"
       (dragOver)="dragOver.emit($event)"
@@ -150,6 +151,9 @@ export class VirtualSortableListComponent<T> {
 
   /** Auto-scroll configuration */
   autoScrollConfig = input<Partial<AutoScrollConfig>>({});
+
+  /** Constrain drag preview and placeholder to container boundaries */
+  constrainToContainer = input<boolean>(false);
 
   // ========== Outputs ==========
 

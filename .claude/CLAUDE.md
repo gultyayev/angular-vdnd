@@ -72,13 +72,13 @@ _`HeightCache` utility: `lib/utils/height-cache.ts`_
 
 ### Directives
 
-| Directive               | Selector          | Key Inputs                                                 |
-| ----------------------- | ----------------- | ---------------------------------------------------------- |
-| DraggableDirective      | `vdndDraggable`   | ID (required), group, data, disabled                       |
-| DroppableDirective      | `vdndDroppable`   | ID (required), group, data, autoScrollConfig, disabled     |
-| DroppableGroupDirective | `vdndGroup`       | group name (required)                                      |
-| ScrollableDirective     | `vdndScrollable`  | scrollContainerId, autoScrollEnabled, autoScrollConfig     |
-| VirtualForDirective     | `*vdndVirtualFor` | items, itemHeight, trackBy, dynamicItemHeight, droppableId |
+| Directive               | Selector          | Key Inputs                                                                   |
+| ----------------------- | ----------------- | ---------------------------------------------------------------------------- |
+| DraggableDirective      | `vdndDraggable`   | ID (required), group, data, disabled                                         |
+| DroppableDirective      | `vdndDroppable`   | ID (required), group, data, autoScrollConfig, constrainToContainer, disabled |
+| DroppableGroupDirective | `vdndGroup`       | group name (required)                                                        |
+| ScrollableDirective     | `vdndScrollable`  | scrollContainerId, autoScrollEnabled, autoScrollConfig                       |
+| VirtualForDirective     | `*vdndVirtualFor` | items, itemHeight, trackBy, dynamicItemHeight, droppableId                   |
 
 ### Components
 
@@ -115,28 +115,30 @@ AutoScrollService → DragStateService, PositionCalculatorService
 
 ### Data Attributes
 
-| Attribute              | Set By              | Used For                             |
-| ---------------------- | ------------------- | ------------------------------------ |
-| `data-draggable-id`    | DraggableDirective  | Identify draggable elements          |
-| `data-droppable-id`    | DroppableDirective  | Identify drop targets                |
-| `data-droppable-group` | DroppableDirective  | Group membership for cross-list drag |
-| `data-item-height`     | VirtualForDirective | Virtual scroll item height           |
+| Attribute                     | Set By              | Used For                             |
+| ----------------------------- | ------------------- | ------------------------------------ |
+| `data-draggable-id`           | DraggableDirective  | Identify draggable elements          |
+| `data-droppable-id`           | DroppableDirective  | Identify drop targets                |
+| `data-droppable-group`        | DroppableDirective  | Group membership for cross-list drag |
+| `data-constrain-to-container` | DroppableDirective  | Clamp drag to container boundaries   |
+| `data-item-height`            | VirtualForDirective | Virtual scroll item height           |
 
 ### Test Files
 
-| Source Area         | Unit Test                       | E2E Tests                                                       |
-| ------------------- | ------------------------------- | --------------------------------------------------------------- |
-| DraggableDirective  | `draggable.directive.spec.ts`   | `drag-drop.spec.ts`, `keyboard-drag/*.spec.ts`                  |
-| KeyboardDragHandler | `keyboard-drag.handler.spec.ts` | -                                                               |
-| PointerDragHandler  | `pointer-drag.handler.spec.ts`  | -                                                               |
-| DroppableDirective  | `droppable.directive.spec.ts`   | `drop-accuracy.spec.ts`                                         |
-| DragStateService    | `drag-state.service.spec.ts`    | -                                                               |
-| AutoScrollService   | `auto-scroll.service.spec.ts`   | `auto-scroll.spec.ts`, `autoscroll-drift.spec.ts`               |
-| Placeholder logic   | -                               | `placeholder-behavior.spec.ts`, `placeholder-integrity.spec.ts` |
-| Keyboard drag       | -                               | `keyboard-drag/*.spec.ts` (6 files)                             |
-| Page scroll         | -                               | `page-scroll.spec.ts`                                           |
-| Mobile touch        | -                               | `touch-scroll.mobile.spec.ts`                                   |
-| Dynamic height      | -                               | `dynamic-height.spec.ts`                                        |
+| Source Area          | Unit Test                       | E2E Tests                                                       |
+| -------------------- | ------------------------------- | --------------------------------------------------------------- |
+| DraggableDirective   | `draggable.directive.spec.ts`   | `drag-drop.spec.ts`, `keyboard-drag/*.spec.ts`                  |
+| KeyboardDragHandler  | `keyboard-drag.handler.spec.ts` | -                                                               |
+| PointerDragHandler   | `pointer-drag.handler.spec.ts`  | -                                                               |
+| DroppableDirective   | `droppable.directive.spec.ts`   | `drop-accuracy.spec.ts`                                         |
+| DragStateService     | `drag-state.service.spec.ts`    | -                                                               |
+| AutoScrollService    | `auto-scroll.service.spec.ts`   | `auto-scroll.spec.ts`, `autoscroll-drift.spec.ts`               |
+| Placeholder logic    | -                               | `placeholder-behavior.spec.ts`, `placeholder-integrity.spec.ts` |
+| Container constraint | -                               | `constrain-to-container.spec.ts`                                |
+| Keyboard drag        | -                               | `keyboard-drag/*.spec.ts` (6 files)                             |
+| Page scroll          | -                               | `page-scroll.spec.ts`                                           |
+| Mobile touch         | -                               | `touch-scroll.mobile.spec.ts`                                   |
+| Dynamic height       | -                               | `dynamic-height.spec.ts`                                        |
 
 ### Public API (from public-api.ts)
 

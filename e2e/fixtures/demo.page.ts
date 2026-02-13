@@ -262,4 +262,11 @@ export class DemoPage {
     const container = list === 'list1' ? this.list1VirtualScroll : this.list2VirtualScroll;
     return container.locator('.item:not([style*="display: none"]), vdnd-drag-placeholder').count();
   }
+
+  /**
+   * Enable constrain to container setting.
+   */
+  async enableConstrainToContainer(): Promise<void> {
+    await this.page.getByTestId('constrain-to-container-checkbox').click();
+  }
 }
