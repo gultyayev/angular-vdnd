@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.3.0-alpha.2](https://github.com/gultyayev/angular-vdnd/compare/v1.2.3...v1.3.0-alpha.2) (2026-02-13)
+
+### Features
+
+- **lib:** add dynamic item height support for virtual scroll ([#15](https://github.com/gultyayev/angular-vdnd/issues/15)) ([a7479e3](https://github.com/gultyayev/angular-vdnd/commit/a7479e38671b8269b897fa56f781a7182609e150))
+- **lib:** constrain drag by container ([#16](https://github.com/gultyayev/angular-vdnd/issues/16)) ([2fe954f](https://github.com/gultyayev/angular-vdnd/commit/2fe954f4b2cc3f92929bad01df679b7692243197))
+
+### Bug Fixes
+
+- **lib:** don't print warnings in prod mode ([d987c96](https://github.com/gultyayev/angular-vdnd/commit/d987c96bbd98c8ae0a5d94c9668d02a6e06f7792))
+- **lib:** stabilize same-list dynamic placeholder index before exclusion sync ([fe6063d](https://github.com/gultyayev/angular-vdnd/commit/fe6063dc77cdc8db02e5ca814d78daf23fe4854c))
+
 ## [1.3.0-alpha.1](https://github.com/gultyayev/angular-vdnd/compare/v1.3.0-alpha.0...v1.3.0-alpha.1) (2026-02-12)
 
 ### Bug Fixes
