@@ -49,6 +49,7 @@ import { createEffectiveGroupSignal } from '../utils/group-resolution';
   host: {
     '[attr.data-droppable-id]': 'vdndDroppable()',
     '[attr.data-droppable-group]': 'effectiveGroup()',
+    '[attr.data-constrain-to-container]': 'constrainToContainer() || null',
     '[attr.aria-dropeffect]': '"move"',
     '[class.vdnd-droppable]': 'true',
     '[class.vdnd-droppable-active]': 'isActive()',
@@ -92,6 +93,9 @@ export class DroppableDirective implements OnInit, OnDestroy {
 
   /** Auto-scroll configuration */
   autoScrollConfig = input<Partial<AutoScrollConfig>>({});
+
+  /** Constrain drag preview and placeholder to container boundaries */
+  constrainToContainer = input<boolean>(false);
 
   /** Emits when a dragged item enters this droppable */
   dragEnter = output<DragEnterEvent>();

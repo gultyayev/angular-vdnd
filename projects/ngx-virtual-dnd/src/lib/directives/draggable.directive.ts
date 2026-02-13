@@ -151,6 +151,12 @@ export class DraggableDirective implements OnInit, OnDestroy {
   #keyboardHandler!: KeyboardDragHandler;
   #pointerHandler!: PointerDragHandler;
 
+  /** Cached source droppable element for container constraint checks */
+  #sourceDroppableElement: HTMLElement | null = null;
+
+  /** Cached constraint flag from source droppable */
+  #constrainToContainer = false;
+
   /**
    * Update the pending state and emit the change event.
    */
@@ -321,6 +327,11 @@ export class DraggableDirective implements OnInit, OnDestroy {
       groupName,
     );
 
+    // Cache source droppable element and constrain flag for clamping during drag
+    this.#sourceDroppableElement = droppableElement;
+    this.#constrainToContainer =
+      droppableElement?.hasAttribute('data-constrain-to-container') ?? false;
+
     const activeDroppableId = droppableElement
       ? this.#positionCalculator.getDroppableId(droppableElement)
       : parentDroppableId;
@@ -433,6 +444,35 @@ export class DraggableDirective implements OnInit, OnDestroy {
   }
 
   /**
+   * Clamp cursor position to source container boundaries when constrainToContainer is enabled.
+   */
+  #clampToContainer(position: CursorPosition): CursorPosition {
+    if (!this.#constrainToContainer || !this.#sourceDroppableElement) {
+      return position;
+    }
+
+    const containerRect = this.#sourceDroppableElement.getBoundingClientRect();
+    const grabOffset = this.#dragState.grabOffset();
+    if (!grabOffset) {
+      return position;
+    }
+
+    const draggedItem = this.#dragState.draggedItem();
+    const itemHeight = draggedItem?.height ?? 0;
+    const itemWidth = draggedItem?.width ?? 0;
+
+    const minY = containerRect.top + grabOffset.y + 1;
+    const maxY = containerRect.bottom - (itemHeight - grabOffset.y) - 1;
+    const minX = containerRect.left + grabOffset.x + 1;
+    const maxX = containerRect.right - (itemWidth - grabOffset.x) - 1;
+
+    return {
+      x: Math.max(minX, Math.min(position.x, maxX)),
+      y: Math.max(minY, Math.min(position.y, maxY)),
+    };
+  }
+
+  /**
    * Update the drag position.
    * @param position Current cursor position
    */
@@ -459,7 +499,10 @@ export class DraggableDirective implements OnInit, OnDestroy {
       };
     }
 
-    // Find droppable at effective position (respects axis locking)
+    // Apply container clamping after axis locking
+    effectivePosition = this.#clampToContainer(effectivePosition);
+
+    // Find droppable at effective position (respects axis locking and clamping)
     const droppableElement = this.#positionCalculator.findDroppableAtPoint(
       effectivePosition.x,
       effectivePosition.y,
@@ -491,10 +534,10 @@ export class DraggableDirective implements OnInit, OnDestroy {
       placeholderId = indexResult.placeholderId;
     }
 
-    // Update drag state with actual cursor position (for preview rendering)
+    // Update drag state with effective position (respects axis locking and container clamping)
     // No ngZone.run() needed - signals work outside zone and effects react automatically
     this.#dragState.updateDragPosition({
-      cursorPosition: position,
+      cursorPosition: effectivePosition,
       activeDroppableId,
       placeholderId,
       placeholderIndex,
@@ -518,6 +561,10 @@ export class DraggableDirective implements OnInit, OnDestroy {
     // No ngZone.run() needed - signals work outside zone and effects react automatically
     // Stop auto-scroll monitoring
     this.#autoScroll.stopMonitoring();
+
+    // Reset cached constraint state
+    this.#sourceDroppableElement = null;
+    this.#constrainToContainer = false;
 
     const sourceIndex = this.#dragState.sourceIndex() ?? 0;
     const placeholderIndex = this.#dragState.placeholderIndex();
