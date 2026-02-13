@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.3.0-alpha.6](https://github.com/gultyayev/angular-vdnd/compare/v1.3.0-alpha.5...v1.3.0-alpha.6) (2026-02-13)
+
+### Bug Fixes
+
+- **lib:** dynamic height drift cases ([916d97e](https://github.com/gultyayev/angular-vdnd/commit/916d97eded0261ccb135daafc3b4d0b0b56cc29b))
+
 ## [1.3.0-alpha.5](https://github.com/gultyayev/angular-vdnd/compare/v1.3.0-alpha.4...v1.3.0-alpha.5) (2026-02-13)
 
 ### Bug Fixes
