@@ -239,7 +239,7 @@ describe('DragIndexCalculatorService', () => {
     expect(bottomIndex).toBe(12);
   });
 
-  it('uses preview bounds in constrained mode so tall items can move above short first item', () => {
+  it('uses edge snapping in constrained mode so tall items can reach first slot', () => {
     const itemHeight = 65;
     const offsets = [0, 65, 130, 195, 260, 325, 390, 455, 520, 585, 650, 715, 780];
     const strategy = new MockStrategy(
@@ -251,9 +251,11 @@ describe('DragIndexCalculatorService', () => {
     const draggedItemHeight = 130;
     const grabOffset = { x: 20, y: 65 };
 
+    // When clamped at container top, preview top ≈ 1px from container edge.
+    // Edge snapping detects this and overrides to index 0.
     const index = calculateIndex({
       strategy,
-      position: { x: 20, y: 105 }, // preview top = 40, center = 105 (would be index 1 by center)
+      position: { x: 20, y: 66 }, // clamped to top: previewTop = 1
       grabOffset,
       draggedItemHeight,
       sourceDroppableId: null,
@@ -437,6 +439,69 @@ describe('DragIndexCalculatorService', () => {
 
     expect(shallowOverlap.index).toBe(1);
     expect(deepOverlap.index).toBe(0);
+  });
+
+  it('constrained mode gives same index as unconstrained for dynamic heights', () => {
+    // Items: [150px, 60px, 60px, 60px, 60px]
+    // Offsets: [0, 150, 210, 270, 330, 390]
+    // Bug: constrained mode uses previewTopY instead of capped center,
+    // and skips midpoint refinement — causing the placeholder to lag.
+    const offsets = [0, 150, 210, 270, 330, 390];
+    const strategy = new MockStrategy(
+      offsets,
+      (offset) => {
+        if (offset < 150) return 0;
+        if (offset < 210) return 1;
+        if (offset < 270) return 2;
+        if (offset < 330) return 3;
+        if (offset < 390) return 4;
+        return 5;
+      },
+      5,
+      80,
+      [150, 60, 60, 60, 60],
+    );
+
+    const grabOffset = { x: 20, y: 60 };
+    // Cursor at y=220: preview top = 160 (in item 1 range 150-210),
+    // capped center = min(220, 160+40) = 200 (in item 1 range too).
+    // Midpoint of item 1 = (150+210)/2 = 180. previewTop 160 < 180 → stays at 1.
+    //
+    // With bug: constrained uses previewTopY=160, findIndexAtOffset(160)=1,
+    // but without midpoint refinement, displacement may differ for other positions.
+    //
+    // At y=250: preview top = 190 (in item 1 range 150-210),
+    // capped center = min(250, 190+40) = 230 (in item 2 range 210-270) → index 2.
+    // Midpoint of item 2 = (210+270)/2 = 240. previewTop 190 < 240 → stays at 2.
+    //
+    // Bug: constrained probe at 190, findIndexAtOffset(190)=1 → index 1, not 2.
+    const position = { x: 20, y: 250 };
+
+    const unconstrainedIndex = calculateIndex({
+      strategy,
+      position,
+      grabOffset,
+      draggedItemHeight: 120,
+      sourceDroppableId: null,
+      sourceIndex: null,
+      itemCount: 5,
+      constrained: false,
+    });
+
+    const constrainedIndex = calculateIndex({
+      strategy,
+      position,
+      grabOffset,
+      draggedItemHeight: 120,
+      sourceDroppableId: null,
+      sourceIndex: null,
+      itemCount: 5,
+      constrained: true,
+    });
+
+    // Both should give index 2 — cursor center is solidly in item 2's range
+    expect(unconstrainedIndex).toBe(2);
+    expect(constrainedIndex).toBe(2);
   });
 
   it('uses registered strategy item count for direct virtualized lists', () => {

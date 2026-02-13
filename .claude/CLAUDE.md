@@ -283,7 +283,7 @@ effect(() => {
    - **Midpoint refinement** (strategy path only): After `findIndexAtOffset` returns an index, checks whether the preview's top edge has passed the target item's midpoint. Only then advances `visualIndex` by 1. Prevents a short preview (e.g. 60px entering a 150px item) from triggering displacement at ~20% overlap — displacement now requires 50% of the target item's actual height.
    - These solve opposite directions of the height mismatch: the cap pulls the probe **up** (tall preview → short items), midpoint pushes the index **down** (short preview → tall items). Removing either breaks the other's scenario.
    - Fixed-height path uses `Math.floor(relativeY / itemHeight)` directly (no refinement needed since all items are the same height).
-   - Constrained mode (`constrainToContainer`) uses preview top edge for index probing so tall items can reach the first slot, and snaps to edges when preview bounds are near container boundaries. Midpoint refinement is skipped in constrained mode.
+   - Constrained mode (`constrainToContainer`) uses the same capped center probe and midpoint refinement as unconstrained mode. Edge snapping overrides the index to 0 or totalItems when the preview bounds are within 2px of the droppable container edges (needed because clamping prevents the probe from reaching the first/last slot for tall items).
 
 2. **Same-list adjustment applied once**: When dragging within the same list, apply +1 adjustment when `visualIndex >= sourceIndex` to compensate for hidden item.
 

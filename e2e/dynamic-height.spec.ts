@@ -486,6 +486,71 @@ test.describe('Dynamic Height Demo', () => {
     await page.mouse.up();
   });
 
+  test('should reorder correctly with constrainToContainer enabled', async ({ page }) => {
+    // Enable constrain-to-container on the droppable element
+    await page.evaluate(() => {
+      const droppable = document.querySelector('[data-droppable-id="tasks"]');
+      if (droppable) {
+        droppable.setAttribute('data-constrain-to-container', '');
+      }
+    });
+
+    // Capture item texts before drag
+    const firstItemText = await page
+      .locator('.task-item')
+      .first()
+      .locator('.task-title')
+      .textContent();
+    const secondItemText = await page
+      .locator('.task-item')
+      .nth(1)
+      .locator('.task-title')
+      .textContent();
+
+    // Get source (item 0) and target (item 1) positions
+    const sourceItem = page.locator('.task-item').first();
+    const sourceBox = await sourceItem.boundingBox();
+    if (!sourceBox) throw new Error('Could not get source bounding box');
+
+    const targetItem = page.locator('.task-item').nth(1);
+    const targetBox = await targetItem.boundingBox();
+    if (!targetBox) throw new Error('Could not get target bounding box');
+
+    // Start drag
+    await sourceItem.hover();
+    await page.mouse.down();
+    await page.mouse.move(sourceBox.x + sourceBox.width / 2 + 5, sourceBox.y + 5, { steps: 2 });
+
+    const dragPreview = page.locator('.vdnd-drag-preview');
+    await expect(dragPreview).toBeVisible({ timeout: 2000 });
+
+    // Move to center of second item — with the bug (top-edge probe + no midpoint
+    // refinement), the placeholder index would lag behind the preview position.
+    const targetY = targetBox.y + targetBox.height / 2;
+    await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY, { steps: 10 });
+
+    // Wait one rAF before drop
+    await page.waitForTimeout(50);
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+
+    // Item 0 should have moved past item 1 — second item is now first
+    const newFirstItemText = await page
+      .locator('.task-item')
+      .nth(0)
+      .locator('.task-title')
+      .textContent();
+    expect(newFirstItemText?.trim()).toBe(secondItemText?.trim());
+
+    // Original first item should now be at index 1
+    const newSecondItemText = await page
+      .locator('.task-item')
+      .nth(1)
+      .locator('.task-title')
+      .textContent();
+    expect(newSecondItemText?.trim()).toBe(firstItemText?.trim());
+  });
+
   test('should not emit ResizeObserver errors', async ({ page }) => {
     let resizeObserverErrors = 0;
 

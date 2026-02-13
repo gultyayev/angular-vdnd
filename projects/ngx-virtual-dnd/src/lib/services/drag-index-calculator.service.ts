@@ -126,12 +126,11 @@ export class DragIndexCalculatorService {
     const previewCenterY = previewTopY + previewHeight / 2;
     const isConstrainedToContainer = droppableElement.hasAttribute('data-constrain-to-container');
 
-    // Constrained mode uses top edge for index probing so tall items
-    // can reach the first slot. Otherwise use preview center — it gives
-    // a balanced 50% displacement threshold that is direction-independent.
-    const indexProbeY = isConstrainedToContainer
-      ? previewTopY
-      : Math.min(previewCenterY, previewTopY + itemHeight / 2);
+    // Capped center probe: use preview center but limit how deep the probe reaches.
+    // The cap prevents a tall preview (e.g. 120px among 60px items) from overshooting
+    // multiple positions — the center would land 2+ items away, but the cap keeps it
+    // within one item of the top edge.
+    const indexProbeY = Math.min(previewCenterY, previewTopY + itemHeight / 2);
 
     // Convert to visual index
     const relativeY = indexProbeY - rect.top + currentScrollTop;
@@ -144,18 +143,16 @@ export class DragIndexCalculatorService {
     if (strategy) {
       visualIndex = strategy.findIndexAtOffset(relativeY);
 
-      // Midpoint refinement for variable heights (unconstrained only):
+      // Midpoint refinement for variable heights:
       // Only advance past an item when the preview top has crossed its midpoint.
       // Without this, a short preview entering a tall item's range triggers
       // displacement at ~20% overlap, which looks like unnatural overlapping.
-      if (!isConstrainedToContainer) {
-        const topRelativeY = previewTopY - rect.top + currentScrollTop;
-        const targetTop = strategy.getOffsetForIndex(visualIndex);
-        const targetBottom = strategy.getOffsetForIndex(visualIndex + 1);
-        const targetMidpoint = (targetTop + targetBottom) / 2;
-        if (topRelativeY >= targetMidpoint) {
-          visualIndex += 1;
-        }
+      const topRelativeY = previewTopY - rect.top + currentScrollTop;
+      const targetTop = strategy.getOffsetForIndex(visualIndex);
+      const targetBottom = strategy.getOffsetForIndex(visualIndex + 1);
+      const targetMidpoint = (targetTop + targetBottom) / 2;
+      if (topRelativeY >= targetMidpoint) {
+        visualIndex += 1;
       }
     } else {
       // Fixed height: simple division
@@ -181,8 +178,7 @@ export class DragIndexCalculatorService {
     // Due to max scroll limits, the math alone can't reach totalItems when the list is longer
     // than the viewport. If cursor is in the bottom portion of the container and we're at
     // or past the last visible slot, snap to totalItems.
-    const bottomProbeY = isConstrainedToContainer ? previewBottomY : previewCenterY;
-    const cursorRelativeToBottom = rect.bottom - bottomProbeY;
+    const cursorRelativeToBottom = rect.bottom - previewCenterY;
     const isNearBottomEdge = cursorRelativeToBottom < itemHeight;
     if (isNearBottomEdge && placeholderIndex >= totalItems - 1) {
       placeholderIndex = totalItems;
@@ -192,9 +188,10 @@ export class DragIndexCalculatorService {
     // cover the first/last slots while their center never reaches them. Snap to edges
     // using preview bounds so top/bottom drops remain reachable.
     if (isConstrainedToContainer) {
+      const droppableRect = droppableElement.getBoundingClientRect();
       const edgeTolerance = 2;
-      const distanceToTop = Math.abs(previewTopY - rect.top);
-      const distanceToBottom = Math.abs(rect.bottom - previewBottomY);
+      const distanceToTop = Math.abs(previewTopY - droppableRect.top);
+      const distanceToBottom = Math.abs(droppableRect.bottom - previewBottomY);
 
       if (distanceToTop <= edgeTolerance && distanceToTop <= distanceToBottom) {
         placeholderIndex = 0;
