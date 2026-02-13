@@ -120,7 +120,10 @@ export class DragIndexCalculatorService {
     // Using math avoids Safari's stale getBoundingClientRect() issue during autoscroll
     // Use actual dragged item height when available (important for dynamic heights)
     const previewHeight = this.#getDraggedItemHeightFallback(draggedItemHeight, itemHeight);
-    const previewCenterY = position.y - (grabOffset?.y ?? 0) + previewHeight / 2;
+    const previewTopY = position.y - (grabOffset?.y ?? 0);
+    const previewBottomY = previewTopY + previewHeight;
+    const previewCenterY = previewTopY + previewHeight / 2;
+    const isConstrainedToContainer = droppableElement.hasAttribute('data-constrain-to-container');
 
     // Convert to visual index
     const relativeY = previewCenterY - rect.top + currentScrollTop;
@@ -158,10 +161,26 @@ export class DragIndexCalculatorService {
     // Due to max scroll limits, the math alone can't reach totalItems when the list is longer
     // than the viewport. If cursor is in the bottom portion of the container and we're at
     // or past the last visible slot, snap to totalItems.
-    const cursorRelativeToBottom = rect.bottom - previewCenterY;
+    const bottomProbeY = isConstrainedToContainer ? previewBottomY : previewCenterY;
+    const cursorRelativeToBottom = rect.bottom - bottomProbeY;
     const isNearBottomEdge = cursorRelativeToBottom < itemHeight;
     if (isNearBottomEdge && placeholderIndex >= totalItems - 1) {
       placeholderIndex = totalItems;
+    }
+
+    // When the preview is constrained to the container bounds, large dragged items can
+    // cover the first/last slots while their center never reaches them. Snap to edges
+    // using preview bounds so top/bottom drops remain reachable.
+    if (isConstrainedToContainer) {
+      const edgeTolerance = 2;
+      const distanceToTop = Math.abs(previewTopY - rect.top);
+      const distanceToBottom = Math.abs(rect.bottom - previewBottomY);
+
+      if (distanceToTop <= edgeTolerance && distanceToTop <= distanceToBottom) {
+        placeholderIndex = 0;
+      } else if (distanceToBottom <= edgeTolerance) {
+        placeholderIndex = totalItems;
+      }
     }
 
     // Clamp to valid range

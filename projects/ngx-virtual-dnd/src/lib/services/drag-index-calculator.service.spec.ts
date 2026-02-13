@@ -67,10 +67,13 @@ describe('DragIndexCalculatorService', () => {
     service = TestBed.inject(DragIndexCalculatorService);
   });
 
-  function createDroppable(id: string, itemCount = 5): HTMLElement {
+  function createDroppable(id: string, itemCount = 5, constrained = false): HTMLElement {
     const droppable = document.createElement('div');
     droppable.setAttribute('data-droppable-id', id);
     droppable.setAttribute('data-droppable-group', 'test-group');
+    if (constrained) {
+      droppable.setAttribute('data-constrain-to-container', '');
+    }
 
     for (let i = 0; i < itemCount; i++) {
       const child = document.createElement('div');
@@ -100,8 +103,10 @@ describe('DragIndexCalculatorService', () => {
     draggedItemHeight: number;
     sourceDroppableId: string | null;
     sourceIndex: number | null;
+    itemCount?: number;
+    constrained?: boolean;
   }): number {
-    const droppable = createDroppable('list-1');
+    const droppable = createDroppable('list-1', args.itemCount ?? 5, args.constrained ?? false);
     service.registerStrategy('list-1', args.strategy);
 
     return service.calculatePlaceholderIndex({
@@ -150,5 +155,39 @@ describe('DragIndexCalculatorService', () => {
     });
 
     expect(index).toBe(3);
+  });
+
+  it('allows constrained drag with tall preview to drop at top and bottom edges', () => {
+    const strategy = new MockStrategy(
+      [0, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600],
+      (offset) => Math.floor(offset / 50),
+    );
+    const draggedItemHeight = 240;
+    const grabOffset = { x: 20, y: 120 };
+
+    const topIndex = calculateIndex({
+      strategy,
+      position: { x: 20, y: 121 }, // clamped top: preview top = 1px
+      grabOffset,
+      draggedItemHeight,
+      sourceDroppableId: null,
+      sourceIndex: null,
+      itemCount: 12,
+      constrained: true,
+    });
+
+    const bottomIndex = calculateIndex({
+      strategy,
+      position: { x: 20, y: 379 }, // clamped bottom: preview bottom = 499px
+      grabOffset,
+      draggedItemHeight,
+      sourceDroppableId: null,
+      sourceIndex: null,
+      itemCount: 12,
+      constrained: true,
+    });
+
+    expect(topIndex).toBe(0);
+    expect(bottomIndex).toBe(12);
   });
 });
