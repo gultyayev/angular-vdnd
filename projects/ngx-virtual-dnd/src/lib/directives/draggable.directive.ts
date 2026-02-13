@@ -347,6 +347,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
       const indexResult = this.#dragIndexCalculator.calculatePlaceholderIndex({
         droppableElement,
         position,
+        previousPosition: null,
         grabOffset,
         draggedItemHeight: rect.height,
         sourceDroppableId: parentDroppableId,
@@ -525,6 +526,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
       const indexResult = this.#dragIndexCalculator.calculatePlaceholderIndex({
         droppableElement,
         position: effectivePosition,
+        previousPosition: this.#dragState.cursorPosition(),
         grabOffset: this.#dragState.grabOffset(),
         draggedItemHeight,
         sourceDroppableId: this.#dragState.sourceDroppableId(),

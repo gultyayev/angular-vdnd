@@ -277,7 +277,11 @@ effect(() => {
 
 ### Key Architectural Decisions
 
-1. **Placeholder index uses preview CENTER**: The center of the drag preview determines placeholder position.
+1. **Placeholder index probe is strategy-aware**:
+   - Fixed-height behavior uses preview center.
+   - Dynamic-height behavior uses direction-aware bounds (`top` when moving up, `bottom` when moving down) for natural mixed-size displacement.
+   - Constrained mode (`constrainToContainer`) keeps top/bottom edge drops reachable by probing preview bounds near container edges.
+   - Direction comes from consecutive cursor positions (`previousPosition -> position`) with last non-zero direction cached per droppable during drag.
 
 2. **Same-list adjustment applied once**: When dragging within the same list, apply +1 adjustment when `visualIndex >= sourceIndex` to compensate for hidden item.
 
@@ -458,7 +462,7 @@ Use ONLY for understanding visual layout, not as primary verification.
 
 ### Cleanup
 
-Always kill `ng serve` before reporting task fixed:
+Always kill `ng serve` before reporting task fixed. Skip if did not use any Chrome MCP tools.
 
 ```bash
 pkill -f "ng serve"

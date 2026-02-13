@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { type CursorPosition, END_OF_LIST, type GrabOffset } from '../models/drag-drop.models';
 import { PositionCalculatorService } from './position-calculator.service';
 import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
+import { FixedHeightStrategy } from '../strategies/fixed-height.strategy';
 
 @Injectable({
   providedIn: 'root',
@@ -11,6 +12,8 @@ export class DragIndexCalculatorService {
 
   /** Registered strategies by droppable ID */
   readonly #strategies = new Map<string, VirtualScrollStrategy>();
+  /** Last non-zero vertical movement direction per droppable (-1 up, +1 down) */
+  readonly #lastVerticalDirection = new Map<string, -1 | 1>();
 
   /**
    * Register a virtual scroll strategy for a droppable.
@@ -46,6 +49,7 @@ export class DragIndexCalculatorService {
   calculatePlaceholderIndex(args: {
     droppableElement: HTMLElement;
     position: CursorPosition;
+    previousPosition: CursorPosition | null;
     grabOffset: GrabOffset | null;
     draggedItemHeight: number;
     sourceDroppableId: string | null;
@@ -54,6 +58,7 @@ export class DragIndexCalculatorService {
     const {
       droppableElement,
       position,
+      previousPosition,
       grabOffset,
       draggedItemHeight,
       sourceDroppableId,
@@ -124,9 +129,47 @@ export class DragIndexCalculatorService {
     const previewBottomY = previewTopY + previewHeight;
     const previewCenterY = previewTopY + previewHeight / 2;
     const isConstrainedToContainer = droppableElement.hasAttribute('data-constrain-to-container');
+    const isDynamicLikeStrategy = strategy !== null && !(strategy instanceof FixedHeightStrategy);
+    const movementDeltaY = previousPosition ? position.y - previousPosition.y : 0;
+
+    if (currentDroppableId && previousPosition === null) {
+      this.#lastVerticalDirection.delete(currentDroppableId);
+    }
+
+    if (currentDroppableId) {
+      if (movementDeltaY < 0) {
+        this.#lastVerticalDirection.set(currentDroppableId, -1);
+      } else if (movementDeltaY > 0) {
+        this.#lastVerticalDirection.set(currentDroppableId, 1);
+      }
+    }
+
+    const verticalDirection: -1 | 0 | 1 =
+      movementDeltaY < 0
+        ? -1
+        : movementDeltaY > 0
+          ? 1
+          : currentDroppableId
+            ? (this.#lastVerticalDirection.get(currentDroppableId) ?? 0)
+            : 0;
+
+    // Direction-aware boundary probing for dynamic heights:
+    // - moving up -> top boundary
+    // - moving down -> bottom boundary
+    // This matches natural displacement with mixed-size items.
+    let indexProbeY = previewCenterY;
+    if (isConstrainedToContainer) {
+      indexProbeY = previewTopY;
+    } else if (isDynamicLikeStrategy) {
+      if (verticalDirection < 0) {
+        indexProbeY = previewTopY;
+      } else if (verticalDirection > 0) {
+        indexProbeY = previewBottomY;
+      }
+    }
 
     // Convert to visual index
-    const relativeY = previewCenterY - rect.top + currentScrollTop;
+    const relativeY = indexProbeY - rect.top + currentScrollTop;
 
     // Determine same-list drag info before strategy branch
     const isSameList = sourceDroppableId !== null && sourceDroppableId === currentDroppableId;
@@ -161,7 +204,10 @@ export class DragIndexCalculatorService {
     // Due to max scroll limits, the math alone can't reach totalItems when the list is longer
     // than the viewport. If cursor is in the bottom portion of the container and we're at
     // or past the last visible slot, snap to totalItems.
-    const bottomProbeY = isConstrainedToContainer ? previewBottomY : previewCenterY;
+    const bottomProbeY =
+      isConstrainedToContainer || (isDynamicLikeStrategy && verticalDirection > 0)
+        ? previewBottomY
+        : previewCenterY;
     const cursorRelativeToBottom = rect.bottom - bottomProbeY;
     const isNearBottomEdge = cursorRelativeToBottom < itemHeight;
     if (isNearBottomEdge && placeholderIndex >= totalItems - 1) {

@@ -99,6 +99,7 @@ describe('DragIndexCalculatorService', () => {
   function calculateIndex(args: {
     strategy: VirtualScrollStrategy;
     position: CursorPosition;
+    previousPosition?: CursorPosition | null;
     grabOffset: GrabOffset | null;
     draggedItemHeight: number;
     sourceDroppableId: string | null;
@@ -112,6 +113,7 @@ describe('DragIndexCalculatorService', () => {
     return service.calculatePlaceholderIndex({
       droppableElement: droppable,
       position: args.position,
+      previousPosition: args.previousPosition ?? null,
       grabOffset: args.grabOffset,
       draggedItemHeight: args.draggedItemHeight,
       sourceDroppableId: args.sourceDroppableId,
@@ -189,5 +191,69 @@ describe('DragIndexCalculatorService', () => {
 
     expect(topIndex).toBe(0);
     expect(bottomIndex).toBe(12);
+  });
+
+  it('uses preview bounds in constrained mode so tall items can move above short first item', () => {
+    const itemHeight = 65;
+    const offsets = [0, 65, 130, 195, 260, 325, 390, 455, 520, 585, 650, 715, 780];
+    const strategy = new MockStrategy(offsets, (offset) => Math.floor(offset / itemHeight));
+    const draggedItemHeight = 130;
+    const grabOffset = { x: 20, y: 65 };
+
+    const index = calculateIndex({
+      strategy,
+      position: { x: 20, y: 105 }, // preview top = 40, center = 105 (would be index 1 by center)
+      grabOffset,
+      draggedItemHeight,
+      sourceDroppableId: null,
+      sourceIndex: null,
+      itemCount: 12,
+      constrained: true,
+    });
+
+    expect(index).toBe(0);
+  });
+
+  it('uses top boundary when moving up with dynamic heights', () => {
+    const itemHeight = 65;
+    const offsets = [0, 65, 130, 195, 260, 325];
+    const strategy = new MockStrategy(offsets, (offset) => Math.floor(offset / itemHeight));
+
+    const index = calculateIndex({
+      strategy,
+      position: { x: 20, y: 105 }, // preview top = 40, center = 105
+      previousPosition: { x: 20, y: 115 }, // moving up
+      grabOffset: { x: 20, y: 65 },
+      draggedItemHeight: 130,
+      sourceDroppableId: null,
+      sourceIndex: null,
+      itemCount: 5,
+      constrained: false,
+    });
+
+    expect(index).toBe(0);
+  });
+
+  it('uses bottom boundary when moving down with dynamic heights', () => {
+    const strategy = new MockStrategy([0, 200, 260, 320], (offset) => {
+      if (offset < 200) return 0;
+      if (offset < 260) return 1;
+      if (offset < 320) return 2;
+      return 3;
+    });
+
+    const index = calculateIndex({
+      strategy,
+      position: { x: 20, y: 180 }, // preview top = 150, center = 180, bottom = 210
+      previousPosition: { x: 20, y: 170 }, // moving down
+      grabOffset: { x: 20, y: 30 },
+      draggedItemHeight: 60,
+      sourceDroppableId: null,
+      sourceIndex: null,
+      itemCount: 3,
+      constrained: false,
+    });
+
+    expect(index).toBe(1);
   });
 });
