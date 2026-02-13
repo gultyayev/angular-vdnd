@@ -11,5 +11,6 @@
   ],
   "packageFiles": [{ "filename": "projects/ngx-virtual-dnd/package.json", "type": "json" }],
   "bumpFiles": [{ "filename": "projects/ngx-virtual-dnd/package.json", "type": "json" }],
-  "tagPrefix": "v"
+  "tagPrefix": "v",
+  "commitAll": true
 }
