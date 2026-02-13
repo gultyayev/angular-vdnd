@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.0.0-alpha.0](https://github.com/gultyayev/angular-vdnd/compare/v1.3.0-alpha.6...v2.0.0-alpha.0) (2026-02-13)
+
+### ⚠ BREAKING CHANGES
+
+- **lib:** VirtualContentComponent template restructured — virtual
+  area is now wrapped in a `.vdnd-virtual-area` div. Consumers using
+  `contentOffset` are unaffected (it remains as an escape hatch).
+- **lib:** `totalItems` input removed from `VirtualViewportComponent`
+  and `VirtualContentComponent`. The total item count is now derived
+  automatically from the child `VirtualForDirective` via the shared strategy.
+
+DX improvements:
+
+- `*vdndVirtualFor` inherits `itemHeight`, `dynamicItemHeight`, and
+  `droppableId` from parent viewport/droppable when inside one — only
+  `trackBy` remains required on the directive
+- `VirtualSortableListComponent.group` is now optional — inherits from
+  parent `vdndGroup` directive
+- `FixedHeightStrategy.setItemKeys()` now bumps `version` on count change,
+  enabling strategy-derived total height
+- `VirtualScrollStrategy.getItemCount()` is now a required interface method
+
+Migration: Remove `[totalItems]` bindings from `vdnd-virtual-viewport` and
+`vdnd-virtual-content`. Remove redundant `itemHeight`, `dynamicItemHeight`,
+and `droppableId` from `*vdndVirtualFor` when inside a viewport component.
+
+### Features
+
+- **lib:** auto-measure projected header height via ContentHeaderDirective ([b94b634](https://github.com/gultyayev/angular-vdnd/commit/b94b6345f2d0f8e2da861ed72d9e7cc6e40ac73f))
+- **lib:** eliminate data duplication in Pattern B consumer API ([2745934](https://github.com/gultyayev/angular-vdnd/commit/2745934ea1280f17ca7c01c622ec7409a5f789e0))
+
+### Bug Fixes
+
+- **lib:** unify constrained mode probe logic with capped center ([9e20230](https://github.com/gultyayev/angular-vdnd/commit/9e20230df4d1870787660579f123c0bfb6432eb5))
+
 ## [1.3.0-alpha.6](https://github.com/gultyayev/angular-vdnd/compare/v1.3.0-alpha.5...v1.3.0-alpha.6) (2026-02-13)
 
 ### Bug Fixes
