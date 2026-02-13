@@ -169,6 +169,7 @@ AutoScrollService → DragStateService, PositionCalculatorService
 - Put host bindings in `host` object of decorators (not `@HostBinding`/`@HostListener`)
 - Use `runOutsideAngular` for RAF loops and event listeners
 - Signal updates do NOT need `ngZone.run()` - signals work across zone boundaries
+- Never use hand made `ngDevMode`. Use `isDevMode()` instead
 
 ### Components
 

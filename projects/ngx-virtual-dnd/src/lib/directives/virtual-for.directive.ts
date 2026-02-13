@@ -7,6 +7,7 @@ import {
   inject,
   Injector,
   input,
+  isDevMode,
   NgZone,
   OnDestroy,
   OnInit,
@@ -597,6 +598,7 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
     // Process items and track placeholder position
     let viewContainerIndex = 0;
     let placeholderDomPosition = -1;
+    const renderedKeys = new Set<unknown>();
 
     for (const entry of itemsToRender) {
       if (entry.type === 'placeholder') {
@@ -604,15 +606,24 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
         continue;
       }
 
+      if (renderedKeys.has(entry.key)) {
+        this.#warnDuplicateTrackByKey(entry.key);
+        continue;
+      }
+      renderedKeys.add(entry.key);
+
       const view = this.#getOrCreateView(entry.key, entry.context!);
 
       // Ensure view is at correct position in ViewContainerRef
       const currentIndex = this.#viewContainer.indexOf(view);
       if (currentIndex !== viewContainerIndex) {
+        const targetIndex = this.#getSafeViewContainerIndex(currentIndex, viewContainerIndex);
         if (currentIndex >= 0) {
-          this.#viewContainer.move(view, viewContainerIndex);
+          if (currentIndex !== targetIndex) {
+            this.#viewContainer.move(view, targetIndex);
+          }
         } else {
-          this.#viewContainer.insert(view, viewContainerIndex);
+          this.#viewContainer.insert(view, targetIndex);
         }
       }
 
@@ -631,6 +642,34 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
     }
 
     return placeholderDomPosition;
+  }
+
+  /**
+   * Clamp target indices for move/insert to avoid out-of-range operations when
+   * reconciliation is given invalid duplicate keys or transiently inconsistent view state.
+   */
+  #getSafeViewContainerIndex(currentIndex: number, requestedIndex: number): number {
+    const length = this.#viewContainer.length;
+
+    if (currentIndex >= 0) {
+      if (length <= 1) return 0;
+      return Math.min(requestedIndex, length - 1);
+    }
+
+    return Math.min(requestedIndex, length);
+  }
+
+  /**
+   * Duplicate trackBy keys cannot be reconciled to distinct views.
+   * Warn in dev mode and skip duplicates to prevent container corruption.
+   */
+  #warnDuplicateTrackByKey(key: unknown): void {
+    if (isDevMode()) {
+      console.warn(
+        `[ngx-virtual-dnd] Duplicate trackBy key detected in vdndVirtualFor: ${String(key)}. ` +
+          'Skipping duplicate item to avoid view reconciliation errors.',
+      );
+    }
   }
 
   /**
