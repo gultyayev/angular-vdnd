@@ -16,7 +16,7 @@ These rules prevent common mistakes that cause hard-to-debug issues:
 
 5. **Never throw errors in drag/drop operations:** Use early returns and graceful degradation instead.
 
-6. **TDD for bug fix tests:** When adding tests that verify bug fixes: (1) Write the test first, (2) Run it - it MUST fail (proving the bug exists), (3) Implement the fix, (4) Run again - it should pass. Never skip step 2.
+6. **TDD for every bug fix — no exceptions:** Every bug fix MUST have a test, and the test MUST be written before the fix. The workflow is: (1) Write a failing test that reproduces the bug, (2) Run it — confirm it fails (this proves the bug exists and the test is valid), (3) Implement the fix, (4) Run it again — confirm it passes. Do not write the fix first and the test second. Do not skip step 2. This applies to all bug fixes regardless of scope.
 
 7. **Run ESLint on changed files:** Before considering a task done, run `npm run lint` or `npx eslint --flag v10_config_lookup_from_file <changed-files>` to catch formatting and style issues.
 
@@ -125,20 +125,21 @@ AutoScrollService → DragStateService, PositionCalculatorService
 
 ### Test Files
 
-| Source Area          | Unit Test                       | E2E Tests                                                       |
-| -------------------- | ------------------------------- | --------------------------------------------------------------- |
-| DraggableDirective   | `draggable.directive.spec.ts`   | `drag-drop.spec.ts`, `keyboard-drag/*.spec.ts`                  |
-| KeyboardDragHandler  | `keyboard-drag.handler.spec.ts` | -                                                               |
-| PointerDragHandler   | `pointer-drag.handler.spec.ts`  | -                                                               |
-| DroppableDirective   | `droppable.directive.spec.ts`   | `drop-accuracy.spec.ts`                                         |
-| DragStateService     | `drag-state.service.spec.ts`    | -                                                               |
-| AutoScrollService    | `auto-scroll.service.spec.ts`   | `auto-scroll.spec.ts`, `autoscroll-drift.spec.ts`               |
-| Placeholder logic    | -                               | `placeholder-behavior.spec.ts`, `placeholder-integrity.spec.ts` |
-| Container constraint | -                               | `constrain-to-container.spec.ts`                                |
-| Keyboard drag        | -                               | `keyboard-drag/*.spec.ts` (6 files)                             |
-| Page scroll          | -                               | `page-scroll.spec.ts`                                           |
-| Mobile touch         | -                               | `touch-scroll.mobile.spec.ts`                                   |
-| Dynamic height       | -                               | `dynamic-height.spec.ts`                                        |
+| Source Area          | Unit Test                               | E2E Tests                                                       |
+| -------------------- | --------------------------------------- | --------------------------------------------------------------- |
+| DraggableDirective   | `draggable.directive.spec.ts`           | `drag-drop.spec.ts`, `keyboard-drag/*.spec.ts`                  |
+| KeyboardDragHandler  | `keyboard-drag.handler.spec.ts`         | -                                                               |
+| PointerDragHandler   | `pointer-drag.handler.spec.ts`          | -                                                               |
+| DroppableDirective   | `droppable.directive.spec.ts`           | `drop-accuracy.spec.ts`                                         |
+| DragStateService     | `drag-state.service.spec.ts`            | -                                                               |
+| AutoScrollService    | `auto-scroll.service.spec.ts`           | `auto-scroll.spec.ts`, `autoscroll-drift.spec.ts`               |
+| DragIndexCalculator  | `drag-index-calculator.service.spec.ts` | -                                                               |
+| Placeholder logic    | -                                       | `placeholder-behavior.spec.ts`, `placeholder-integrity.spec.ts` |
+| Container constraint | -                                       | `constrain-to-container.spec.ts`                                |
+| Keyboard drag        | -                                       | `keyboard-drag/*.spec.ts` (6 files)                             |
+| Page scroll          | -                                       | `page-scroll.spec.ts`                                           |
+| Mobile touch         | -                                       | `touch-scroll.mobile.spec.ts`                                   |
+| Dynamic height       | -                                       | `dynamic-height.spec.ts`                                        |
 
 ### Public API (from public-api.ts)
 
@@ -277,11 +278,12 @@ effect(() => {
 
 ### Key Architectural Decisions
 
-1. **Placeholder index probe is strategy-aware**:
-   - Fixed-height behavior uses preview center.
-   - Dynamic-height behavior uses direction-aware bounds (`top` when moving up, `bottom` when moving down) for natural mixed-size displacement.
-   - Constrained mode (`constrainToContainer`) keeps top/bottom edge drops reachable by probing preview bounds near container edges.
-   - Direction comes from consecutive cursor positions (`previousPosition -> position`) with last non-zero direction cached per droppable during drag.
+1. **Placeholder index probe uses two complementary mechanisms for dynamic heights**:
+   - **Capped center probe**: `min(center, top + itemHeight/2)` limits how deep the probe reaches. Prevents a tall preview (e.g. 120px among 60px items) from overshooting multiple positions — the center would land 2+ items away, but the cap keeps it within one item of the top edge.
+   - **Midpoint refinement** (strategy path only): After `findIndexAtOffset` returns an index, checks whether the preview's top edge has passed the target item's midpoint. Only then advances `visualIndex` by 1. Prevents a short preview (e.g. 60px entering a 150px item) from triggering displacement at ~20% overlap — displacement now requires 50% of the target item's actual height.
+   - These solve opposite directions of the height mismatch: the cap pulls the probe **up** (tall preview → short items), midpoint pushes the index **down** (short preview → tall items). Removing either breaks the other's scenario.
+   - Fixed-height path uses `Math.floor(relativeY / itemHeight)` directly (no refinement needed since all items are the same height).
+   - Constrained mode (`constrainToContainer`) uses preview top edge for index probing so tall items can reach the first slot, and snaps to edges when preview bounds are near container boundaries. Midpoint refinement is skipped in constrained mode.
 
 2. **Same-list adjustment applied once**: When dragging within the same list, apply +1 adjustment when `visualIndex >= sourceIndex` to compensate for hidden item.
 
@@ -343,6 +345,7 @@ Load these ONLY when working on specific areas:
 | Signal write error in effect                       | Using deprecated option                           | Remove `allowSignalWrites: true`                                         |
 | Drag preview offset in Ionic/transformed container | Ancestor CSS `transform` breaks `position: fixed` | Already fixed — `OverlayContainerService` teleports preview to body      |
 | Unit test can't find drag preview element          | Preview teleported to overlay container           | Use `document.querySelector()` instead of `fixture.debugElement.query()` |
+| Short item displaces tall item too early           | Probe enters tall item's range at ~20% overlap    | Already fixed — midpoint refinement in `DragIndexCalculatorService`      |
 
 ## Common Tasks
 
@@ -356,9 +359,10 @@ Load these ONLY when working on specific areas:
 ### Modifying placeholder calculation
 
 1. Read `DragIndexCalculatorService` thoroughly
-2. Understand: preview CENTER positioning, same-list +1 adjustment, virtual scroll height math
+2. Understand: capped center probe, midpoint refinement, same-list +1 adjustment, virtual scroll height math
 3. Write E2E test first (TDD)
 4. Run `placeholder-behavior.spec.ts` and `placeholder-integrity.spec.ts`
+5. Run `drag-index-calculator.service.spec.ts` unit tests for index math edge cases
 
 ## Testing
 
@@ -495,18 +499,37 @@ type(scope): description
 
 ## Documentation Updates
 
-When modifying public API (exports in `public-api.ts`):
+### README.md (`/README.md`)
 
-**Update docs for:** New directives/components/services, new inputs/outputs, behavior changes, new config options, deprecations.
+**Audience:** Library consumers — developers who `npm install ngx-virtual-dnd` and use it in their apps. They care about what the library does, how to use it, and what options they have. They do not care about internal algorithms, service architecture, or implementation mechanics.
 
-**No update needed for:** Internal refactoring, performance improvements, bug fixes (unless behavior changes), test changes.
+**Public API** is everything consumers interact with: component selectors, directive selectors, inputs, outputs, utility functions, CSS classes, keyboard shortcuts, injection tokens, events, configuration options, and exported TypeScript types/interfaces.
 
-**Locations:**
+**Update README when a change affects what consumers can do, use, or configure:**
 
-1. `README.md` (`/README.md`)
-2. JSDoc comments on public exports
+- New or removed component, directive, service, utility, or token
+- New, changed, or removed input, output, or configuration option
+- New or changed CSS class, keyboard shortcut, or event
+- New usage pattern made possible (e.g. page-level scroll support)
+- Changed default behavior that consumers will observe and may need to adapt to
 
-**Note:** CHANGELOG.md is auto-generated - do NOT manually edit.
+**Do NOT update README for:**
+
+- Bug fixes (consumers don't configure the fix)
+- Internal algorithm changes (displacement thresholds, probe logic, scroll math)
+- Performance improvements (unless they introduce new configuration)
+- Refactoring, test changes, build/tooling changes
+- Anything a consumer cannot control, configure, or opt into
+
+**Content style:** Show what to do, not how it works internally. Use code examples. Describe capabilities and options, not mechanisms.
+
+### JSDoc Comments
+
+Update JSDoc on the actual class, function, and interface definitions (not barrel files) when their signature, behavior, or usage contract changes.
+
+### CHANGELOG.md
+
+Auto-generated — do NOT manually edit.
 
 ## Releasing
 

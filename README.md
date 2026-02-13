@@ -185,12 +185,12 @@ When items have variable heights, enable `dynamicItemHeight`. Items are auto-mea
 </ng-container>
 ```
 
-How it works:
+Notes:
 
-- `FixedHeightStrategy` is used by default — simple `index * itemHeight` math with zero overhead
-- Setting `dynamicItemHeight` switches to `DynamicHeightStrategy`, which uses a height cache with prefix-sum offsets and binary search for O(log N) scroll-to-index lookups
+- `FixedHeightStrategy` is used by default when `dynamicItemHeight` is not set
+- Setting `dynamicItemHeight` switches to `DynamicHeightStrategy` with automatic height measurement
 - Heights are tracked by `trackBy` key, so they survive reordering
-- The `itemHeight` value is used as the estimate for items not yet measured
+- The `itemHeight` value is used as the initial estimate for items not yet measured
 
 ### Low-Level API
 
