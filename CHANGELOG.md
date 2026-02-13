@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.3.0-alpha.4](https://github.com/gultyayev/angular-vdnd/compare/v1.3.0-alpha.3...v1.3.0-alpha.4) (2026-02-13)
+
+### Bug Fixes
+
+- **lib:** allow constrained dynamic drag to reach list edges ([38519b2](https://github.com/gultyayev/angular-vdnd/commit/38519b27648d1d8c8de6d0f50f2af55b5dea5da4))
+
 ## [1.3.0-alpha.3](https://github.com/gultyayev/angular-vdnd/compare/v1.3.0-alpha.2...v1.3.0-alpha.3) (2026-02-13)
 
 ### Features
