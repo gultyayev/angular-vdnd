@@ -9,13 +9,19 @@ class MockStrategy implements VirtualScrollStrategy {
   readonly #version = signal(0);
   readonly version = this.#version.asReadonly();
   readonly #itemCount: number;
+  readonly #itemHeight: number;
+  readonly #heights: number[] | null;
 
   constructor(
     private readonly offsetMap: number[],
     private readonly indexAtOffset: (offset: number) => number,
     itemCount?: number,
+    itemHeight?: number,
+    heights?: number[],
   ) {
     this.#itemCount = itemCount ?? Math.max(0, offsetMap.length - 1);
+    this.#itemHeight = itemHeight ?? 50;
+    this.#heights = heights ?? null;
   }
 
   getTotalHeight(itemCount: number): number {
@@ -36,8 +42,10 @@ class MockStrategy implements VirtualScrollStrategy {
   }
 
   getItemHeight(index: number): number {
-    void index;
-    return 50;
+    if (this.#heights && index >= 0 && index < this.#heights.length) {
+      return this.#heights[index];
+    }
+    return this.#itemHeight;
   }
 
   setMeasuredHeight(key: unknown, height: number): void {
@@ -74,6 +82,36 @@ describe('DragIndexCalculatorService', () => {
     });
     service = TestBed.inject(DragIndexCalculatorService);
   });
+
+  function createVirtualDroppable(
+    id: string,
+    opts: { itemHeight: number; totalItems: number; containerHeight?: number },
+  ): HTMLElement {
+    const droppable = document.createElement('div');
+    droppable.setAttribute('data-droppable-id', id);
+    droppable.setAttribute('data-droppable-group', 'test-group');
+
+    const virtualScroll = document.createElement('vdnd-virtual-scroll');
+    virtualScroll.setAttribute('data-item-height', String(opts.itemHeight));
+    virtualScroll.setAttribute('data-total-items', String(opts.totalItems));
+
+    const containerHeight = opts.containerHeight ?? 500;
+    Object.defineProperty(virtualScroll, 'scrollTop', { value: 0, writable: true });
+    jest.spyOn(virtualScroll, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      width: 300,
+      height: containerHeight,
+      top: 0,
+      right: 300,
+      bottom: containerHeight,
+      left: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+    droppable.appendChild(virtualScroll);
+    return droppable;
+  }
 
   function createDroppable(id: string, itemCount = 5, constrained = false): HTMLElement {
     const droppable = document.createElement('div');
@@ -204,7 +242,12 @@ describe('DragIndexCalculatorService', () => {
   it('uses preview bounds in constrained mode so tall items can move above short first item', () => {
     const itemHeight = 65;
     const offsets = [0, 65, 130, 195, 260, 325, 390, 455, 520, 585, 650, 715, 780];
-    const strategy = new MockStrategy(offsets, (offset) => Math.floor(offset / itemHeight));
+    const strategy = new MockStrategy(
+      offsets,
+      (offset) => Math.floor(offset / itemHeight),
+      undefined,
+      65,
+    );
     const draggedItemHeight = 130;
     const grabOffset = { x: 20, y: 65 };
 
@@ -222,15 +265,22 @@ describe('DragIndexCalculatorService', () => {
     expect(index).toBe(0);
   });
 
-  it('uses top boundary when moving up with dynamic heights', () => {
+  it('uses center probe for dynamic heights regardless of direction', () => {
     const itemHeight = 65;
     const offsets = [0, 65, 130, 195, 260, 325];
-    const strategy = new MockStrategy(offsets, (offset) => Math.floor(offset / itemHeight));
+    const strategy = new MockStrategy(
+      offsets,
+      (offset) => Math.floor(offset / itemHeight),
+      5,
+      itemHeight,
+    );
 
-    const index = calculateIndex({
+    // Preview center at same position, different directions → same result
+    // grabOffset y=65 (center of 130px preview), so center = position.y
+    const upResult = calculateIndex({
       strategy,
-      position: { x: 20, y: 105 }, // preview top = 40, center = 105
-      previousPosition: { x: 20, y: 115 }, // moving up
+      position: { x: 20, y: 97 },
+      previousPosition: { x: 20, y: 110 }, // moving up
       grabOffset: { x: 20, y: 65 },
       draggedItemHeight: 130,
       sourceDroppableId: null,
@@ -239,30 +289,154 @@ describe('DragIndexCalculatorService', () => {
       constrained: false,
     });
 
-    expect(index).toBe(0);
-  });
-
-  it('uses bottom boundary when moving down with dynamic heights', () => {
-    const strategy = new MockStrategy([0, 200, 260, 320], (offset) => {
-      if (offset < 200) return 0;
-      if (offset < 260) return 1;
-      if (offset < 320) return 2;
-      return 3;
+    const downResult = calculateIndex({
+      strategy,
+      position: { x: 20, y: 97 },
+      previousPosition: { x: 20, y: 90 }, // moving down
+      grabOffset: { x: 20, y: 65 },
+      draggedItemHeight: 130,
+      sourceDroppableId: null,
+      sourceIndex: null,
+      itemCount: 5,
+      constrained: false,
     });
 
+    // Center probe: previewTop = 97 - 65 = 32, center = 32 + 65 = 97
+    // relativeY = 97, floor(97/65) = 1. Same index regardless of direction.
+    expect(upResult).toBe(1);
+    expect(downResult).toBe(1);
+  });
+
+  it('center probe gives balanced threshold for mixed-height dynamic items', () => {
+    const heights = [200, 60, 60];
+    const strategy = new MockStrategy(
+      [0, 200, 260, 320],
+      (offset) => {
+        if (offset < 200) return 0;
+        if (offset < 260) return 1;
+        if (offset < 320) return 2;
+        return 3;
+      },
+      3,
+      undefined,
+      heights,
+    );
+
+    // 100px preview, grabOffset y=50, position y=280 → center = 280
+    // relativeY = 280 → findIndexAtOffset(280) = 2
     const index = calculateIndex({
       strategy,
-      position: { x: 20, y: 180 }, // preview top = 150, center = 180, bottom = 210
-      previousPosition: { x: 20, y: 170 }, // moving down
-      grabOffset: { x: 20, y: 30 },
-      draggedItemHeight: 60,
+      position: { x: 20, y: 280 },
+      previousPosition: { x: 20, y: 270 }, // moving down
+      grabOffset: { x: 20, y: 50 },
+      draggedItemHeight: 100,
       sourceDroppableId: null,
       sourceIndex: null,
       itemCount: 3,
       constrained: false,
     });
 
-    expect(index).toBe(1);
+    expect(index).toBe(2);
+  });
+
+  it('caps probe depth so tall preview among short items does not jump multiple positions', () => {
+    // 10 items at 60px each. Item-1 (120px) is being dragged.
+    // Strategy has exclusion applied: item-1 collapsed to 0 height.
+    // Post-exclusion: [item-0: 0-60] [item-2: 60-120] [item-3: 120-180] ...
+    const offsets = [0, 60, 60, 120, 180, 240, 300, 360, 420, 480];
+    const strategy = new MockStrategy(
+      offsets,
+      (offset) => {
+        if (offset < 60) return 0;
+        if (offset < 120) return 2;
+        if (offset < 180) return 3;
+        if (offset < 240) return 4;
+        if (offset < 300) return 5;
+        if (offset < 360) return 6;
+        if (offset < 420) return 7;
+        if (offset < 480) return 8;
+        return 9;
+      },
+      9,
+      60,
+    );
+
+    const droppable = createVirtualDroppable('list-v', {
+      itemHeight: 60,
+      totalItems: 9,
+    });
+    service.registerStrategy('list-v', strategy);
+
+    // Preview is 120px, grabbed at center (grabOffset.y = 60).
+    // Cursor at y=123: tiny movement from item-1's original position.
+    //   previewTop = 123 - 60 = 63
+    //   previewCenter = 63 + 60 = 123
+    // Without cap: relativeY = 123 → findIndexAtOffset(123) = 3 (2-item jump!)
+    // With cap: relativeY = min(123, 63 + 30) = 93 → findIndexAtOffset(93) = 2 (1-item move)
+    const result = service.calculatePlaceholderIndex({
+      droppableElement: droppable,
+      position: { x: 10, y: 123 },
+      previousPosition: null,
+      grabOffset: { x: 10, y: 60 },
+      draggedItemHeight: 120,
+      sourceDroppableId: 'list-v',
+      sourceIndex: 1,
+    });
+
+    expect(result.index).toBe(2);
+  });
+
+  it('does not displace a tall item until preview top passes its midpoint', () => {
+    // Item-0 is 150px, items 1-5 are 60px. Item-4 excluded (being dragged).
+    // Offsets with exclusion: [0, 150, 210, 270, 330(item-4 collapsed), 330, 390]
+    const offsets = [0, 150, 210, 270, 330, 330, 390];
+    const strategy = new MockStrategy(
+      offsets,
+      (offset) => {
+        if (offset < 150) return 0;
+        if (offset < 210) return 1;
+        if (offset < 270) return 2;
+        if (offset < 330) return 3;
+        if (offset < 390) return 5;
+        return 6;
+      },
+      6,
+      undefined,
+      [150, 60, 60, 60, 0, 60],
+    );
+
+    const droppable = createVirtualDroppable('list-v2', {
+      itemHeight: 80,
+      totalItems: 6,
+    });
+    service.registerStrategy('list-v2', strategy);
+
+    // Preview top at 119: 31px into the 150px item, midpoint is at 75.
+    // Preview top (119) > midpoint (75) → should NOT displace (placeholder = 1).
+    const shallowOverlap = service.calculatePlaceholderIndex({
+      droppableElement: droppable,
+      position: { x: 10, y: 119 },
+      previousPosition: null,
+      grabOffset: null,
+      draggedItemHeight: 60,
+      sourceDroppableId: 'list-v2',
+      sourceIndex: 4,
+    });
+
+    // Preview top at 74: 76px into the 150px item, past midpoint.
+    // Preview top (74) < midpoint (75) → should displace (placeholder = 0).
+    const deepOverlap = service.calculatePlaceholderIndex({
+      droppableElement: droppable,
+      position: { x: 10, y: 74 },
+      previousPosition: null,
+      grabOffset: null,
+      draggedItemHeight: 60,
+      sourceDroppableId: 'list-v2',
+      sourceIndex: 4,
+    });
+
+    expect(shallowOverlap.index).toBe(1);
+    expect(deepOverlap.index).toBe(0);
   });
 
   it('uses registered strategy item count for direct virtualized lists', () => {
