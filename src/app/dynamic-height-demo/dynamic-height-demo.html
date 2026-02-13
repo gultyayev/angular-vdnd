@@ -11,40 +11,38 @@
 <ion-content [scrollY]="false">
   <!-- Custom scroll container with Ionic's scroll host class -->
   <div #scrollContainer class="scroll-container ion-content-scroll-host" vdndScrollable>
-    <!-- Header section that scrolls away -->
-    <div class="page-header" #headerElement>
-      @if (showBanner()) {
-        <div class="welcome-banner">
-          <ion-button fill="clear" class="close-btn" (click)="dismissBanner()">
-            <ion-icon name="close" slot="icon-only"></ion-icon>
-          </ion-button>
-          <h2>Variable Heights</h2>
-          <p>Items have different heights based on their description length</p>
-        </div>
-      }
-
-      <h3 class="section-title">My Tasks</h3>
-
-      <!-- Sticky category filter -->
-      <div class="category-chips">
-        @for (cat of categories; track cat.value) {
-          <ion-chip [class.active]="category() === cat.value" (click)="setCategory(cat.value)">
-            {{ cat.label }}
-          </ion-chip>
-        }
-      </div>
-    </div>
-
     <!-- Virtual list with wrapper-based positioning -->
     <div vdndGroup="tasks">
       <vdnd-virtual-content
         class="virtual-list-wrapper"
         [itemHeight]="estimatedItemHeight"
         [dynamicItemHeight]="true"
-        [contentOffset]="headerHeight()"
         vdndDroppable="tasks"
         (drop)="onDrop($event)"
       >
+        <!-- Header section that scrolls away (auto-measured) -->
+        <div class="page-header" vdndContentHeader>
+          @if (showBanner()) {
+            <div class="welcome-banner">
+              <ion-button fill="clear" class="close-btn" (click)="dismissBanner()">
+                <ion-icon name="close" slot="icon-only"></ion-icon>
+              </ion-button>
+              <h2>Variable Heights</h2>
+              <p>Items have different heights based on their description length</p>
+            </div>
+          }
+
+          <h3 class="section-title">My Tasks</h3>
+
+          <!-- Sticky category filter -->
+          <div class="category-chips">
+            @for (cat of categories; track cat.value) {
+              <ion-chip [class.active]="category() === cat.value" (click)="setCategory(cat.value)">
+                {{ cat.label }}
+              </ion-chip>
+            }
+          </div>
+        </div>
         <ng-container *vdndVirtualFor="let task of filteredTasks(); trackBy: trackById">
           <div class="task-item" [vdndDraggable]="task.id">
             <ion-icon name="reorder-three" class="drag-handle"></ion-icon>

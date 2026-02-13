@@ -1,0 +1,230 @@
+import { Component, signal } from '@angular/core';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideZonelessChangeDetection } from '@angular/core';
+import { By } from '@angular/platform-browser';
+import { VirtualContentComponent } from './virtual-content.component';
+import { ContentHeaderDirective } from '../directives/content-header.directive';
+import { VDND_SCROLL_CONTAINER, VdndScrollContainer } from '../tokens/scroll-container.token';
+
+// Mock ResizeObserver for JSDOM — captures callback so tests can simulate resize events
+let lastResizeCallback: ResizeObserverCallback | null = null;
+
+class MockResizeObserver {
+  #callback: ResizeObserverCallback;
+
+  constructor(callback: ResizeObserverCallback) {
+    this.#callback = callback;
+    lastResizeCallback = callback;
+  }
+
+  observe = jest.fn();
+  unobserve = jest.fn();
+  disconnect = jest.fn();
+
+  /** Simulate a resize entry for the given element with the given blockSize */
+  trigger(element: HTMLElement, blockSize: number): void {
+    this.#callback(
+      [
+        {
+          target: element,
+          borderBoxSize: [{ blockSize, inlineSize: 0 }],
+        } as unknown as ResizeObserverEntry,
+      ],
+      this as unknown as ResizeObserver,
+    );
+  }
+}
+
+@Component({
+  template: `
+    <vdnd-virtual-content [itemHeight]="50">
+      <ng-content />
+    </vdnd-virtual-content>
+  `,
+  imports: [VirtualContentComponent],
+  providers: [{ provide: VDND_SCROLL_CONTAINER, useExisting: TestHostComponent }],
+})
+class TestHostComponent implements VdndScrollContainer {
+  scrollTop = signal(0);
+  containerHeight = signal(500);
+  nativeElement = document.createElement('div');
+
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  scrollTo(): void {}
+}
+
+@Component({
+  template: `
+    <vdnd-virtual-content [itemHeight]="50">
+      <div vdndContentHeader style="height: 100px;">Header</div>
+    </vdnd-virtual-content>
+  `,
+  imports: [VirtualContentComponent, ContentHeaderDirective],
+  providers: [{ provide: VDND_SCROLL_CONTAINER, useExisting: TestHostWithHeaderComponent }],
+})
+class TestHostWithHeaderComponent implements VdndScrollContainer {
+  scrollTop = signal(0);
+  containerHeight = signal(500);
+  nativeElement = document.createElement('div');
+
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  scrollTo(): void {}
+}
+
+@Component({
+  template: ` <vdnd-virtual-content [itemHeight]="50" [contentOffset]="42" /> `,
+  imports: [VirtualContentComponent],
+  providers: [{ provide: VDND_SCROLL_CONTAINER, useExisting: TestHostWithManualOffsetComponent }],
+})
+class TestHostWithManualOffsetComponent implements VdndScrollContainer {
+  scrollTop = signal(0);
+  containerHeight = signal(500);
+  nativeElement = document.createElement('div');
+
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  scrollTo(): void {}
+}
+
+describe('VirtualContentComponent', () => {
+  let originalResizeObserver: typeof ResizeObserver;
+
+  beforeAll(() => {
+    originalResizeObserver = global.ResizeObserver;
+    global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
+  });
+
+  afterAll(() => {
+    global.ResizeObserver = originalResizeObserver;
+  });
+
+  describe('no header projected', () => {
+    let fixture: ComponentFixture<TestHostComponent>;
+
+    beforeEach(() => {
+      TestBed.configureTestingModule({
+        imports: [TestHostComponent],
+        providers: [provideZonelessChangeDetection()],
+      });
+
+      fixture = TestBed.createComponent(TestHostComponent);
+      fixture.detectChanges();
+      fixture.detectChanges();
+    });
+
+    afterEach(() => {
+      fixture.destroy();
+    });
+
+    it('should have effectiveContentOffset of 0', () => {
+      const virtualContent = fixture.debugElement.query(By.directive(VirtualContentComponent));
+      expect(virtualContent.nativeElement.getAttribute('data-content-offset')).toBe('0');
+    });
+  });
+
+  describe('contentOffset input without header projection', () => {
+    let fixture: ComponentFixture<TestHostWithManualOffsetComponent>;
+
+    beforeEach(() => {
+      TestBed.configureTestingModule({
+        imports: [TestHostWithManualOffsetComponent],
+        providers: [provideZonelessChangeDetection()],
+      });
+
+      fixture = TestBed.createComponent(TestHostWithManualOffsetComponent);
+      fixture.detectChanges();
+      fixture.detectChanges();
+    });
+
+    afterEach(() => {
+      fixture.destroy();
+    });
+
+    it('should use contentOffset input when no header is projected', () => {
+      const virtualContent = fixture.debugElement.query(By.directive(VirtualContentComponent));
+      expect(virtualContent.nativeElement.getAttribute('data-content-offset')).toBe('42');
+    });
+  });
+
+  describe('header projection', () => {
+    let fixture: ComponentFixture<TestHostWithHeaderComponent>;
+
+    beforeEach(() => {
+      TestBed.configureTestingModule({
+        imports: [TestHostWithHeaderComponent],
+        providers: [provideZonelessChangeDetection()],
+      });
+
+      fixture = TestBed.createComponent(TestHostWithHeaderComponent);
+      fixture.detectChanges();
+      fixture.detectChanges();
+    });
+
+    afterEach(() => {
+      fixture.destroy();
+    });
+
+    it('should project header before virtual area', () => {
+      const virtualContent = fixture.debugElement.query(By.directive(VirtualContentComponent))
+        .nativeElement as HTMLElement;
+
+      const virtualArea = virtualContent.querySelector('.vdnd-virtual-area')!;
+      const header = virtualContent.querySelector('[vdndcontentheader]');
+
+      expect(header).not.toBeNull();
+
+      // Header should come before the virtual area in DOM order
+      const children = Array.from(virtualContent.children);
+      const headerIndex = children.indexOf(header!);
+      const virtualAreaIndex = children.indexOf(virtualArea);
+
+      expect(headerIndex).toBeLessThan(virtualAreaIndex);
+    });
+  });
+
+  describe('ResizeObserver updates', () => {
+    let fixture: ComponentFixture<TestHostWithHeaderComponent>;
+
+    beforeEach(() => {
+      lastResizeCallback = null;
+
+      TestBed.configureTestingModule({
+        imports: [TestHostWithHeaderComponent],
+        providers: [provideZonelessChangeDetection()],
+      });
+
+      fixture = TestBed.createComponent(TestHostWithHeaderComponent);
+      fixture.detectChanges();
+      fixture.detectChanges();
+    });
+
+    afterEach(() => {
+      fixture.destroy();
+    });
+
+    it('should update effectiveContentOffset when header resizes', () => {
+      const virtualContent = fixture.debugElement.query(By.directive(VirtualContentComponent));
+      const headerEl = (virtualContent.nativeElement as HTMLElement).querySelector(
+        '[vdndcontentheader]',
+      ) as HTMLElement;
+
+      expect(headerEl).not.toBeNull();
+      expect(lastResizeCallback).not.toBeNull();
+
+      // Simulate a ResizeObserver callback with a new height
+      lastResizeCallback!(
+        [
+          {
+            target: headerEl,
+            borderBoxSize: [{ blockSize: 150, inlineSize: 0 }],
+          } as unknown as ResizeObserverEntry,
+        ],
+        {} as ResizeObserver,
+      );
+
+      fixture.detectChanges();
+      fixture.detectChanges();
+
+      expect(virtualContent.nativeElement.getAttribute('data-content-offset')).toBe('150');
+    });
+  });
+});

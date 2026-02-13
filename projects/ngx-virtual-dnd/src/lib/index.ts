@@ -44,6 +44,7 @@ export type { VdndGroupContext } from './directives/droppable-group.directive';
 export { ScrollableDirective } from './directives/scrollable.directive';
 export { VirtualForDirective } from './directives/virtual-for.directive';
 export type { VirtualForContext } from './directives/virtual-for.directive';
+export { ContentHeaderDirective } from './directives/content-header.directive';
 
 // Utilities
 export {

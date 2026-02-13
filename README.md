@@ -118,6 +118,7 @@ The library exports these main pieces (use IDE completion for full details):
 - `DroppableGroupDirective` (`vdndGroup`) - Provides group context to children
 - `ScrollableDirective` (`vdndScrollable`) - Marks external scroll container
 - `VirtualForDirective` (`*vdndVirtualFor`) - Structural directive for virtual lists
+- `ContentHeaderDirective` (`vdndContentHeader`) - Marks a projected header inside `VirtualContentComponent` (auto-measured via ResizeObserver)
 
 **Services:**
 
@@ -373,21 +374,20 @@ Use `VirtualContentComponent` with `vdndScrollable` for page-level scrolling wit
     DroppableDirective,
     DroppableGroupDirective,
     DragPreviewComponent,
+    ContentHeaderDirective,
   ],
   template: `
     <ion-content [scrollY]="false">
       <div class="scroll-container ion-content-scroll-host" vdndScrollable>
-        <!-- Header that scrolls away -->
-        <div class="header" #header>Welcome!</div>
-
-        <!-- Virtual list -->
         <div vdndGroup="tasks">
           <vdnd-virtual-content
             [itemHeight]="72"
-            [contentOffset]="headerHeight()"
             vdndDroppable="list-1"
             (drop)="onDrop($event)"
           >
+            <!-- Header — auto-measured via ResizeObserver, scrolls with content -->
+            <div class="header" vdndContentHeader>Welcome!</div>
+
             <ng-container
               *vdndVirtualFor="
                 let item of items();
@@ -396,10 +396,11 @@ Use `VirtualContentComponent` with `vdndScrollable` for page-level scrolling wit
             >
               <div class="item" [vdndDraggable]="item.id">{{ item.name }}</div>
             </ng-container>
+
           </vdnd-virtual-content>
         </div>
 
-        <!-- Footer -->
+        <!-- Footer — normal sibling in document flow -->
         <div class="footer">Load more</div>
       </div>
     </ion-content>
@@ -409,16 +410,6 @@ Use `VirtualContentComponent` with `vdndScrollable` for page-level scrolling wit
 })
 export class PageComponent {
   items = signal<Item[]>([...]);
-  headerHeight = signal(0);
-  header = viewChild.required<ElementRef<HTMLElement>>('header');
-
-  // Measure header height after initial render
-  constructor() {
-    afterNextRender(() => {
-      const header = this.header().nativeElement;
-      this.headerHeight.set(header.offsetHeight);
-    });
-  }
 }
 ```
 
@@ -426,7 +417,8 @@ Key points:
 
 - `vdndScrollable` marks the scroll container
 - `VirtualContentComponent` provides wrapper-based positioning and derives total items from the child `*vdndVirtualFor` automatically
-- `contentOffset` accounts for content above the list (headers)
+- `vdndContentHeader` marks a projected header — its height is auto-measured via ResizeObserver and used as the content offset (no manual measurement needed)
+- `contentOffset` input is available as an escape hatch when the header lives outside the component
 - `*vdndVirtualFor` inherits `itemHeight`, `dynamicItemHeight`, and `droppableId` from the parent viewport/droppable — only `trackBy` is required
 
 ### Screen Reader Announcements

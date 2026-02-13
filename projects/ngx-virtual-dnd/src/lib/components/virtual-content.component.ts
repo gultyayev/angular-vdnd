@@ -2,9 +2,12 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  contentChild,
+  effect,
   ElementRef,
   inject,
   input,
+  NgZone,
   signal,
 } from '@angular/core';
 import { VDND_VIRTUAL_VIEWPORT, VdndVirtualViewport } from '../tokens/virtual-viewport.token';
@@ -12,6 +15,7 @@ import { VDND_SCROLL_CONTAINER, VdndScrollContainer } from '../tokens/scroll-con
 import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
 import { FixedHeightStrategy } from '../strategies/fixed-height.strategy';
 import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
+import { ContentHeaderDirective } from '../directives/content-header.directive';
 
 /**
  * A virtual content component that provides wrapper-based positioning
@@ -22,24 +26,32 @@ import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
  * a content wrapper with GPU-accelerated transform positioning while delegating
  * scroll handling to the parent `vdndScrollable` container.
  *
+ * Headers marked with `vdndContentHeader` are automatically measured via
+ * ResizeObserver — no manual offset calculation needed.
+ *
  * @example
- * Mixed content with header and footer:
+ * Content projection with auto-measured header:
  * ```html
  * <div vdndScrollable style="overflow: auto; height: 100vh;">
- *   <!-- Header that scrolls away -->
- *   <div class="header" #header>Welcome!</div>
- *
- *   <!-- Virtual list with wrapper positioning -->
- *   <vdnd-virtual-content
- *     [itemHeight]="50"
- *     [contentOffset]="header.offsetHeight">
+ *   <vdnd-virtual-content [itemHeight]="50">
+ *     <div class="header" vdndContentHeader>Welcome!</div>
  *     <ng-container *vdndVirtualFor="let item of items(); trackBy: trackById">
  *       <div class="item">{{ item.name }}</div>
  *     </ng-container>
  *   </vdnd-virtual-content>
+ * </div>
+ * ```
  *
- *   <!-- Footer at the end -->
- *   <div class="footer">Load more</div>
+ * @example
+ * Manual offset (escape hatch):
+ * ```html
+ * <div vdndScrollable style="overflow: auto; height: 100vh;">
+ *   <div class="header" #header>Welcome!</div>
+ *   <vdnd-virtual-content [itemHeight]="50" [contentOffset]="header.offsetHeight">
+ *     <ng-container *vdndVirtualFor="let item of items(); trackBy: trackById">
+ *       <div class="item">{{ item.name }}</div>
+ *     </ng-container>
+ *   </vdnd-virtual-content>
  * </div>
  * ```
  */
@@ -54,40 +66,46 @@ import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
     class: 'vdnd-virtual-content',
     '[style.display]': '"block"',
     '[style.position]': '"relative"',
-    '[style.height.px]': 'totalHeight()',
-    '[attr.data-content-offset]': 'contentOffset()',
+    '[attr.data-content-offset]': 'effectiveContentOffset()',
     '[attr.data-item-height]': 'itemHeight()',
     '[attr.data-total-items]': 'totalItems()',
   },
   template: `
-    <!-- Spacer maintains scroll height for the virtual list portion -->
-    <div
-      class="vdnd-content-spacer"
-      [style.position]="'absolute'"
-      [style.top.px]="0"
-      [style.left.px]="0"
-      [style.width.px]="1"
-      [style.height.px]="totalHeight()"
-      [style.visibility]="'hidden'"
-      [style.pointer-events]="'none'"
-    ></div>
+    <!-- Projected header — in normal document flow, auto-measured via ResizeObserver -->
+    <ng-content select="[vdndContentHeader]" />
 
-    <!-- Content wrapper with GPU-accelerated transform -->
-    <div
-      class="vdnd-content-wrapper"
-      [style.position]="'absolute'"
-      [style.top.px]="0"
-      [style.left.px]="0"
-      [style.right.px]="0"
-      [style.will-change]="'transform'"
-      [style.transform]="contentTransform()"
-    >
-      <ng-content></ng-content>
+    <!-- Virtual area — sized to totalHeight, contains absolute-positioned spacer + wrapper -->
+    <div class="vdnd-virtual-area" [style.position]="'relative'" [style.height.px]="totalHeight()">
+      <!-- Spacer maintains scroll height for the virtual list portion -->
+      <div
+        class="vdnd-content-spacer"
+        [style.position]="'absolute'"
+        [style.top.px]="0"
+        [style.left.px]="0"
+        [style.width.px]="1"
+        [style.height.px]="totalHeight()"
+        [style.visibility]="'hidden'"
+        [style.pointer-events]="'none'"
+      ></div>
+
+      <!-- Content wrapper with GPU-accelerated transform -->
+      <div
+        class="vdnd-content-wrapper"
+        [style.position]="'absolute'"
+        [style.top.px]="0"
+        [style.left.px]="0"
+        [style.right.px]="0"
+        [style.will-change]="'transform'"
+        [style.transform]="contentTransform()"
+      >
+        <ng-content />
+      </div>
     </div>
   `,
 })
 export class VirtualContentComponent implements VdndVirtualViewport, VdndScrollContainer {
   readonly #elementRef = inject(ElementRef<HTMLElement>);
+  readonly #ngZone = inject(NgZone);
 
   /**
    * The parent scroll container injected via skip-self to get the actual scrollable element.
@@ -95,12 +113,22 @@ export class VirtualContentComponent implements VdndVirtualViewport, VdndScrollC
    */
   readonly #parentScrollContainer = inject(VDND_SCROLL_CONTAINER, { skipSelf: true });
 
+  // ========== Content Queries ==========
+
+  /** Projected header directive (if any) */
+  private readonly headerDirective = contentChild(ContentHeaderDirective);
+
   // ========== Inputs ==========
 
   /** Height of each item in pixels (used as estimate in dynamic mode) */
   itemHeight = input.required<number>();
 
-  /** Offset for content above the virtual list (e.g., header height) */
+  /**
+   * Offset for content above the virtual list (e.g., header height).
+   * When a `vdndContentHeader` is projected, this input is ignored —
+   * the offset is auto-measured via ResizeObserver.
+   * Use this input only when the header lives outside the component.
+   */
   contentOffset = input<number>(0);
 
   /**
@@ -117,6 +145,9 @@ export class VirtualContentComponent implements VdndVirtualViewport, VdndScrollC
    * This accounts for overscan and is used for wrapper positioning.
    */
   readonly #renderStartIndex = signal(0);
+
+  /** Auto-measured header height from ResizeObserver */
+  readonly #measuredHeaderHeight = signal(0);
 
   // ========== Strategy ==========
 
@@ -149,11 +180,21 @@ export class VirtualContentComponent implements VdndVirtualViewport, VdndScrollC
   });
 
   /**
+   * Effective content offset: when a `vdndContentHeader` directive is projected,
+   * returns the auto-measured header height. Otherwise falls back to the
+   * `contentOffset` input for backward compatibility.
+   */
+  readonly effectiveContentOffset = computed(() => {
+    const header = this.headerDirective();
+    return header ? this.#measuredHeaderHeight() : this.contentOffset();
+  });
+
+  /**
    * Adjusted scroll position - subtracts the content offset so the virtual scroll
    * calculates visible items correctly relative to where the list starts.
    */
   readonly #adjustedScrollTop = computed(() => {
-    return Math.max(0, this.#parentScrollContainer.scrollTop() - this.contentOffset());
+    return Math.max(0, this.#parentScrollContainer.scrollTop() - this.effectiveContentOffset());
   });
 
   /** Transform for content wrapper positioning */
@@ -163,6 +204,10 @@ export class VirtualContentComponent implements VdndVirtualViewport, VdndScrollC
     const offset = s.getOffsetForIndex(startIndex);
     return `translateY(${offset}px)`;
   });
+
+  constructor() {
+    this.#setupHeaderMeasurement();
+  }
 
   // ========== VdndVirtualViewport Implementation ==========
 
@@ -200,8 +245,41 @@ export class VirtualContentComponent implements VdndVirtualViewport, VdndScrollC
     const adjustedOptions = { ...options };
     if (adjustedOptions.top !== undefined) {
       // Add offset back when scrolling to ensure correct position
-      adjustedOptions.top += this.contentOffset();
+      adjustedOptions.top += this.effectiveContentOffset();
     }
     this.#parentScrollContainer.scrollTo(adjustedOptions);
+  }
+
+  // ========== Private Methods ==========
+
+  /**
+   * Sets up an effect that observes the projected header directive's element
+   * with a ResizeObserver, keeping `#measuredHeaderHeight` in sync.
+   */
+  #setupHeaderMeasurement(): void {
+    effect((onCleanup) => {
+      const dir = this.headerDirective();
+      if (!dir) {
+        this.#measuredHeaderHeight.set(0);
+        return;
+      }
+
+      const el = dir.elementRef.nativeElement;
+      this.#measuredHeaderHeight.set(el.offsetHeight);
+
+      let observer: ResizeObserver | null = null;
+      this.#ngZone.runOutsideAngular(() => {
+        observer = new ResizeObserver((entries) => {
+          for (const entry of entries) {
+            const height =
+              entry.borderBoxSize?.[0]?.blockSize ?? (entry.target as HTMLElement).offsetHeight;
+            this.#measuredHeaderHeight.set(height);
+          }
+        });
+        observer.observe(el, { box: 'border-box' });
+      });
+
+      onCleanup(() => observer?.disconnect());
+    });
   }
 }

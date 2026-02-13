@@ -1,13 +1,4 @@
-import {
-  afterNextRender,
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  ElementRef,
-  OnDestroy,
-  signal,
-  viewChild,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   IonBadge,
@@ -23,6 +14,7 @@ import {
 import { addIcons } from 'ionicons';
 import { add, arrowBack, checkmarkCircle, close, reorderThree } from 'ionicons/icons';
 import {
+  ContentHeaderDirective,
   DraggableDirective,
   DragPreviewComponent,
   DropEvent,
@@ -68,11 +60,12 @@ type CategoryFilter = 'all' | 'work' | 'personal' | 'urgent';
     DroppableGroupDirective,
     DragPreviewComponent,
     VirtualContentComponent,
+    ContentHeaderDirective,
   ],
   styleUrl: './dynamic-height-demo.scss',
   templateUrl: './dynamic-height-demo.html',
 })
-export class DynamicHeightDemoComponent implements OnDestroy {
+export class DynamicHeightDemoComponent {
   readonly estimatedItemHeight = 80;
 
   readonly categories: { value: CategoryFilter; label: string }[] = [
@@ -82,16 +75,10 @@ export class DynamicHeightDemoComponent implements OnDestroy {
     { value: 'urgent', label: 'Urgent' },
   ];
 
-  // View queries
-  readonly headerElement = viewChild.required<ElementRef<HTMLElement>>('headerElement');
-
   // State
   readonly showBanner = signal(true);
   readonly category = signal<CategoryFilter>('all');
   readonly tasks = signal<DynamicTask[]>(this.#generateTasks(150));
-
-  // Header height for offset calculation
-  readonly headerHeight = signal(0);
 
   // Filtered tasks based on category
   readonly filteredTasks = computed(() => {
@@ -101,28 +88,8 @@ export class DynamicHeightDemoComponent implements OnDestroy {
     return allTasks.filter((t) => t.category === cat);
   });
 
-  #resizeObserver: ResizeObserver | null = null;
-
   constructor() {
     addIcons({ add, arrowBack, checkmarkCircle, close, reorderThree });
-
-    afterNextRender(() => {
-      const headerEl = this.headerElement().nativeElement;
-      this.headerHeight.set(headerEl.offsetHeight);
-
-      this.#resizeObserver = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          const height =
-            entry.borderBoxSize?.[0]?.blockSize ?? (entry.target as HTMLElement).offsetHeight;
-          this.headerHeight.set(height);
-        }
-      });
-      this.#resizeObserver.observe(headerEl);
-    });
-  }
-
-  ngOnDestroy(): void {
-    this.#resizeObserver?.disconnect();
   }
 
   trackById = (_index: number, task: DynamicTask): string => task.id;
