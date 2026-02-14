@@ -26,6 +26,8 @@ These rules prevent common mistakes that cause hard-to-debug issues:
 
 10. **Never use `expect(true).toBe(true)` or similar no-op assertions:** Every test assertion must verify actual behavior. Tests that always pass regardless of code behavior provide false confidence and zero coverage. If you can't write a meaningful assertion, the test shouldn't exist.
 
+11. **Keep skills in sync with public API:** Any change to the consumer-facing API (new/changed/removed component, directive, input, output, event, utility, token, CSS class, or keyboard shortcut) must update `skills/ngx-virtual-dnd/SKILL.md` and/or `skills/ngx-virtual-dnd/references/api-reference.md` in the same commit. Internal-only changes (bug fixes, refactoring, performance) do not require skill updates unless they change observable consumer behavior.
+
 ## Version Requirements
 
 - **Angular:** 21.0.0+
@@ -160,6 +162,12 @@ AutoScrollService → DragStateService, PositionCalculatorService
 | Empty list              | -                                            | `empty-list.spec.ts`                                            |
 | Page scroll             | -                                            | `page-scroll.spec.ts`                                           |
 | Mobile touch            | -                                            | `touch-scroll.mobile.spec.ts`                                   |
+
+### Skills (for library consumers)
+
+| Skill           | Path                      | Purpose                                  |
+| --------------- | ------------------------- | ---------------------------------------- |
+| ngx-virtual-dnd | `skills/ngx-virtual-dnd/` | Complete integration guide for AI agents |
 
 ### Public API (from public-api.ts)
 
@@ -300,13 +308,15 @@ Use direct `element.scrollTop += delta` (not `scrollBy()`) with synchronous call
 
 Load these ONLY when working on specific areas:
 
-| Doc                                        | When to Load                               |
-| ------------------------------------------ | ------------------------------------------ |
-| `.ai/E2E.md`                               | Before writing/modifying Playwright tests  |
-| `.claude/demo/DESIGN_SYSTEM.md`            | Before styling demo pages                  |
-| `.claude/history/safari-autoscroll.md`     | If debugging Safari scroll drift           |
-| `.claude/history/placeholder-algorithm.md` | If modifying placeholder index calculation |
-| `.claude/TROUBLESHOOTING.md`               | If debugging unexpected behavior           |
+| Doc                                                  | When to Load                                     |
+| ---------------------------------------------------- | ------------------------------------------------ |
+| `.ai/E2E.md`                                         | Before writing/modifying Playwright tests        |
+| `.claude/demo/DESIGN_SYSTEM.md`                      | Before styling demo pages                        |
+| `.claude/history/safari-autoscroll.md`               | If debugging Safari scroll drift                 |
+| `.claude/history/placeholder-algorithm.md`           | If modifying placeholder index calculation       |
+| `.claude/TROUBLESHOOTING.md`                         | If debugging unexpected behavior                 |
+| `skills/ngx-virtual-dnd/SKILL.md`                    | When modifying the library's consumer-facing API |
+| `skills/ngx-virtual-dnd/references/api-reference.md` | When modifying the library's consumer-facing API |
 
 ### When to Create Lazy Documentation
 
@@ -344,6 +354,12 @@ See `.claude/TROUBLESHOOTING.md` for common error symptoms, causes, and fixes.
 2. Write E2E test first (TDD)
 3. Run `placeholder-behavior.spec.ts` and `placeholder-integrity.spec.ts`
 4. Run `drag-index-calculator.service.spec.ts` unit tests for index math edge cases
+
+### Updating skills after public API changes
+
+1. Determine if the change affects consumer-facing API (same criteria as README updates)
+2. Update `skills/ngx-virtual-dnd/SKILL.md` patterns if usage patterns changed
+3. Update `skills/ngx-virtual-dnd/references/api-reference.md` tables for new/changed/removed inputs, outputs, events, utilities, tokens, or CSS classes
 
 ### Adding documentation for a new subsystem
 
