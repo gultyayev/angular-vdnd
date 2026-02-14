@@ -1,31 +1,54 @@
 import { computed, effect, Injectable, signal } from '@angular/core';
-import {
-  CursorPosition,
-  DraggedItem,
-  DragState,
-  GrabOffset,
-  INITIAL_DRAG_STATE,
-} from '../models/drag-drop.models';
+import { CursorPosition, DraggedItem, DragState, GrabOffset } from '../models/drag-drop.models';
+
+/**
+ * Internal state type without high-frequency fields.
+ * `cursorPosition` and `keyboardTargetIndex` are split into dedicated signals
+ * so that 60fps cursor updates don't trigger re-evaluation of rarely-changing computeds.
+ */
+type CoreDragState = Omit<DragState, 'cursorPosition' | 'keyboardTargetIndex'>;
+
+const INITIAL_CORE_STATE: CoreDragState = {
+  isDragging: false,
+  draggedItem: null,
+  sourceDroppableId: null,
+  sourceIndex: null,
+  activeDroppableId: null,
+  placeholderId: null,
+  placeholderIndex: null,
+  grabOffset: null,
+  initialPosition: null,
+  lockAxis: null,
+  isKeyboardDrag: false,
+};
 
 /**
  * Central service for managing drag-and-drop state.
  * Uses signals for reactive state management.
+ *
+ * Architecture: High-frequency fields (`cursorPosition`, `keyboardTargetIndex`)
+ * are stored in dedicated signals, separate from the core state. This prevents
+ * 60fps cursor updates from triggering re-evaluation of the 10+ computeds
+ * that only depend on rarely-changing properties (isDragging, draggedItem, etc.).
  */
 @Injectable({
   providedIn: 'root',
 })
 export class DragStateService {
-  /** Internal state signal */
-  readonly #state = signal<DragState>(INITIAL_DRAG_STATE);
+  /** Core state signal — contains all rarely-changing properties */
+  readonly #state = signal<CoreDragState>(INITIAL_CORE_STATE);
+
+  /** High-frequency cursor position — updated at 60fps during pointer drag */
+  readonly #cursorPosition = signal<CursorPosition | null>(null);
+
+  /** High-frequency keyboard target index — updated on each arrow key press */
+  readonly #keyboardTargetIndex = signal<number | null>(null);
 
   /** Flag indicating if the last drag was cancelled (not dropped) */
   readonly #wasCancelled = signal<boolean>(false);
 
   /** Whether the last drag was cancelled (for droppable to check before emitting drop) */
   readonly wasCancelled = this.#wasCancelled.asReadonly();
-
-  /** Read-only access to the full state */
-  readonly state = this.#state.asReadonly();
 
   /** Whether a drag operation is in progress */
   readonly isDragging = computed(() => this.#state().isDragging);
@@ -52,7 +75,7 @@ export class DragStateService {
   readonly placeholderIndex = computed(() => this.#state().placeholderIndex);
 
   /** Current cursor position */
-  readonly cursorPosition = computed(() => this.#state().cursorPosition);
+  readonly cursorPosition = this.#cursorPosition.asReadonly();
 
   /** Offset from cursor to element top-left (for maintaining grab position) */
   readonly grabOffset = computed(() => this.#state().grabOffset);
@@ -67,7 +90,7 @@ export class DragStateService {
   readonly isKeyboardDrag = computed(() => this.#state().isKeyboardDrag);
 
   /** Target index during keyboard navigation */
-  readonly keyboardTargetIndex = computed(() => this.#state().keyboardTargetIndex);
+  readonly keyboardTargetIndex = this.#keyboardTargetIndex.asReadonly();
 
   constructor() {
     // Inject cursor styles once (for consistent grabbing cursor during drag)
@@ -111,6 +134,8 @@ export class DragStateService {
   ): void {
     // Reset cancellation flag at start of new drag
     this.#wasCancelled.set(false);
+    this.#cursorPosition.set(cursorPosition ?? null);
+    this.#keyboardTargetIndex.set(isKeyboardDrag ? (sourceIndex ?? 0) : null);
     this.#state.set({
       isDragging: true,
       draggedItem: item,
@@ -119,12 +144,10 @@ export class DragStateService {
       activeDroppableId: activeDroppableId ?? null,
       placeholderId: placeholderId ?? null,
       placeholderIndex: placeholderIndex ?? null,
-      cursorPosition: cursorPosition ?? null,
       grabOffset: grabOffset ?? null,
       initialPosition: axisLockPosition ?? cursorPosition ?? null,
       lockAxis: lockAxis ?? null,
       isKeyboardDrag: isKeyboardDrag ?? false,
-      keyboardTargetIndex: isKeyboardDrag ? (sourceIndex ?? 0) : null,
     });
   }
 
@@ -141,13 +164,23 @@ export class DragStateService {
       return;
     }
 
-    this.#state.update((state) => ({
-      ...state,
-      cursorPosition: update.cursorPosition,
-      activeDroppableId: update.activeDroppableId,
-      placeholderId: update.placeholderId,
-      placeholderIndex: update.placeholderIndex,
-    }));
+    // Write cursor to dedicated high-frequency signal
+    this.#cursorPosition.set(update.cursorPosition);
+
+    // Only update core state if droppable/placeholder actually changed
+    const current = this.#state();
+    if (
+      current.activeDroppableId !== update.activeDroppableId ||
+      current.placeholderId !== update.placeholderId ||
+      current.placeholderIndex !== update.placeholderIndex
+    ) {
+      this.#state.update((state) => ({
+        ...state,
+        activeDroppableId: update.activeDroppableId,
+        placeholderId: update.placeholderId,
+        placeholderIndex: update.placeholderIndex,
+      }));
+    }
   }
 
   /**
@@ -183,7 +216,9 @@ export class DragStateService {
    */
   endDrag(): void {
     this.#wasCancelled.set(false);
-    this.#state.set(INITIAL_DRAG_STATE);
+    this.#cursorPosition.set(null);
+    this.#keyboardTargetIndex.set(null);
+    this.#state.set(INITIAL_CORE_STATE);
   }
 
   /**
@@ -191,7 +226,9 @@ export class DragStateService {
    */
   cancelDrag(): void {
     this.#wasCancelled.set(true);
-    this.#state.set(INITIAL_DRAG_STATE);
+    this.#cursorPosition.set(null);
+    this.#keyboardTargetIndex.set(null);
+    this.#state.set(INITIAL_CORE_STATE);
   }
 
   /**
@@ -205,7 +242,11 @@ export class DragStateService {
    * Get the current state snapshot (for event creation).
    */
   getStateSnapshot(): DragState {
-    return this.#state();
+    return {
+      ...this.#state(),
+      cursorPosition: this.#cursorPosition(),
+      keyboardTargetIndex: this.#keyboardTargetIndex(),
+    };
   }
 
   /**
@@ -217,25 +258,24 @@ export class DragStateService {
       return;
     }
 
-    this.#state.update((state) => {
-      // Same-list adjustment: if target is at or after source, add 1
-      // This accounts for the hidden item shifting everything up visually
-      const sourceDroppableId = state.draggedItem?.droppableId;
-      const activeDroppableId = state.activeDroppableId;
-      const isSameList = sourceDroppableId === activeDroppableId;
-      const sourceIndex = state.sourceIndex ?? -1;
+    const state = this.#state();
+    // Same-list adjustment: if target is at or after source, add 1
+    // This accounts for the hidden item shifting everything up visually
+    const sourceDroppableId = state.draggedItem?.droppableId;
+    const activeDroppableId = state.activeDroppableId;
+    const isSameList = sourceDroppableId === activeDroppableId;
+    const sourceIndex = state.sourceIndex ?? -1;
 
-      let placeholderIndex = targetIndex;
-      if (isSameList && sourceIndex >= 0 && targetIndex >= sourceIndex) {
-        placeholderIndex = targetIndex + 1;
-      }
+    let placeholderIndex = targetIndex;
+    if (isSameList && sourceIndex >= 0 && targetIndex >= sourceIndex) {
+      placeholderIndex = targetIndex + 1;
+    }
 
-      return {
-        ...state,
-        keyboardTargetIndex: targetIndex,
-        placeholderIndex,
-      };
-    });
+    this.#keyboardTargetIndex.set(targetIndex);
+    this.#state.update((s) => ({
+      ...s,
+      placeholderIndex,
+    }));
   }
 
   /**
@@ -246,23 +286,22 @@ export class DragStateService {
       return;
     }
 
-    this.#state.update((state) => {
-      // Same-list adjustment: if moving back to source list and target is at or after source, add 1
-      const sourceDroppableId = state.draggedItem?.droppableId;
-      const isSameList = sourceDroppableId === droppableId;
-      const sourceIndex = state.sourceIndex ?? -1;
+    const state = this.#state();
+    // Same-list adjustment: if moving back to source list and target is at or after source, add 1
+    const sourceDroppableId = state.draggedItem?.droppableId;
+    const isSameList = sourceDroppableId === droppableId;
+    const sourceIndex = state.sourceIndex ?? -1;
 
-      let placeholderIndex = targetIndex;
-      if (isSameList && sourceIndex >= 0 && targetIndex >= sourceIndex) {
-        placeholderIndex = targetIndex + 1;
-      }
+    let placeholderIndex = targetIndex;
+    if (isSameList && sourceIndex >= 0 && targetIndex >= sourceIndex) {
+      placeholderIndex = targetIndex + 1;
+    }
 
-      return {
-        ...state,
-        activeDroppableId: droppableId,
-        keyboardTargetIndex: targetIndex,
-        placeholderIndex,
-      };
-    });
+    this.#keyboardTargetIndex.set(targetIndex);
+    this.#state.update((s) => ({
+      ...s,
+      activeDroppableId: droppableId,
+      placeholderIndex,
+    }));
   }
 }

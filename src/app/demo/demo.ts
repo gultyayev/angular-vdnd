@@ -82,17 +82,14 @@ export class DemoComponent {
   });
 
   /** Debug state for display */
-  readonly debugState = computed(() => {
-    const state = this.#dragState.state();
-    return {
-      isDragging: state.isDragging,
-      draggedItemId: state.draggedItem?.draggableId ?? null,
-      sourceDroppable: state.sourceDroppableId,
-      activeDroppable: state.activeDroppableId,
-      placeholder: state.placeholderId,
-      placeholderIndex: state.placeholderIndex,
-    };
-  });
+  readonly debugState = computed(() => ({
+    isDragging: this.#dragState.isDragging(),
+    draggedItemId: this.#dragState.draggedItemId(),
+    sourceDroppable: this.#dragState.sourceDroppableId(),
+    activeDroppable: this.#dragState.activeDroppableId(),
+    placeholder: this.#dragState.placeholderId(),
+    placeholderIndex: this.#dragState.placeholderIndex(),
+  }));
 
   constructor() {
     this.regenerateItems();

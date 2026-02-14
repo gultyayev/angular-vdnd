@@ -84,7 +84,7 @@ describe('DragStateService', () => {
     });
 
     it('should match INITIAL_DRAG_STATE', () => {
-      expect(service.state()).toEqual(INITIAL_DRAG_STATE);
+      expect(service.getStateSnapshot()).toEqual(INITIAL_DRAG_STATE);
     });
   });
 
@@ -320,20 +320,11 @@ describe('DragStateService', () => {
   describe('endDrag', () => {
     it('should reset state to initial values', () => {
       const item = createMockDraggedItem();
-      service.startDrag(
-        item,
-        { x: 100, y: 200 },
-        { x: 10, y: 20 },
-        'x',
-        'list-1',
-        'item-5',
-        5,
-        2
-      );
+      service.startDrag(item, { x: 100, y: 200 }, { x: 10, y: 20 }, 'x', 'list-1', 'item-5', 5, 2);
 
       service.endDrag();
 
-      expect(service.state()).toEqual(INITIAL_DRAG_STATE);
+      expect(service.getStateSnapshot()).toEqual(INITIAL_DRAG_STATE);
     });
 
     it('should set isDragging to false', () => {
@@ -372,7 +363,7 @@ describe('DragStateService', () => {
 
       service.cancelDrag();
 
-      expect(service.state()).toEqual(INITIAL_DRAG_STATE);
+      expect(service.getStateSnapshot()).toEqual(INITIAL_DRAG_STATE);
     });
 
     it('should set isDragging to false', () => {
@@ -445,10 +436,10 @@ describe('DragStateService', () => {
       expect(snapshot.lockAxis).toBe('y');
     });
 
-    it('should return a reference to the current state (not a copy)', () => {
+    it('should return an equivalent state snapshot each call', () => {
       const snapshot1 = service.getStateSnapshot();
       const snapshot2 = service.getStateSnapshot();
-      expect(snapshot1).toBe(snapshot2);
+      expect(snapshot1).toEqual(snapshot2);
     });
   });
 
@@ -464,25 +455,6 @@ describe('DragStateService', () => {
       service.endDrag();
 
       expect(service.draggedItemId()).toBeNull();
-    });
-
-    it('should derive all signals from single state source', () => {
-      const item = createMockDraggedItem();
-      service.startDrag(item, { x: 100, y: 200 }, { x: 10, y: 20 }, 'x', 'list-1', 'item-2', 2, 1);
-
-      // All signals should reflect the state
-      const state = service.state();
-      expect(service.isDragging()).toBe(state.isDragging);
-      expect(service.draggedItem()).toBe(state.draggedItem);
-      expect(service.sourceDroppableId()).toBe(state.sourceDroppableId);
-      expect(service.sourceIndex()).toBe(state.sourceIndex);
-      expect(service.activeDroppableId()).toBe(state.activeDroppableId);
-      expect(service.placeholderId()).toBe(state.placeholderId);
-      expect(service.placeholderIndex()).toBe(state.placeholderIndex);
-      expect(service.cursorPosition()).toBe(state.cursorPosition);
-      expect(service.grabOffset()).toBe(state.grabOffset);
-      expect(service.initialPosition()).toBe(state.initialPosition);
-      expect(service.lockAxis()).toBe(state.lockAxis);
     });
   });
 });
