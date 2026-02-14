@@ -200,6 +200,28 @@ visibility — empty list targets don't produce placeholders. Use rAF wait
 instead. Only wait for placeholder in inline test code where you know the
 target list has items.
 
+### Atomic Measurements During Animations
+
+When measuring multiple element positions during rapid updates (autoscroll, animations), use a single `page.evaluate()` to capture all measurements atomically. Sequential `boundingBox()` calls have round-trip latency, allowing positions to change between calls.
+
+```typescript
+// WRONG - sequential calls introduce timing skew during rapid scroll
+const previewBox = await preview.boundingBox(); // Round-trip 1
+const placeholderBox = await placeholder.boundingBox(); // Round-trip 2 - position may have changed!
+const drift = Math.abs(previewBox.y - placeholderBox.y);
+
+// CORRECT - atomic measurement in single browser evaluation
+const { previewY, placeholderY } = await page.evaluate(() => {
+  const preview = document.querySelector('.preview');
+  const placeholder = document.querySelector('.placeholder');
+  return {
+    previewY: preview?.getBoundingClientRect().top,
+    placeholderY: placeholder?.getBoundingClientRect().top,
+  };
+});
+const drift = Math.abs(previewY - placeholderY);
+```
+
 ### Content Offset and Cross-Browser Precision
 
 Firefox and WebKit round `borderBoxSize.blockSize` (via `ResizeObserver`) and
