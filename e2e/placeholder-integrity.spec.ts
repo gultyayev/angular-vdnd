@@ -164,6 +164,8 @@ test.describe('Placeholder Rendering Integrity', () => {
       await sourceItem.hover();
       await page.mouse.down();
       await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 100, { steps: 10 });
+      // Firefox/WebKit can miss the final stepped position; direct follow-up ensures arrival
+      await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 100);
       await expect(demoPage.dragPreview).toBeVisible();
 
       // Check for any duplicate visible placeholder situations — wrap in toPass

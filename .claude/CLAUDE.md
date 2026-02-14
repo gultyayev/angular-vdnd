@@ -503,7 +503,8 @@ type(scope): description
 ```
 
 **Types:** `feat`, `fix`, `perf`, `docs`, `refactor`, `test`, `chore`
-**Scopes:** `lib`, `demo`, `docs`, `deps`, `release`
+**Scopes:** `lib`, `demo`, `e2e`, `docs`, `deps`, `release`
+**Scope selection:** Match the scope to the files changed, not the feature area the change is "about." E2E-only changes use `e2e`, library-only changes use `lib`, demo-only changes use `demo`. Mixed changes spanning library + tests use `lib` (the primary change).
 **Breaking changes:** Add `!` after type (e.g., `feat!:`) or `BREAKING CHANGE:` in footer
 
 ## Documentation Updates

@@ -209,50 +209,40 @@ export class DemoPage {
   /**
    * Count ghost elements - empty .item divs without text content.
    * These indicate broken placeholder rendering.
+   * Uses atomic page.evaluate() to avoid TOCTOU races with virtual scroll re-renders.
    */
   async countGhostElements(list: 'list1' | 'list2'): Promise<number> {
     const container = list === 'list1' ? this.list1VirtualScroll : this.list2VirtualScroll;
-    // Get all visible .item elements (excluding hidden dragged items)
-    const items = container.locator('.item:not([style*="display: none"])');
-    const count = await items.count();
-    let ghostCount = 0;
-
-    for (let i = 0; i < count; i++) {
-      const itemText = items.nth(i).locator('.item-text');
-      const text = (await itemText.textContent())?.trim() ?? '';
-      if (text === '') {
-        ghostCount++;
-      }
-    }
-
-    return ghostCount;
+    return container.evaluate((el) => {
+      const items = el.querySelectorAll('.item:not([style*="display: none"])');
+      return Array.from(items).filter((item) => {
+        const text = item.querySelector('.item-text')?.textContent?.trim() ?? '';
+        return text === '';
+      }).length;
+    });
   }
 
   /**
    * Get all rendered items with their content for inspection.
+   * Uses atomic page.evaluate() to avoid TOCTOU races with virtual scroll re-renders.
    */
   async getRenderedItemsWithContent(
     list: 'list1' | 'list2',
   ): Promise<{ text: string; tagName: string; isPlaceholder: boolean }[]> {
     const container = list === 'list1' ? this.list1VirtualScroll : this.list2VirtualScroll;
-    const elements = container.locator(
-      '.item:not([style*="display: none"]), vdnd-drag-placeholder',
-    );
-    const count = await elements.count();
-    const result: { text: string; tagName: string; isPlaceholder: boolean }[] = [];
-
-    for (let i = 0; i < count; i++) {
-      const el = elements.nth(i);
-      const tagName = await el.evaluate((e) => e.tagName.toLowerCase());
-      const isPlaceholder = tagName === 'vdnd-drag-placeholder';
-      const text = isPlaceholder
-        ? ''
-        : ((await el.locator('.item-text').textContent())?.trim() ?? '');
-
-      result.push({ text, tagName, isPlaceholder });
-    }
-
-    return result;
+    return container.evaluate((el) => {
+      const elements = el.querySelectorAll(
+        '.item:not([style*="display: none"]), vdnd-drag-placeholder',
+      );
+      return Array.from(elements).map((element) => {
+        const tagName = element.tagName.toLowerCase();
+        const isPlaceholder = tagName === 'vdnd-drag-placeholder';
+        const text = isPlaceholder
+          ? ''
+          : (element.querySelector('.item-text')?.textContent?.trim() ?? '');
+        return { text, tagName, isPlaceholder };
+      });
+    });
   }
 
   /**
