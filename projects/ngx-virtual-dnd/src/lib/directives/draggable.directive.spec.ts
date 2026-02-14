@@ -332,25 +332,58 @@ describe('DraggableDirective', () => {
   });
 
   describe('axis locking input', () => {
-    it('should accept null lockAxis', () => {
+    /** Simulate a full pointer drag start: mousedown → mousemove past threshold */
+    function startDragViaPointer(): void {
+      // Mock elementFromPoint since JSDOM doesn't support it
+      const posCalc = TestBed.inject(PositionCalculatorService);
+      jest.spyOn(posCalc, 'findDroppableAtPoint').mockReturnValue(null);
+
+      const mousedown = new MouseEvent('mousedown', {
+        clientX: 100,
+        clientY: 100,
+        button: 0,
+        bubbles: true,
+        cancelable: true,
+      });
+      draggableNative.dispatchEvent(mousedown);
+
+      // Move past the 5px threshold to trigger drag start
+      const mousemove = new MouseEvent('mousemove', {
+        clientX: 100,
+        clientY: 110,
+        bubbles: true,
+      });
+      document.dispatchEvent(mousemove);
+    }
+
+    it('should store null lockAxis in drag state when no axis is locked', () => {
       component.lockAxis.set(null);
       fixture.detectChanges();
-      // No error should occur
-      expect(true).toBe(true);
+
+      startDragViaPointer();
+
+      expect(dragStateService.isDragging()).toBe(true);
+      expect(dragStateService.lockAxis()).toBeNull();
     });
 
-    it('should accept x lockAxis', () => {
+    it('should pass x lockAxis to drag state when starting a drag', () => {
       component.lockAxis.set('x');
       fixture.detectChanges();
-      // No error should occur
-      expect(true).toBe(true);
+
+      startDragViaPointer();
+
+      expect(dragStateService.isDragging()).toBe(true);
+      expect(dragStateService.lockAxis()).toBe('x');
     });
 
-    it('should accept y lockAxis', () => {
+    it('should pass y lockAxis to drag state when starting a drag', () => {
       component.lockAxis.set('y');
       fixture.detectChanges();
-      // No error should occur
-      expect(true).toBe(true);
+
+      startDragViaPointer();
+
+      expect(dragStateService.isDragging()).toBe(true);
+      expect(dragStateService.lockAxis()).toBe('y');
     });
   });
 
