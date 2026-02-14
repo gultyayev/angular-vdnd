@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.0.0-alpha.1](https://github.com/gultyayev/angular-vdnd/compare/v2.0.0-alpha.0...v2.0.0-alpha.1) (2026-02-14)
+
+### Performance
+
+- **lib:** split high-frequency signals from monolithic drag state ([18d642f](https://github.com/gultyayev/angular-vdnd/commit/18d642f880461f4c59d5252ab1eee1b8c0bbc506))
+
 ## [2.0.0-alpha.0](https://github.com/gultyayev/angular-vdnd/compare/v1.3.0-alpha.6...v2.0.0-alpha.0) (2026-02-13)
 
 ### ⚠ BREAKING CHANGES
