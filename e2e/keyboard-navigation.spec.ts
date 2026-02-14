@@ -49,9 +49,8 @@ test.describe('Keyboard Navigation', () => {
 
     // Press Escape to cancel (document-level keydown listener handles this)
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(100);
 
-    // Drag preview should be hidden
+    // Wait for drag to be canceled (preview disappears)
     await expect(demoPage.dragPreview).not.toBeVisible();
 
     // Original item should be visible again

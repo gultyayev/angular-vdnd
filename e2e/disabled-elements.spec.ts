@@ -35,7 +35,8 @@ test.describe('Disabled Elements', () => {
       await sourceItem.hover();
       await page.mouse.down();
       await page.mouse.move(sourceBox.x + 200, sourceBox.y);
-      await page.waitForTimeout(50);
+      // Wait one rAF for any potential drag state processing
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     }
 
     // Drag preview should NOT be visible
@@ -159,7 +160,8 @@ test.describe('Disabled Elements', () => {
     // Try to drag with delay
     await sourceItem.hover();
     await page.mouse.down();
-    await page.waitForTimeout(250); // Wait longer than delay
+    // Intentional delay: must exceed the 200ms drag delay to verify disabled state persists
+    await page.waitForTimeout(250);
     await page.mouse.move(sourceBox!.x + 100, sourceBox!.y + 100);
 
     // Should still not start drag because disabled

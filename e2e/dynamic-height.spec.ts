@@ -40,15 +40,17 @@ test.describe('Dynamic Height Demo', () => {
 
   test('should filter tasks by category', async ({ page }) => {
     await page.locator('ion-chip').filter({ hasText: 'Work' }).click();
-    await page.waitForTimeout(100);
 
-    const badges = page.locator('.task-item ion-badge');
-    const count = await badges.count();
-    expect(count).toBeGreaterThan(0);
-    for (let i = 0; i < count; i++) {
-      const text = await badges.nth(i).textContent();
-      expect(text?.trim()).toBe('work');
-    }
+    // Wait for filter to apply by checking that only work badges are shown
+    await expect(async () => {
+      const badges = page.locator('.task-item ion-badge');
+      const count = await badges.count();
+      expect(count).toBeGreaterThan(0);
+      for (let i = 0; i < count; i++) {
+        const text = await badges.nth(i).textContent();
+        expect(text?.trim()).toBe('work');
+      }
+    }).toPass({ timeout: 2000 });
   });
 
   test('should scroll and render items correctly', async ({ page }) => {
@@ -64,31 +66,42 @@ test.describe('Dynamic Height Demo', () => {
     });
 
     const scrollAmount = headerHeight + 500;
-    await page.evaluate((amount) => {
-      const scrollContainer = document.querySelector('.scroll-container');
-      if (scrollContainer) scrollContainer.scrollTop = amount;
-    }, scrollAmount);
-    await page.waitForTimeout(200);
 
-    const afterScrollFirstItem = await page
-      .locator('.task-item')
-      .first()
-      .locator('.task-title')
-      .textContent();
-    expect(afterScrollFirstItem?.trim()).not.toBe(initialFirstItem?.trim());
+    // Scroll down — wrap write+read+assertion in toPass (virtual scroll needs a frame to re-render)
+    await expect(async () => {
+      await page.evaluate((amount) => {
+        const scrollContainer = document.querySelector('.scroll-container');
+        if (scrollContainer) scrollContainer.scrollTop = amount;
+      }, scrollAmount);
+      const scrollTop = await page.evaluate(
+        () => document.querySelector('.scroll-container')?.scrollTop ?? 0,
+      );
+      expect(scrollTop).toBeGreaterThan(0);
+      const afterScrollFirstItem = await page
+        .locator('.task-item')
+        .first()
+        .locator('.task-title')
+        .textContent();
+      expect(afterScrollFirstItem?.trim()).not.toBe(initialFirstItem?.trim());
+    }).toPass({ timeout: 3000 });
 
-    await page.evaluate(() => {
-      const scrollContainer = document.querySelector('.scroll-container');
-      if (scrollContainer) scrollContainer.scrollTop = 0;
-    });
-    await page.waitForTimeout(200);
-
-    const restoredFirstItem = await page
-      .locator('.task-item')
-      .first()
-      .locator('.task-title')
-      .textContent();
-    expect(restoredFirstItem?.trim()).toBe(initialFirstItem?.trim());
+    // Scroll back to top — include item check in toPass (virtual scroll needs a frame to re-render)
+    await expect(async () => {
+      await page.evaluate(() => {
+        const scrollContainer = document.querySelector('.scroll-container');
+        if (scrollContainer) scrollContainer.scrollTop = 0;
+      });
+      const scrollTop = await page.evaluate(
+        () => document.querySelector('.scroll-container')?.scrollTop ?? 0,
+      );
+      expect(scrollTop).toBe(0);
+      const restoredFirstItem = await page
+        .locator('.task-item')
+        .first()
+        .locator('.task-title')
+        .textContent();
+      expect(restoredFirstItem?.trim()).toBe(initialFirstItem?.trim());
+    }).toPass({ timeout: 3000 });
   });
 
   test('should reorder tasks via drag-drop', async ({ page }) => {
@@ -118,17 +131,19 @@ test.describe('Dynamic Height Demo', () => {
     const targetY = targetBox.y + targetBox.height / 2;
     await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY, { steps: 10 });
 
-    // Wait one rAF before drop
-    await page.waitForTimeout(50);
+    // Wait one rAF before drop (position update is rAF-throttled)
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     await page.mouse.up();
-    await page.waitForTimeout(200);
 
-    const newFirstItemText = await page
-      .locator('.task-item')
-      .nth(0)
-      .locator('.task-title')
-      .textContent();
-    expect(newFirstItemText?.trim()).toBe(secondItemText?.trim());
+    // Wait for drop to complete by verifying DOM update
+    await expect(async () => {
+      const newFirstItemText = await page
+        .locator('.task-item')
+        .nth(0)
+        .locator('.task-title')
+        .textContent();
+      expect(newFirstItemText?.trim()).toBe(secondItemText?.trim());
+    }).toPass({ timeout: 2000 });
   });
 
   test('should show drag preview while dragging', async ({ page }) => {
@@ -144,8 +159,8 @@ test.describe('Dynamic Height Demo', () => {
     await expect(dragPreview).toBeVisible({ timeout: 2000 });
 
     await page.mouse.move(sourceBox.x + 100, sourceBox.y + 100, { steps: 10 });
-    await page.waitForTimeout(100);
 
+    // Verify drag preview is still visible after moving
     await expect(dragPreview).toBeVisible();
     await page.mouse.up();
   });
@@ -168,7 +183,9 @@ test.describe('Dynamic Height Demo', () => {
 
     const targetY = targetBox.y + targetBox.height / 2;
     await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY, { steps: 10 });
-    await page.waitForTimeout(50);
+
+    // Wait one rAF for position update, then check placeholder
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
 
     const placeholder = page.locator('.vdnd-drag-placeholder-visible');
     await expect(placeholder).toBeVisible({ timeout: 2000 });
@@ -177,22 +194,31 @@ test.describe('Dynamic Height Demo', () => {
   });
 
   test('should not show gray gaps during rapid scroll', async ({ page }) => {
-    await page.evaluate(() => {
-      const scrollContainer = document.querySelector('.scroll-container');
-      if (scrollContainer) scrollContainer.scrollTop = 2000;
-    });
-    await page.waitForTimeout(200);
+    // Scroll down
+    await expect(async () => {
+      await page.evaluate(() => {
+        const scrollContainer = document.querySelector('.scroll-container');
+        if (scrollContainer) scrollContainer.scrollTop = 2000;
+      });
+      const scrollTop = await page.evaluate(
+        () => document.querySelector('.scroll-container')?.scrollTop ?? 0,
+      );
+      expect(scrollTop).toBeGreaterThan(0);
+    }).toPass({ timeout: 2000 });
 
     const countBefore = await page.locator('.task-item').count();
 
+    // Rapidly scroll up
     await page.evaluate(() => {
       const scrollContainer = document.querySelector('.scroll-container');
       if (scrollContainer) scrollContainer.scrollTop -= 500;
     });
-    await page.waitForTimeout(100);
 
-    const countAfter = await page.locator('.task-item').count();
-    expect(countAfter).toBeGreaterThan(countBefore - 3);
+    // Wait for virtual scroll to render items at new position
+    await expect(async () => {
+      const countAfter = await page.locator('.task-item').count();
+      expect(countAfter).toBeGreaterThan(countBefore - 3);
+    }).toPass({ timeout: 2000 });
   });
 
   test('should keep drag preview visible during autoscroll', async ({ page }) => {
@@ -233,11 +259,16 @@ test.describe('Dynamic Height Demo', () => {
   test('should correctly reorder after scrolling and maintain virtual scroll', async ({ page }) => {
     // Scroll down so visible items are past the first few
     const scrollAmount = 800;
-    await page.evaluate((amount) => {
-      const scrollContainer = document.querySelector('.scroll-container');
-      if (scrollContainer) scrollContainer.scrollTop = amount;
-    }, scrollAmount);
-    await page.waitForTimeout(300);
+    await expect(async () => {
+      await page.evaluate((amount) => {
+        const scrollContainer = document.querySelector('.scroll-container');
+        if (scrollContainer) scrollContainer.scrollTop = amount;
+      }, scrollAmount);
+      const scrollTop = await page.evaluate(
+        () => document.querySelector('.scroll-container')?.scrollTop ?? 0,
+      );
+      expect(scrollTop).toBeGreaterThan(0);
+    }).toPass({ timeout: 2000 });
 
     // Get items actually visible in the viewport (not overscan items)
     const visibleInfo = await page.evaluate(() => {
@@ -286,37 +317,43 @@ test.describe('Dynamic Height Demo', () => {
     await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY, { steps: 10 });
 
     // Wait one rAF before drop
-    await page.waitForTimeout(50);
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     await page.mouse.up();
-    await page.waitForTimeout(300);
 
-    // Get the new visible items after drop
-    const afterInfo = await page.evaluate(() => {
-      const container = document.querySelector('.scroll-container');
-      if (!container) return { items: [] as { id: string; top: number }[] };
-      const containerRect = container.getBoundingClientRect();
-      const items = document.querySelectorAll('[data-draggable-id]');
-      const visible: { id: string; top: number }[] = [];
-      for (const item of items) {
-        const rect = item.getBoundingClientRect();
-        if (rect.bottom > containerRect.top && rect.top < containerRect.bottom) {
-          visible.push({ id: item.getAttribute('data-draggable-id') ?? '', top: rect.top });
+    // Wait for drop to complete — verify source item moved
+    await expect(async () => {
+      const afterInfo = await page.evaluate(() => {
+        const container = document.querySelector('.scroll-container');
+        if (!container) return { items: [] as { id: string; top: number }[] };
+        const containerRect = container.getBoundingClientRect();
+        const items = document.querySelectorAll('[data-draggable-id]');
+        const visible: { id: string; top: number }[] = [];
+        for (const item of items) {
+          const rect = item.getBoundingClientRect();
+          if (rect.bottom > containerRect.top && rect.top < containerRect.bottom) {
+            visible.push({ id: item.getAttribute('data-draggable-id') ?? '', top: rect.top });
+          }
         }
-      }
-      visible.sort((a, b) => a.top - b.top);
-      return { items: visible };
-    });
+        visible.sort((a, b) => a.top - b.top);
+        return { items: visible };
+      });
 
-    // The source item should have moved — it should no longer be the first visible
-    const afterIds = afterInfo.items.map((i) => i.id);
-    expect(afterIds[0]).not.toBe(sourceId);
+      // The source item should have moved — it should no longer be the first visible
+      const afterIds = afterInfo.items.map((i) => i.id);
+      expect(afterIds[0]).not.toBe(sourceId);
+    }).toPass({ timeout: 2000 });
 
     // Virtual scroll integrity: scroll to top and verify items render
-    await page.evaluate(() => {
-      const scrollContainer = document.querySelector('.scroll-container');
-      if (scrollContainer) scrollContainer.scrollTop = 0;
-    });
-    await page.waitForTimeout(200);
+    await expect(async () => {
+      await page.evaluate(() => {
+        const scrollContainer = document.querySelector('.scroll-container');
+        if (scrollContainer) scrollContainer.scrollTop = 0;
+      });
+      const scrollTop = await page.evaluate(
+        () => document.querySelector('.scroll-container')?.scrollTop ?? 0,
+      );
+      expect(scrollTop).toBe(0);
+    }).toPass({ timeout: 2000 });
 
     const topItems = await page.locator('[data-draggable-id]').count();
     expect(topItems).toBeGreaterThan(0);
@@ -366,24 +403,27 @@ test.describe('Dynamic Height Demo', () => {
     }).toPass({ timeout: 10000 });
 
     // Wait one rAF before drop
-    await page.waitForTimeout(50);
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     await page.mouse.up();
-    await page.waitForTimeout(300);
 
-    // Scroll back to top to verify reorder happened
-    await page.evaluate(() => {
-      const container = document.querySelector('.scroll-container');
-      if (container) container.scrollTop = 0;
-    });
-    await page.waitForTimeout(300);
-
-    // The first item should have moved — it should no longer be at index 0
-    const newFirstItemText = await page
-      .locator('.task-item')
-      .first()
-      .locator('.task-title')
-      .textContent();
-    expect(newFirstItemText?.trim()).not.toBe(firstItemText?.trim());
+    // Scroll back to top to verify reorder happened — include item check in toPass
+    await expect(async () => {
+      await page.evaluate(() => {
+        const container = document.querySelector('.scroll-container');
+        if (container) container.scrollTop = 0;
+      });
+      const scrollTop = await page.evaluate(
+        () => document.querySelector('.scroll-container')?.scrollTop ?? 0,
+      );
+      expect(scrollTop).toBe(0);
+      // The first item should have moved — it should no longer be at index 0
+      const newFirstItemText = await page
+        .locator('.task-item')
+        .first()
+        .locator('.task-title')
+        .textContent();
+      expect(newFirstItemText?.trim()).not.toBe(firstItemText?.trim());
+    }).toPass({ timeout: 3000 });
 
     // Virtual scroll integrity: items should still render
     const itemCount = await page.locator('.task-item').count();
@@ -530,17 +570,18 @@ test.describe('Dynamic Height Demo', () => {
     await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY, { steps: 10 });
 
     // Wait one rAF before drop
-    await page.waitForTimeout(50);
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     await page.mouse.up();
-    await page.waitForTimeout(200);
 
-    // Item 0 should have moved past item 1 — second item is now first
-    const newFirstItemText = await page
-      .locator('.task-item')
-      .nth(0)
-      .locator('.task-title')
-      .textContent();
-    expect(newFirstItemText?.trim()).toBe(secondItemText?.trim());
+    // Wait for drop to complete — verify reorder happened
+    await expect(async () => {
+      const newFirstItemText = await page
+        .locator('.task-item')
+        .nth(0)
+        .locator('.task-title')
+        .textContent();
+      expect(newFirstItemText?.trim()).toBe(secondItemText?.trim());
+    }).toPass({ timeout: 2000 });
 
     // Original first item should now be at index 1
     const newSecondItemText = await page
@@ -566,14 +607,17 @@ test.describe('Dynamic Height Demo', () => {
       }
     });
 
-    await page.waitForTimeout(200);
+    // Wait for initial render to settle
+    await expect(page.locator('.task-item').first()).toBeVisible();
 
+    // Scroll multiple times to trigger potential ResizeObserver issues
     for (let i = 0; i < 5; i++) {
       await page.evaluate((scrollAmount) => {
         const scrollContainer = document.querySelector('.scroll-container');
         if (scrollContainer) scrollContainer.scrollTop = scrollAmount;
       }, i * 500);
-      await page.waitForTimeout(50);
+      // Wait one rAF between scrolls for rendering to process
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     }
 
     expect(resizeObserverErrors).toBe(0);

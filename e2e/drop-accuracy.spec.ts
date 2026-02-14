@@ -41,9 +41,12 @@ test.describe('Drop Position Accuracy', () => {
     const initialList2Count = await demoPage.getItemCount('list2');
 
     // First scroll list2 to the end so we can drop at the actual end
-    await demoPage.scrollList('list2', (initialList2Count - 1) * 50);
-    // Wait for scroll to settle
-    await demoPage.page.waitForTimeout(100);
+    // Wrap write+read in toPass so scroll re-applies if content isn't ready
+    await expect(async () => {
+      await demoPage.scrollList('list2', (initialList2Count - 1) * 50);
+      const scrollTop = await demoPage.getScrollTop('list2');
+      expect(scrollTop).toBeGreaterThan(0);
+    }).toPass({ timeout: 2000 });
 
     // Now drag to the end of the visible area (which is now the actual end)
     await demoPage.dragItemToList('list1', 0, 'list2', 999);
@@ -53,8 +56,11 @@ test.describe('Drop Position Accuracy', () => {
     expect(newCount).toBe(initialList2Count + 1);
 
     // Scroll to the very end to see the last item
-    await demoPage.scrollList('list2', (newCount - 1) * 50);
-    await demoPage.page.waitForTimeout(100);
+    await expect(async () => {
+      await demoPage.scrollList('list2', (newCount - 1) * 50);
+      const scrollTop = await demoPage.getScrollTop('list2');
+      expect(scrollTop).toBeGreaterThan(0);
+    }).toPass({ timeout: 2000 });
 
     // Verify item is at the end of list2 (last visible item after scrolling)
     const lastVisibleItem = await demoPage.list2Items.last().textContent();
@@ -79,12 +85,11 @@ test.describe('Drop Position Accuracy', () => {
     // Press escape to cancel
     await page.keyboard.press('Escape');
 
-    await page.waitForTimeout(100);
+    // Wait for drag to be canceled (preview disappears)
+    await expect(demoPage.dragPreview).not.toBeVisible();
 
     // Release mouse (drag was canceled, so this should have no effect)
     await page.mouse.up();
-
-    await page.waitForTimeout(100);
 
     // Counts should remain unchanged
     const finalList1Count = await demoPage.getItemCount('list1');
@@ -95,7 +100,7 @@ test.describe('Drop Position Accuracy', () => {
   });
 
   // Previously skipped on WebKit, testing fix
-  test('should maintain item order after multiple drags', async ({ browserName }) => {
+  test('should maintain item order after multiple drags', async () => {
     // Get original order of first 3 items in list1
     const item0 = await demoPage.getItemText('list1', 0);
     const item1 = await demoPage.getItemText('list1', 1);
@@ -104,20 +109,12 @@ test.describe('Drop Position Accuracy', () => {
     // Move first item to list2
     await demoPage.dragItemToList('list1', 0, 'list2', 0);
 
-    // Wait for DOM to stabilize between drags (critical for WebKit)
-    await demoPage.page.waitForTimeout(100);
-
     // Verify the first drag worked
     const list2First = await demoPage.getItemText('list2', 0);
     expect(list2First).toBe(item0); // Should be "List 1 - Item 1"
 
     // Move it back to list1 at position 2
     await demoPage.dragItemToList('list2', 0, 'list1', 2);
-
-    // Give WebKit extra time to process
-    if (browserName === 'webkit') {
-      await demoPage.page.waitForTimeout(100);
-    }
 
     // Verify the order: item1, item2, item0
     expect(await demoPage.getItemText('list1', 0)).toBe(item1);

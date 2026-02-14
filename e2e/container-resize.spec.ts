@@ -26,14 +26,15 @@ test.describe('Container Resize', () => {
 
     // Resize the viewport to be larger
     await page.setViewportSize({ width: 1280, height: 1200 });
-    await page.waitForTimeout(100); // Wait for ResizeObserver
 
-    // The number of visible items should remain stable since container has fixed height
-    const afterResizeItems = await demoPage.list1Items.count();
-    expect(afterResizeItems).toBe(initialVisibleItems);
+    // Wait for ResizeObserver to process and verify items remain stable
+    await expect(async () => {
+      const afterResizeItems = await demoPage.list1Items.count();
+      expect(afterResizeItems).toBe(initialVisibleItems);
+    }).toPass({ timeout: 2000 });
   });
 
-  test('should adapt to container height changes via JavaScript', async ({ page }) => {
+  test('should adapt to container height changes via JavaScript', async () => {
     const container = demoPage.list1VirtualScroll;
 
     // Get initial state
@@ -43,18 +44,19 @@ test.describe('Container Resize', () => {
     await container.evaluate((el) => {
       el.style.height = '600px';
     });
-    await page.waitForTimeout(150); // Wait for ResizeObserver callback
 
-    // Verify the container height changed
-    const newBox = await container.boundingBox();
-    expect(newBox?.height).toBe(600);
+    // Wait for ResizeObserver to process the height change
+    await expect(async () => {
+      const newBox = await container.boundingBox();
+      expect(newBox?.height).toBe(600);
+    }).toPass({ timeout: 2000 });
 
     // More items should now be visible (or at least the same if overscan covers it)
     const newVisibleItems = await demoPage.list1Items.count();
     expect(newVisibleItems).toBeGreaterThanOrEqual(initialVisibleItems);
   });
 
-  test('should maintain scroll position after container resize', async ({ page }) => {
+  test('should maintain scroll position after container resize', async () => {
     // Scroll down in the list
     await demoPage.scrollList('list1', 500);
     const scrollTopBefore = await demoPage.getScrollTop('list1');
@@ -65,20 +67,27 @@ test.describe('Container Resize', () => {
     await container.evaluate((el) => {
       el.style.height = '300px';
     });
-    await page.waitForTimeout(150); // Wait for ResizeObserver
 
-    // Scroll position should be preserved
+    // Wait for ResizeObserver to process, then verify scroll position preserved
+    await expect(async () => {
+      const newBox = await container.boundingBox();
+      expect(newBox?.height).toBe(300);
+    }).toPass({ timeout: 2000 });
     const scrollTopAfter = await demoPage.getScrollTop('list1');
     expect(scrollTopAfter).toBe(500);
   });
 
-  test('should handle drag and drop correctly after resize', async ({ page }) => {
+  test('should handle drag and drop correctly after resize', async () => {
     // Resize the container first
     const container = demoPage.list1VirtualScroll;
     await container.evaluate((el) => {
       el.style.height = '500px';
     });
-    await page.waitForTimeout(150);
+    // Wait for ResizeObserver to process the height change
+    await expect(async () => {
+      const box = await container.boundingBox();
+      expect(box?.height).toBe(500);
+    }).toPass({ timeout: 2000 });
 
     // Get initial counts
     const initialList1Count = await demoPage.getItemCount('list1');
@@ -100,16 +109,19 @@ test.describe('Container Resize', () => {
     expect(newFirstItem).toBe(itemText);
   });
 
-  test('should handle very small container heights', async ({ page }) => {
+  test('should handle very small container heights', async () => {
     const container = demoPage.list1VirtualScroll;
 
     // Set a very small height (only fits 2 items)
     await container.evaluate((el) => {
       el.style.height = '100px';
     });
-    await page.waitForTimeout(150);
 
-    // Verify items are still rendered
+    // Wait for ResizeObserver to process, then verify items are still rendered
+    await expect(async () => {
+      const box = await container.boundingBox();
+      expect(box?.height).toBe(100);
+    }).toPass({ timeout: 2000 });
     const visibleItems = await demoPage.list1Items.count();
     expect(visibleItems).toBeGreaterThan(0);
 
@@ -175,15 +187,15 @@ test.describe('Container Resize', () => {
       await container.evaluate((el, h) => {
         el.style.height = `${h}px`;
       }, height);
-      await page.waitForTimeout(50);
+      // Wait one rAF between resizes for rendering to process
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     }
 
-    // Wait for final resize to settle
-    await page.waitForTimeout(150);
-
-    // Verify final state is correct
-    const finalBox = await container.boundingBox();
-    expect(finalBox?.height).toBe(400);
+    // Wait for final resize to settle via ResizeObserver
+    await expect(async () => {
+      const finalBox = await container.boundingBox();
+      expect(finalBox?.height).toBe(400);
+    }).toPass({ timeout: 2000 });
 
     // Verify items are still rendered correctly
     const visibleItems = await demoPage.list1Items.count();

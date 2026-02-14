@@ -24,7 +24,7 @@ test.describe('Placeholder Rendering Integrity', () => {
       await sourceItem.hover();
       await page.mouse.down();
       await page.mouse.move(sourceBox!.x + sourceBox!.width / 2, sourceBox!.y + 75, { steps: 5 });
-      await page.waitForTimeout(100);
+      await expect(demoPage.dragPreview).toBeVisible();
 
       // Count ghost elements (empty .item divs without text)
       const ghostCount = await demoPage.countGhostElements('list2');
@@ -42,7 +42,7 @@ test.describe('Placeholder Rendering Integrity', () => {
       await sourceItem.hover();
       await page.mouse.down();
       await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 75, { steps: 10 });
-      await page.waitForTimeout(100);
+      await expect(demoPage.dragPreview).toBeVisible();
 
       // Check both lists for ghost elements
       const ghostCountList1 = await demoPage.countGhostElements('list1');
@@ -62,7 +62,7 @@ test.describe('Placeholder Rendering Integrity', () => {
       await sourceItem.hover();
       await page.mouse.down();
       await page.mouse.move(sourceBox!.x + sourceBox!.width / 2, sourceBox!.y + 75, { steps: 5 });
-      await page.waitForTimeout(100);
+      await expect(demoPage.dragPreview).toBeVisible();
 
       const ghostCount = await demoPage.countGhostElements('list2');
       expect(ghostCount, 'Ghost elements should not exist in simplified API').toBe(0);
@@ -81,13 +81,15 @@ test.describe('Placeholder Rendering Integrity', () => {
       await sourceItem.hover();
       await page.mouse.down();
       await page.mouse.move(sourceBox!.x + sourceBox!.width / 2, sourceBox!.y + 75, { steps: 5 });
-      await page.waitForTimeout(100);
+      await expect(demoPage.dragPreview).toBeVisible();
 
-      // Count visible placeholders
-      const properPlaceholders = await demoPage.list2Container
-        .locator('.vdnd-drag-placeholder-visible')
-        .count();
-      expect(properPlaceholders, 'Should have exactly one proper placeholder').toBe(1);
+      // Count visible placeholders — wrap in toPass since count() is one-shot and rAF-dependent
+      await expect(async () => {
+        const properPlaceholders = await demoPage.list2Container
+          .locator('.vdnd-drag-placeholder-visible')
+          .count();
+        expect(properPlaceholders, 'Should have exactly one proper placeholder').toBe(1);
+      }).toPass({ timeout: 2000 });
 
       // Ensure no broken placeholder elements (items without text)
       const items = await demoPage.getRenderedItemsWithContent('list2');
@@ -104,7 +106,7 @@ test.describe('Placeholder Rendering Integrity', () => {
       await sourceItem.hover();
       await page.mouse.down();
       await page.mouse.move(sourceBox!.x + sourceBox!.width / 2, sourceBox!.y + 75, { steps: 5 });
-      await page.waitForTimeout(100);
+      await expect(demoPage.dragPreview).toBeVisible();
 
       // Get all rendered content
       const items = await demoPage.getRenderedItemsWithContent('list2');
@@ -138,13 +140,15 @@ test.describe('Placeholder Rendering Integrity', () => {
       await sourceItem.hover();
       await page.mouse.down();
       await page.mouse.move(sourceBox!.x + sourceBox!.width / 2, sourceBox!.y + 75, { steps: 5 });
-      await page.waitForTimeout(100);
+      await expect(demoPage.dragPreview).toBeVisible();
 
-      // Count visible placeholders - should be exactly 1
-      const placeholderCount = await demoPage.list2Container
-        .locator('.vdnd-drag-placeholder-visible')
-        .count();
-      expect(placeholderCount, 'Should have exactly one placeholder').toBe(1);
+      // Count visible placeholders — wrap in toPass since count() is one-shot and rAF-dependent
+      await expect(async () => {
+        const placeholderCount = await demoPage.list2Container
+          .locator('.vdnd-drag-placeholder-visible')
+          .count();
+        expect(placeholderCount, 'Should have exactly one placeholder').toBe(1);
+      }).toPass({ timeout: 2000 });
 
       // Count ghost elements - should be 0
       const ghostCount = await demoPage.countGhostElements('list2');
@@ -160,13 +164,15 @@ test.describe('Placeholder Rendering Integrity', () => {
       await sourceItem.hover();
       await page.mouse.down();
       await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 100, { steps: 10 });
-      await page.waitForTimeout(100);
+      await expect(demoPage.dragPreview).toBeVisible();
 
-      // Check for any duplicate visible placeholder situations
-      const placeholderCount = await demoPage.list2Container
-        .locator('.vdnd-drag-placeholder-visible')
-        .count();
-      expect(placeholderCount, 'Should have exactly one placeholder').toBe(1);
+      // Check for any duplicate visible placeholder situations — wrap in toPass
+      await expect(async () => {
+        const placeholderCount = await demoPage.list2Container
+          .locator('.vdnd-drag-placeholder-visible')
+          .count();
+        expect(placeholderCount, 'Should have exactly one placeholder').toBe(1);
+      }).toPass({ timeout: 2000 });
 
       // Also check that we don't have placeholder-like elements
       // (elements that take up space but have no visible content)
@@ -187,15 +193,20 @@ test.describe('Placeholder Rendering Integrity', () => {
       await sourceItem.hover();
       await page.mouse.down();
       await page.mouse.move(sourceBox!.x + sourceBox!.width / 2, sourceBox!.y + 75, { steps: 5 });
-      await page.waitForTimeout(100);
+      await expect(demoPage.dragPreview).toBeVisible();
 
-      const verbosePlaceholders = await demoPage.list2Container
-        .locator('.vdnd-drag-placeholder-visible')
-        .count();
+      // Wrap in toPass since count() is one-shot
+      let verbosePlaceholders = 0;
+      await expect(async () => {
+        verbosePlaceholders = await demoPage.list2Container
+          .locator('.vdnd-drag-placeholder-visible')
+          .count();
+        expect(verbosePlaceholders).toBe(1);
+      }).toPass({ timeout: 2000 });
       const verboseGhosts = await demoPage.countGhostElements('list2');
 
       await page.mouse.up();
-      await page.waitForTimeout(100);
+      await expect(demoPage.dragPreview).not.toBeVisible();
 
       // Switch to simplified API
       await demoPage.enableSimplifiedApi();
@@ -215,11 +226,15 @@ test.describe('Placeholder Rendering Integrity', () => {
         sourceBoxSimplified!.y + 75,
         { steps: 5 },
       );
-      await page.waitForTimeout(100);
+      await expect(demoPage.dragPreview).toBeVisible();
 
-      const simplifiedPlaceholders = await demoPage.list2Container
-        .locator('.vdnd-drag-placeholder-visible')
-        .count();
+      let simplifiedPlaceholders = 0;
+      await expect(async () => {
+        simplifiedPlaceholders = await demoPage.list2Container
+          .locator('.vdnd-drag-placeholder-visible')
+          .count();
+        expect(simplifiedPlaceholders).toBe(1);
+      }).toPass({ timeout: 2000 });
       const simplifiedGhosts = await demoPage.countGhostElements('list2');
 
       await page.mouse.up();

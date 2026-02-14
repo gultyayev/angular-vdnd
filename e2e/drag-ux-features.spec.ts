@@ -58,10 +58,12 @@ test.describe('Drag UX Features - Drag Handle', () => {
     // Enable drag handle mode
     const handleCheckbox = page.locator('[data-testid="drag-handle-checkbox"]');
     await handleCheckbox.check();
-    await page.waitForTimeout(100);
 
-    // Get first item and its handle
+    // Wait for Angular to process the handle mode change and get first item
     const firstItem = demoPage.list1Items.first();
+    await expect(firstItem).toHaveClass(/use-handle/);
+
+    // Get first item's handle
     const handle = firstItem.locator('.item-handle');
 
     // Try to drag by clicking on the item text (not the handle)
@@ -116,17 +118,15 @@ test.describe('Drag UX Features - Drag Handle', () => {
     // Enable drag handle mode
     const handleCheckbox = page.locator('[data-testid="drag-handle-checkbox"]');
     await handleCheckbox.check();
-    await page.waitForTimeout(100);
 
-    // Items should have use-handle class
+    // Items should have use-handle class (auto-waits for Angular to update)
     const firstItem = demoPage.list1Items.first();
     await expect(firstItem).toHaveClass(/use-handle/);
 
     // Disable drag handle mode
     await handleCheckbox.uncheck();
-    await page.waitForTimeout(100);
 
-    // Items should not have use-handle class
+    // Items should not have use-handle class (auto-waits for Angular to update)
     await expect(firstItem).not.toHaveClass(/use-handle/);
   });
 });

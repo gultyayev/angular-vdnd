@@ -24,21 +24,22 @@ test.describe('Auto Scroll', () => {
     const nearBottomY = containerBox!.y + containerBox!.height - 25;
     await page.mouse.move(containerBox!.x + 100, nearBottomY);
 
-    // Wait for auto-scroll to occur
-    await page.waitForTimeout(500);
-
-    const finalScrollTop = await demoPage.getScrollTop('list1');
-
-    // Scroll position should have increased
-    expect(finalScrollTop).toBeGreaterThan(initialScrollTop);
+    // Wait for auto-scroll to accumulate distance
+    await expect(async () => {
+      const scrollTop = await demoPage.getScrollTop('list1');
+      expect(scrollTop).toBeGreaterThan(initialScrollTop);
+    }).toPass({ timeout: 3000 });
 
     await page.mouse.up();
   });
 
   test('should auto-scroll when dragging near top edge', async ({ page }) => {
-    // First scroll down
-    await demoPage.scrollList('list1', 200);
-    await page.waitForTimeout(100);
+    // First scroll down — wrap write+read in toPass so scroll re-applies if content isn't ready
+    await expect(async () => {
+      await demoPage.scrollList('list1', 200);
+      const scrollTop = await demoPage.getScrollTop('list1');
+      expect(scrollTop).toBeGreaterThanOrEqual(200);
+    }).toPass({ timeout: 2000 });
 
     const initialScrollTop = await demoPage.getScrollTop('list1');
     expect(initialScrollTop).toBeGreaterThanOrEqual(200);
@@ -54,13 +55,11 @@ test.describe('Auto Scroll', () => {
     const nearTopY = containerBox!.y + 25;
     await page.mouse.move(containerBox!.x + 100, nearTopY);
 
-    // Wait for auto-scroll
-    await page.waitForTimeout(500);
-
-    const finalScrollTop = await demoPage.getScrollTop('list1');
-
-    // Scroll position should have decreased
-    expect(finalScrollTop).toBeLessThan(initialScrollTop);
+    // Wait for auto-scroll to decrease scroll position
+    await expect(async () => {
+      const scrollTop = await demoPage.getScrollTop('list1');
+      expect(scrollTop).toBeLessThan(initialScrollTop);
+    }).toPass({ timeout: 3000 });
 
     await page.mouse.up();
   });
@@ -73,11 +72,13 @@ test.describe('Auto Scroll', () => {
     await page.mouse.down();
 
     // Move near bottom edge
-    await page.mouse.move(
-      containerBox!.x + 100,
-      containerBox!.y + containerBox!.height - 25
-    );
-    await page.waitForTimeout(200);
+    await page.mouse.move(containerBox!.x + 100, containerBox!.y + containerBox!.height - 25);
+
+    // Wait for some autoscroll to happen
+    await expect(async () => {
+      const scrollTop = await demoPage.getScrollTop('list1');
+      expect(scrollTop).toBeGreaterThan(0);
+    }).toPass({ timeout: 3000 });
 
     // End drag
     await page.mouse.up();
@@ -85,7 +86,7 @@ test.describe('Auto Scroll', () => {
     // Get scroll position after drop
     const scrollAfterDrop = await demoPage.getScrollTop('list1');
 
-    // Wait and verify no further scrolling
+    // Intentional delay: verify no further scrolling occurs after drag ends
     await page.waitForTimeout(300);
     const scrollAfterWait = await demoPage.getScrollTop('list1');
 
@@ -105,7 +106,7 @@ test.describe('Auto Scroll', () => {
     const centerY = containerBox!.y + containerBox!.height / 2;
     await page.mouse.move(containerBox!.x + 100, centerY);
 
-    // Wait to see if any scrolling occurs
+    // Intentional delay: verify no scrolling occurs when cursor is in center
     await page.waitForTimeout(500);
 
     const finalScrollTop = await demoPage.getScrollTop('list1');
