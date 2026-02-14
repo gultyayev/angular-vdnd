@@ -24,6 +24,8 @@ These rules prevent common mistakes that cause hard-to-debug issues:
 
 9. **Keep this file in sync:** If you add/remove/rename a service, directive, component, data attribute, public API export, or E2E test file, update the corresponding table in this file in the same commit.
 
+10. **Never use `expect(true).toBe(true)` or similar no-op assertions:** Every test assertion must verify actual behavior. Tests that always pass regardless of code behavior provide false confidence and zero coverage. If you can't write a meaningful assertion, the test shouldn't exist.
+
 ## Version Requirements
 
 - **Angular:** 21.0.0+
@@ -393,6 +395,12 @@ npx playwright test --reporter=list
 - Testing DOM behavior/user interaction → E2E (Playwright)
 - Testing pure logic/services → Unit tests (Jest)
 - Debugging visual layout → Chrome MCP (last resort)
+
+### Unit Test Guidelines
+
+- Every assertion must test actual behavior — never use `expect(true).toBe(true)` or equivalent no-op patterns
+- Test behavior, not implementation details
+- Include negative tests (verify things DON'T happen when they shouldn't)
 
 ### E2E Patterns
 
