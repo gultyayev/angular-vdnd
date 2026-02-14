@@ -316,19 +316,7 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
       .toBe(sourceItemText);
   });
 
-  // Test autoscroll in simplified API mode
-  // Skip on Firefox due to Playwright-specific mouse event handling issue
-  // Note: Autoscroll works correctly in Firefox when tested manually and in verbose mode
-  // (see autoscroll-drift.spec.ts which passes on all browsers including Firefox)
-  test('should reorder item with autoscroll in simplified mode', async ({
-    page,
-    browserName,
-  }, testInfo) => {
-    testInfo.skip(
-      browserName === 'firefox',
-      'Playwright mouse events not properly triggering autoscroll in simplified mode on Firefox',
-    );
-
+  test('should reorder item with autoscroll in simplified mode', async ({ page }) => {
     const secondItemText = await demoPage.getItemText('list2', 1);
 
     // Get container bounds for edge detection (scroll into view first per E2E best practices)
@@ -338,29 +326,22 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
       throw new Error('Could not get container bounding box');
     }
 
-    // Use hover() to position on item (matches working autoscroll-drift pattern)
+    // Move from first item directly to bottom edge (single move exceeds drag threshold)
     const sourceItem = demoPage.list2Items.first();
-    const sourceBox = await sourceItem.boundingBox();
-    if (!sourceBox) throw new Error('Could not get source bounding box');
     await sourceItem.hover();
     await page.mouse.down();
-    await page.mouse.move(sourceBox.x + 5, sourceBox.y + 5, { steps: 2 });
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
-
-    // Move to bottom edge to trigger autoscroll
     const nearBottomY = containerBox.y + containerBox.height - 25;
-    await page.mouse.move(containerBox.x + containerBox.width / 2, nearBottomY, { steps: 10 });
+    const edgeX = containerBox.x + containerBox.width / 2;
+    await page.mouse.move(edgeX, nearBottomY, { steps: 10 });
+    await page.mouse.move(edgeX, nearBottomY); // Firefox: direct follow-up after stepped move
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
     await expect(demoPage.placeholder).toBeVisible({ timeout: 2000 });
 
-    // Wait for autoscroll (3 seconds should scroll significantly)
-    // Note: This timeout is intentional - we need real time for autoscroll behavior
-    await page.waitForTimeout(3000);
-
-    // Verify scroll happened using auto-waiting assertion
+    // Wait for autoscroll to move significantly
     await expect(async () => {
       const scrollTop = await demoPage.getScrollTop('list2');
       expect(scrollTop).toBeGreaterThan(200);
-    }).toPass({ timeout: 3000 });
+    }).toPass({ timeout: 10000 });
 
     // Drop the item and wait for drag to complete
     await page.mouse.up();
