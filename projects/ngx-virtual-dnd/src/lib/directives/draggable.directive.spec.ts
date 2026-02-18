@@ -7,7 +7,7 @@ import { DragStateService } from '../services/drag-state.service';
 import { PositionCalculatorService } from '../services/position-calculator.service';
 import { AutoScrollService } from '../services/auto-scroll.service';
 import { ElementCloneService } from '../services/element-clone.service';
-import { DragStartEvent, DragMoveEvent, DragEndEvent } from '../models/drag-drop.models';
+import { DragStartEvent, DragEndEvent } from '../models/drag-drop.models';
 
 // Test host component
 @Component({
@@ -28,7 +28,6 @@ import { DragStartEvent, DragMoveEvent, DragEndEvent } from '../models/drag-drop
         [lockAxis]="lockAxis()"
         style="height: 50px; width: 200px;"
         (dragStart)="onDragStart($event)"
-        (dragMove)="onDragMove($event)"
         (dragEnd)="onDragEnd($event)"
       >
         <span class="handle">Handle</span>
@@ -49,15 +48,10 @@ class TestHostComponent {
   lockAxis = signal<'x' | 'y' | null>(null);
 
   dragStartEvents: DragStartEvent[] = [];
-  dragMoveEvents: DragMoveEvent[] = [];
   dragEndEvents: DragEndEvent[] = [];
 
   onDragStart(event: DragStartEvent): void {
     this.dragStartEvents.push(event);
-  }
-
-  onDragMove(event: DragMoveEvent): void {
-    this.dragMoveEvents.push(event);
   }
 
   onDragEnd(event: DragEndEvent): void {

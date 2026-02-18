@@ -4,7 +4,6 @@ import { By } from '@angular/platform-browser';
 import {
   VirtualScrollContainerComponent,
   VirtualScrollItemContext,
-  VisibleRangeChange,
 } from './virtual-scroll-container.component';
 import { DragStateService } from '../services/drag-state.service';
 import { AutoScrollService } from '../services/auto-scroll.service';
@@ -50,8 +49,6 @@ interface TestItem {
       [itemTemplate]="itemTpl"
       [scrollContainerId]="scrollContainerId()"
       [autoScrollEnabled]="autoScrollEnabled()"
-      (visibleRangeChange)="onVisibleRangeChange($event)"
-      (scrollPositionChange)="onScrollPositionChange($event)"
     >
     </vdnd-virtual-scroll>
   `,
@@ -67,19 +64,8 @@ class TestHostComponent {
   scrollContainerId = signal<string | undefined>('test-scroll');
   autoScrollEnabled = signal(true);
 
-  visibleRangeChanges: VisibleRangeChange[] = [];
-  scrollPositionChanges: number[] = [];
-
   readonly itemIdFn = (item: TestItem): string => item.id;
   readonly trackByFn = (_: number, item: TestItem): string => item.id;
-
-  onVisibleRangeChange(range: VisibleRangeChange): void {
-    this.visibleRangeChanges.push(range);
-  }
-
-  onScrollPositionChange(position: number): void {
-    this.scrollPositionChanges.push(position);
-  }
 }
 
 describe('VirtualScrollContainerComponent', () => {
@@ -310,36 +296,6 @@ describe('VirtualScrollContainerComponent', () => {
       expect(spacer.nativeElement.style.height).toBe('5000px');
 
       dragStateService.endDrag();
-    });
-  });
-
-  describe('scroll events', () => {
-    it('should emit scrollPositionChange on scroll', async () => {
-      virtualScrollEl.scrollTop = 500;
-      virtualScrollEl.dispatchEvent(new Event('scroll'));
-      await nextAnimationFrame(); // raf-throttled scroll binding
-      fixture.detectChanges();
-      fixture.detectChanges();
-
-      expect(component.scrollPositionChanges.length).toBeGreaterThan(0);
-    });
-
-    it('should emit visibleRangeChange on range change', () => {
-      // Should have emitted on initial render
-      expect(component.visibleRangeChanges.length).toBeGreaterThan(0);
-    });
-
-    it('should not emit for small scroll changes', () => {
-      const initialChanges = component.scrollPositionChanges.length;
-
-      // Scroll only 2px (less than threshold)
-      virtualScrollEl.scrollTop = 2;
-      virtualScrollEl.dispatchEvent(new Event('scroll'));
-      fixture.detectChanges();
-      fixture.detectChanges();
-
-      // Should not have emitted another change
-      expect(component.scrollPositionChanges.length).toBe(initialChanges);
     });
   });
 

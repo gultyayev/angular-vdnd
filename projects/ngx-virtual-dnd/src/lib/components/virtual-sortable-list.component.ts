@@ -2,16 +2,10 @@ import { ChangeDetectionStrategy, Component, input, output, TemplateRef } from '
 import {
   VirtualScrollContainerComponent,
   VirtualScrollItemContext,
-  VisibleRangeChange,
 } from './virtual-scroll-container.component';
 import { DroppableDirective } from '../directives/droppable.directive';
 import { AutoScrollConfig } from '../services/auto-scroll.service';
-import {
-  DragEnterEvent,
-  DragLeaveEvent,
-  DragOverEvent,
-  DropEvent,
-} from '../models/drag-drop.models';
+import { DropEvent } from '../models/drag-drop.models';
 
 /**
  * A high-level component that combines droppable, virtual scroll, and placeholder
@@ -65,9 +59,6 @@ import {
       [vdndDroppableData]="droppableData()"
       [disabled]="disabled()"
       [constrainToContainer]="constrainToContainer()"
-      (dragEnter)="dragEnter.emit($event)"
-      (dragLeave)="dragLeave.emit($event)"
-      (dragOver)="dragOver.emit($event)"
       (drop)="drop.emit($event)"
     >
       <vdnd-virtual-scroll
@@ -83,8 +74,6 @@ import {
         [overscan]="overscan()"
         [autoScrollEnabled]="autoScrollEnabled()"
         [autoScrollConfig]="autoScrollConfig()"
-        (visibleRangeChange)="visibleRangeChange.emit($event)"
-        (scrollPositionChange)="scrollPositionChange.emit($event)"
       >
       </vdnd-virtual-scroll>
     </div>
@@ -163,19 +152,4 @@ export class VirtualSortableListComponent<T> {
   /** Emits when an item is dropped on this list */
   // eslint-disable-next-line @angular-eslint/no-output-native
   drop = output<DropEvent>();
-
-  /** Emits when a dragged item enters this list */
-  dragEnter = output<DragEnterEvent>();
-
-  /** Emits when a dragged item leaves this list */
-  dragLeave = output<DragLeaveEvent>();
-
-  /** Emits while a dragged item is over this list */
-  dragOver = output<DragOverEvent>();
-
-  /** Emits when the visible range changes */
-  visibleRangeChange = output<VisibleRangeChange>();
-
-  /** Emits when scroll position changes */
-  scrollPositionChange = output<number>();
 }

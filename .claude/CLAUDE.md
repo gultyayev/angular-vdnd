@@ -171,7 +171,7 @@ AutoScrollService → DragStateService, PositionCalculatorService
 
 ### Public API (from public-api.ts)
 
-**Events:** `DragStartEvent`, `DragMoveEvent`, `DragEnterEvent`, `DragLeaveEvent`, `DragOverEvent`, `DropEvent`, `DragEndEvent`
+**Events:** `DragStartEvent`, `DropEvent`, `DragEndEvent`
 
 **Utilities:** `moveItem()`, `reorderItems()`, `applyMove()`, `isNoOpDrop()`, `insertAt()`, `removeAt()`
 
@@ -181,7 +181,7 @@ AutoScrollService → DragStateService, PositionCalculatorService
 
 **Strategies:** `VirtualScrollStrategy` (interface), `FixedHeightStrategy`, `DynamicHeightStrategy`
 
-**Types:** `AutoScrollConfig`, `DraggedItem`, `CursorPosition`, `GrabOffset`, `DragState`, `DropSource`, `DropDestination`, `VdndGroupContext`, `VdndScrollContainer`, `VdndVirtualViewport`, `VirtualScrollItemContext`, `VisibleRangeChange`, `DragPreviewContext`, `PlaceholderContext`, `VirtualForContext`
+**Types:** `AutoScrollConfig`, `DraggedItem`, `CursorPosition`, `GrabOffset`, `DragState`, `DropSource`, `DropDestination`, `VdndGroupContext`, `VdndScrollContainer`, `VdndVirtualViewport`, `VirtualScrollItemContext`, `DragPreviewContext`, `PlaceholderContext`, `VirtualForContext`
 
 ## Code Patterns
 

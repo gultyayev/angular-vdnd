@@ -35,11 +35,6 @@ High-level component combining droppable, virtual scroll, and placeholder. Defau
 | Output | Type | Description |
 |--------|------|-------------|
 | `drop` | `DropEvent` | Item dropped into this list |
-| `dragEnter` | `DragEnterEvent` | Dragged item entered this list |
-| `dragLeave` | `DragLeaveEvent` | Dragged item left this list |
-| `dragOver` | `DragOverEvent` | Dragged item hovering over this list |
-| `visibleRangeChange` | `VisibleRangeChange` | Visible item range changed (after scroll) |
-| `scrollPositionChange` | `number` | Scroll position changed (scrollTop value) |
 
 ---
 
@@ -68,12 +63,7 @@ Low-level virtual scroll container. Use with `DroppableDirective` for custom lay
 | `trackByFn` | `(index: number, item: T) => string \| number` | `undefined` | No | Track-by function |
 | `autoStickyDraggedItem` | `boolean` | `true` | No | Auto-stick dragged item during drag |
 
-**Outputs:**
-
-| Output | Type | Description |
-|--------|------|-------------|
-| `visibleRangeChange` | `VisibleRangeChange` | Visible item range changed |
-| `scrollPositionChange` | `number` | Scroll position changed |
+**Outputs:** None
 
 **Public Methods:**
 
@@ -204,9 +194,7 @@ Makes an element draggable via mouse, touch, or keyboard.
 | Output | Type | Description |
 |--------|------|-------------|
 | `dragStart` | `DragStartEvent` | Drag operation started |
-| `dragMove` | `DragMoveEvent` | Dragged item moved |
 | `dragEnd` | `DragEndEvent` | Drag operation ended (includes `cancelled` flag) |
-| `dragReadyChange` | `boolean` | `true` when delay passes and drag is ready to start |
 
 ---
 
@@ -232,9 +220,6 @@ Marks an element as a drop target.
 
 | Output | Type | Description |
 |--------|------|-------------|
-| `dragEnter` | `DragEnterEvent` | Dragged item entered this droppable |
-| `dragLeave` | `DragLeaveEvent` | Dragged item left this droppable |
-| `dragOver` | `DragOverEvent` | Dragged item hovering over this droppable |
 | `drop` | `DropEvent` | Item dropped into this droppable |
 
 ---
@@ -330,48 +315,6 @@ interface DragStartEvent {
   data?: unknown;
   position: CursorPosition;
   sourceIndex: number;
-}
-```
-
-### DragMoveEvent
-
-```typescript
-interface DragMoveEvent {
-  draggableId: string;
-  sourceDroppableId: string;
-  targetDroppableId: string | null;
-  placeholderId: string | null;
-  position: CursorPosition;
-  targetIndex: number | null;
-}
-```
-
-### DragEnterEvent
-
-```typescript
-interface DragEnterEvent {
-  droppableId: string;
-  draggedItem: DraggedItem;
-}
-```
-
-### DragLeaveEvent
-
-```typescript
-interface DragLeaveEvent {
-  droppableId: string;
-  draggedItem: DraggedItem;
-}
-```
-
-### DragOverEvent
-
-```typescript
-interface DragOverEvent {
-  droppableId: string;
-  draggedItem: DraggedItem;
-  placeholderId: string | null;
-  position: CursorPosition;
 }
 ```
 
@@ -574,15 +517,6 @@ interface VirtualForContext<T> {
   first: boolean;
   last: boolean;
   count: number;
-}
-```
-
-### VisibleRangeChange
-
-```typescript
-interface VisibleRangeChange {
-  start: number;
-  end: number;
 }
 ```
 

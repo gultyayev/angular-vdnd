@@ -383,7 +383,7 @@ Lock dragging to a single axis:
 
 - `dragThreshold` (default: `5`) — minimum distance in pixels before drag starts. Prevents accidental drags on click.
 - `dragDelay` (default: `0`) — delay in milliseconds after pointer down before drag activates. Useful on touch devices to distinguish scrolling from dragging.
-- Listen to `(dragReadyChange)` to show visual feedback when the delay passes.
+- Use the `vdnd-drag-pending` CSS class to show visual feedback when the delay passes.
 
 ### Container Constraints
 
@@ -641,15 +641,8 @@ export class MyComponent {
 | Output | Event Type | Emitted By |
 |--------|-----------|-----------|
 | `(dragStart)` | `DragStartEvent` | `DraggableDirective` |
-| `(dragMove)` | `DragMoveEvent` | `DraggableDirective` |
 | `(dragEnd)` | `DragEndEvent` | `DraggableDirective` |
-| `(dragReadyChange)` | `boolean` | `DraggableDirective` |
-| `(dragEnter)` | `DragEnterEvent` | `DroppableDirective`, `VirtualSortableListComponent` |
-| `(dragLeave)` | `DragLeaveEvent` | `DroppableDirective`, `VirtualSortableListComponent` |
-| `(dragOver)` | `DragOverEvent` | `DroppableDirective`, `VirtualSortableListComponent` |
 | `(drop)` | `DropEvent` | `DroppableDirective`, `VirtualSortableListComponent` |
-| `(visibleRangeChange)` | `VisibleRangeChange` | `VirtualScrollContainerComponent`, `VirtualSortableListComponent` |
-| `(scrollPositionChange)` | `number` | `VirtualScrollContainerComponent`, `VirtualSortableListComponent` |
 
 `DragEndEvent.cancelled` distinguishes drops from cancellations. `DragEndEvent.sourceIndex` and `DragEndEvent.destinationIndex` provide 0-indexed positions for announcements.
 

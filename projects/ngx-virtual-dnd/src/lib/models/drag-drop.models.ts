@@ -84,58 +84,6 @@ export interface DragStartEvent {
 }
 
 /**
- * Event emitted during drag movement.
- */
-export interface DragMoveEvent {
-  /** Unique identifier for the draggable item */
-  draggableId: string;
-  /** ID of the droppable container the item originated from */
-  sourceDroppableId: string;
-  /** ID of the droppable currently being hovered, or null */
-  targetDroppableId: string | null;
-  /** ID of the item to insert before, or null */
-  placeholderId: string | null;
-  /** Current cursor position */
-  position: CursorPosition;
-  /** Current 0-indexed placeholder position (for screen reader announcements) */
-  targetIndex: number | null;
-}
-
-/**
- * Event emitted when an item enters a droppable container.
- */
-export interface DragEnterEvent {
-  /** ID of the droppable being entered */
-  droppableId: string;
-  /** Information about the dragged item */
-  draggedItem: DraggedItem;
-}
-
-/**
- * Event emitted when an item leaves a droppable container.
- */
-export interface DragLeaveEvent {
-  /** ID of the droppable being left */
-  droppableId: string;
-  /** Information about the dragged item */
-  draggedItem: DraggedItem;
-}
-
-/**
- * Event emitted while hovering over a droppable container.
- */
-export interface DragOverEvent {
-  /** ID of the droppable being hovered */
-  droppableId: string;
-  /** Information about the dragged item */
-  draggedItem: DraggedItem;
-  /** ID of the item the placeholder should appear before */
-  placeholderId: string | null;
-  /** Current cursor position */
-  position: CursorPosition;
-}
-
-/**
  * Source information for a drop event.
  */
 export interface DropSource {

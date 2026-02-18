@@ -12,7 +12,6 @@ import {
   NgZone,
   OnDestroy,
   OnInit,
-  output,
   signal,
   TemplateRef,
 } from '@angular/core';
@@ -39,14 +38,6 @@ export interface VirtualScrollItemContext<T> {
   index: number;
   /** Whether this item is "sticky" (always rendered) */
   isSticky: boolean;
-}
-
-/**
- * Event emitted when the visible range changes.
- */
-export interface VisibleRangeChange {
-  start: number;
-  end: number;
 }
 
 /**
@@ -300,12 +291,6 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
     return [...userIds, draggedId];
   });
 
-  /** Emits when the visible range changes */
-  visibleRangeChange = output<VisibleRangeChange>();
-
-  /** Emits when scroll position changes */
-  scrollPositionChange = output<number>();
-
   /** Current scroll position */
   readonly #scrollTop = signal(0);
 
@@ -522,12 +507,6 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
       strategy.setExcludedIndex(draggedIndex >= 0 ? draggedIndex : null);
     });
 
-    // Emit visible range changes
-    effect(() => {
-      const range = this.#renderRange();
-      this.visibleRangeChange.emit(range);
-    });
-
     // Keyboard drag autoscroll: scroll to keep target index visible
     effect(() => {
       // Only apply when this droppable is active during keyboard drag
@@ -666,9 +645,6 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
       ngZone: this.#ngZone,
       scrollTop: this.#scrollTop,
       thresholdPx: 5,
-      onCommit: (newScrollTop) => {
-        this.scrollPositionChange.emit(newScrollTop);
-      },
     });
 
     // Observe rendered items for dynamic height measurement

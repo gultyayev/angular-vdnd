@@ -8,18 +8,10 @@ import {
   OnDestroy,
   OnInit,
   output,
-  untracked,
 } from '@angular/core';
 import { DragStateService } from '../services/drag-state.service';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
-import {
-  DragEnterEvent,
-  DragLeaveEvent,
-  DragOverEvent,
-  DragState,
-  DropEvent,
-  END_OF_LIST,
-} from '../models/drag-drop.models';
+import { DragState, DropEvent, END_OF_LIST } from '../models/drag-drop.models';
 import { VDND_GROUP_TOKEN } from './droppable-group.directive';
 import { createEffectiveGroupSignal } from '../utils/group-resolution';
 
@@ -97,15 +89,6 @@ export class DroppableDirective implements OnInit, OnDestroy {
   /** Constrain drag preview and placeholder to container boundaries */
   constrainToContainer = input<boolean>(false);
 
-  /** Emits when a dragged item enters this droppable */
-  dragEnter = output<DragEnterEvent>();
-
-  /** Emits when a dragged item leaves this droppable */
-  dragLeave = output<DragLeaveEvent>();
-
-  /** Emits while a dragged item is over this droppable */
-  dragOver = output<DragOverEvent>();
-
   /** Emits when an item is dropped on this droppable */
   // eslint-disable-next-line @angular-eslint/no-output-native
   drop = output<DropEvent>();
@@ -124,11 +107,8 @@ export class DroppableDirective implements OnInit, OnDestroy {
     return this.#dragState.placeholderId();
   });
 
-  /** Track previous active state for enter/leave events */
+  /** Track previous active state for cache clearing on leave */
   #wasActive = false;
-
-  /** Track previous placeholder for over events */
-  #previousPlaceholder: string | null = null;
 
   /** Cached state for handling drop (since state is cleared before effect fires) */
   #cachedDragState: DragState | null = null;
@@ -175,13 +155,11 @@ export class DroppableDirective implements OnInit, OnDestroy {
   }
 
   constructor() {
-    // React to state changes and emit appropriate events
+    // React to state changes and handle drop events
     effect(() => {
       const active = this.isActive();
-      const placeholder = this.placeholderId();
       const draggedItem = this.#dragState.draggedItem();
       const isDragging = this.#dragState.isDragging();
-      // NOTE: cursorPosition is read with untracked() below to avoid effect running 60x/sec
 
       // Cache state while active for use during drop handling
       if (active && isDragging && draggedItem) {
@@ -198,48 +176,12 @@ export class DroppableDirective implements OnInit, OnDestroy {
         this.#cachedDragState = null;
       }
 
-      // Handle enter/leave
-      if (active && !this.#wasActive) {
-        // Entered
-        if (draggedItem) {
-          this.dragEnter.emit({
-            droppableId: this.vdndDroppable(),
-            draggedItem,
-          });
-        }
-      } else if (!active && this.#wasActive) {
-        // Left (but not dropped here)
-        if (isDragging && draggedItem) {
-          this.dragLeave.emit({
-            droppableId: this.vdndDroppable(),
-            draggedItem,
-          });
-        }
-        // Clear cached state when leaving without dropping
-        if (isDragging) {
-          this.#cachedDragState = null;
-        }
-      }
-
-      // Handle over (placeholder changed)
-      if (active && placeholder !== this.#previousPlaceholder) {
-        if (draggedItem) {
-          // Use untracked() to read cursorPosition without tracking it as a dependency
-          // This prevents the effect from running on every cursor move (60Hz during autoscroll)
-          const cursorPosition = untracked(() => this.#dragState.cursorPosition());
-          if (cursorPosition) {
-            this.dragOver.emit({
-              droppableId: this.vdndDroppable(),
-              draggedItem,
-              placeholderId: placeholder,
-              position: cursorPosition,
-            });
-          }
-        }
+      // Clear cached state when leaving without dropping
+      if (!active && this.#wasActive && isDragging) {
+        this.#cachedDragState = null;
       }
 
       this.#wasActive = active;
-      this.#previousPlaceholder = placeholder;
     });
   }
 

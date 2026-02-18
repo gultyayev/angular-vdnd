@@ -23,10 +23,7 @@ export { OverlayContainerService } from './services/overlay-container.service';
 
 // Components
 export { VirtualScrollContainerComponent } from './components/virtual-scroll-container.component';
-export type {
-  VirtualScrollItemContext,
-  VisibleRangeChange,
-} from './components/virtual-scroll-container.component';
+export type { VirtualScrollItemContext } from './components/virtual-scroll-container.component';
 export { DragPreviewComponent } from './components/drag-preview.component';
 export type { DragPreviewContext } from './components/drag-preview.component';
 export { PlaceholderComponent } from './components/placeholder.component';

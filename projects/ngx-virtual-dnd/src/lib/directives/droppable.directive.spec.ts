@@ -5,13 +5,7 @@ import { DroppableDirective } from './droppable.directive';
 import { DragStateService } from '../services/drag-state.service';
 import { AutoScrollService, AutoScrollConfig } from '../services/auto-scroll.service';
 import { PositionCalculatorService } from '../services/position-calculator.service';
-import {
-  DragEnterEvent,
-  DragLeaveEvent,
-  DragOverEvent,
-  DropEvent,
-  DraggedItem,
-} from '../models/drag-drop.models';
+import { DropEvent, DraggedItem } from '../models/drag-drop.models';
 
 // Test host component
 @Component({
@@ -24,14 +18,10 @@ import {
       [autoScrollEnabled]="autoScrollEnabled()"
       [autoScrollConfig]="autoScrollConfig()"
       style="height: 300px; overflow: auto;"
-      (dragEnter)="onDragEnter($event)"
-      (dragLeave)="onDragLeave($event)"
-      (dragOver)="onDragOver($event)"
-      (drop)="onDrop($event)">
+      (drop)="onDrop($event)"
+    >
       @for (item of items; track item.id) {
-        <div
-          [attr.data-draggable-id]="item.id"
-          style="height: 50px;">
+        <div [attr.data-draggable-id]="item.id" style="height: 50px;">
           {{ item.name }}
         </div>
       }
@@ -50,22 +40,7 @@ class TestHostComponent {
   autoScrollEnabled = signal(true);
   autoScrollConfig = signal<Partial<AutoScrollConfig>>({});
 
-  dragEnterEvents: DragEnterEvent[] = [];
-  dragLeaveEvents: DragLeaveEvent[] = [];
-  dragOverEvents: DragOverEvent[] = [];
   dropEvents: DropEvent[] = [];
-
-  onDragEnter(event: DragEnterEvent): void {
-    this.dragEnterEvents.push(event);
-  }
-
-  onDragLeave(event: DragLeaveEvent): void {
-    this.dragLeaveEvents.push(event);
-  }
-
-  onDragOver(event: DragOverEvent): void {
-    this.dragOverEvents.push(event);
-  }
 
   onDrop(event: DropEvent): void {
     this.dropEvents.push(event);

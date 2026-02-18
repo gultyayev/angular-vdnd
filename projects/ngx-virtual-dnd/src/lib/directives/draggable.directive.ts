@@ -20,7 +20,6 @@ import { DragIndexCalculatorService } from '../services/drag-index-calculator.se
 import {
   CursorPosition,
   DragEndEvent,
-  DragMoveEvent,
   DragStartEvent,
   GrabOffset,
 } from '../models/drag-drop.models';
@@ -129,14 +128,8 @@ export class DraggableDirective implements OnInit, OnDestroy {
   /** Emits when drag starts */
   dragStart = output<DragStartEvent>();
 
-  /** Emits during drag movement */
-  dragMove = output<DragMoveEvent>();
-
   /** Emits when drag ends */
   dragEnd = output<DragEndEvent>();
-
-  /** Emits when ready-to-drag state changes (after delay passes) */
-  dragReadyChange = output<boolean>();
 
   /** Whether this element is in the "ready to drag" state (delay has passed) */
   #isPending = signal(false);
@@ -163,7 +156,6 @@ export class DraggableDirective implements OnInit, OnDestroy {
   #setPending(pending: boolean): void {
     if (this.#isPending() !== pending) {
       this.#isPending.set(pending);
-      this.dragReadyChange.emit(pending);
     }
   }
 
@@ -567,16 +559,6 @@ export class DraggableDirective implements OnInit, OnDestroy {
       activeDroppableId,
       placeholderId,
       placeholderIndex,
-    });
-
-    // Emit drag move event
-    this.dragMove.emit({
-      draggableId: this.vdndDraggable(),
-      sourceDroppableId: this.#getParentDroppableId() ?? '',
-      targetDroppableId: activeDroppableId,
-      placeholderId,
-      position,
-      targetIndex: placeholderIndex,
     });
   }
 

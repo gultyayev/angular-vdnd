@@ -253,7 +253,7 @@ Values: `'x'` (horizontal only), `'y'` (vertical only), or omit for free movemen
 ```
 
 - `dragThreshold` — minimum distance (px) before drag starts (default: `5`). Prevents accidental drags on click.
-- `dragDelay` — delay (ms) after pointer down before drag activates (default: `0`). Useful on touch devices to distinguish scrolling from dragging. Listen to `(dragReadyChange)` to show visual feedback when the delay passes.
+- `dragDelay` — delay (ms) after pointer down before drag activates (default: `0`). Useful on touch devices to distinguish scrolling from dragging. Use the `vdnd-drag-pending` CSS class to show visual feedback when the delay passes.
 
 ### Custom Drag Preview
 
@@ -483,16 +483,11 @@ ARIA attributes (`aria-grabbed`, `aria-dropeffect`, `tabindex`) are managed auto
 
 All event types are importable from `ngx-virtual-dnd`.
 
-| Output              | Event Type       | Emitted By                                           |
-| ------------------- | ---------------- | ---------------------------------------------------- |
-| `(dragStart)`       | `DragStartEvent` | `DraggableDirective`                                 |
-| `(dragMove)`        | `DragMoveEvent`  | `DraggableDirective`                                 |
-| `(dragEnd)`         | `DragEndEvent`   | `DraggableDirective`                                 |
-| `(dragReadyChange)` | `boolean`        | `DraggableDirective`                                 |
-| `(dragEnter)`       | `DragEnterEvent` | `DroppableDirective`, `VirtualSortableListComponent` |
-| `(dragLeave)`       | `DragLeaveEvent` | `DroppableDirective`, `VirtualSortableListComponent` |
-| `(dragOver)`        | `DragOverEvent`  | `DroppableDirective`, `VirtualSortableListComponent` |
-| `(drop)`            | `DropEvent`      | `DroppableDirective`, `VirtualSortableListComponent` |
+| Output        | Event Type       | Emitted By                                           |
+| ------------- | ---------------- | ---------------------------------------------------- |
+| `(dragStart)` | `DragStartEvent` | `DraggableDirective`                                 |
+| `(dragEnd)`   | `DragEndEvent`   | `DraggableDirective`                                 |
+| `(drop)`      | `DropEvent`      | `DroppableDirective`, `VirtualSortableListComponent` |
 
 `DragEndEvent` includes a `cancelled` boolean to distinguish drops from cancellations.
 
