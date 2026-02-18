@@ -64,40 +64,48 @@ import { ContentHeaderDirective } from '../directives/content-header.directive';
   ],
   host: {
     class: 'vdnd-virtual-content',
-    '[style.display]': '"block"',
-    '[style.position]': '"relative"',
     '[attr.data-content-offset]': 'effectiveContentOffset()',
     '[attr.data-item-height]': 'itemHeight()',
     '[attr.data-total-items]': 'totalItems()',
   },
+  styles: `
+    :host {
+      display: block;
+      position: relative;
+    }
+
+    .vdnd-virtual-area {
+      position: relative;
+    }
+
+    .vdnd-content-spacer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1px;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .vdnd-content-wrapper {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      will-change: transform;
+    }
+  `,
   template: `
     <!-- Projected header — in normal document flow, auto-measured via ResizeObserver -->
     <ng-content select="[vdndContentHeader]" />
 
     <!-- Virtual area — sized to totalHeight, contains absolute-positioned spacer + wrapper -->
-    <div class="vdnd-virtual-area" [style.position]="'relative'" [style.height.px]="totalHeight()">
+    <div class="vdnd-virtual-area" [style.height.px]="totalHeight()">
       <!-- Spacer maintains scroll height for the virtual list portion -->
-      <div
-        class="vdnd-content-spacer"
-        [style.position]="'absolute'"
-        [style.top.px]="0"
-        [style.left.px]="0"
-        [style.width.px]="1"
-        [style.height.px]="totalHeight()"
-        [style.visibility]="'hidden'"
-        [style.pointer-events]="'none'"
-      ></div>
+      <div class="vdnd-content-spacer" [style.height.px]="totalHeight()"></div>
 
       <!-- Content wrapper with GPU-accelerated transform -->
-      <div
-        class="vdnd-content-wrapper"
-        [style.position]="'absolute'"
-        [style.top.px]="0"
-        [style.left.px]="0"
-        [style.right.px]="0"
-        [style.will-change]="'transform'"
-        [style.transform]="contentTransform()"
-      >
+      <div class="vdnd-content-wrapper" [style.transform]="contentTransform()">
         <ng-content />
       </div>
     </div>

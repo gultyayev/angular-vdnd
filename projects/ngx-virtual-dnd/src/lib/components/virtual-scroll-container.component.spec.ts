@@ -139,12 +139,8 @@ describe('VirtualScrollContainerComponent', () => {
       expect(virtualScrollComponent).toBeTruthy();
     });
 
-    it('should have overflow auto', () => {
-      expect(virtualScrollEl.style.overflow).toBe('auto');
-    });
-
-    it('should have position relative', () => {
-      expect(virtualScrollEl.style.position).toBe('relative');
+    it('should have vdnd-virtual-scroll class (provides overflow and position via CSS)', () => {
+      expect(virtualScrollEl.classList.contains('vdnd-virtual-scroll')).toBe(true);
     });
 
     it('should set container height from input', () => {

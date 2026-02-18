@@ -62,34 +62,44 @@ import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
   ],
   host: {
     class: 'vdnd-virtual-viewport',
-    '[style.display]': '"block"',
-    '[style.overflow]': '"auto"',
-    '[style.position]': '"relative"',
-    // Disable browser scroll anchoring to prevent scroll position adjustments
-    // when DOM changes (e.g., placeholder position updates during drag)
-    '[style.overflow-anchor]': '"none"',
   },
+  styles: `
+    :host {
+      display: block;
+      overflow: auto;
+      position: relative;
+      /* Disable browser scroll anchoring to prevent scroll position adjustments
+         when DOM changes (e.g., placeholder position updates during drag) */
+      overflow-anchor: none;
+    }
+
+    .vdnd-viewport-spacer {
+      position: absolute;
+      left: 0;
+      width: 1px;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .vdnd-viewport-content {
+      position: absolute;
+      left: 0;
+      right: 0;
+      will-change: transform;
+    }
+  `,
   template: `
     <!-- Spacer maintains total scroll height -->
     <div
       class="vdnd-viewport-spacer"
-      [style.position]="'absolute'"
       [style.top.px]="contentOffset()"
-      [style.left.px]="0"
-      [style.width.px]="1"
       [style.height.px]="totalHeight()"
-      [style.visibility]="'hidden'"
-      [style.pointer-events]="'none'"
     ></div>
 
     <!-- Content wrapper with GPU-accelerated transform -->
     <div
       class="vdnd-viewport-content"
-      [style.position]="'absolute'"
       [style.top.px]="contentOffset()"
-      [style.left.px]="0"
-      [style.right.px]="0"
-      [style.will-change]="'transform'"
       [style.transform]="contentTransform()"
     >
       <ng-content></ng-content>

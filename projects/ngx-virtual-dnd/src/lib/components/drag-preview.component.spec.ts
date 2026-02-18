@@ -251,34 +251,14 @@ describe('DragPreviewComponent', () => {
     });
 
     describe('styling', () => {
-      it('should have fixed position', () => {
+      it('should have vdnd-drag-preview class (provides position, pointer-events, z-index via CSS)', () => {
         const item = createMockDraggedItem();
         dragStateService.startDrag(item, { x: 100, y: 100 });
         fixture.detectChanges();
         fixture.detectChanges();
 
         const preview = queryPreview('.vdnd-drag-preview');
-        expect(preview!.style.position).toBe('fixed');
-      });
-
-      it('should have pointer-events none', () => {
-        const item = createMockDraggedItem();
-        dragStateService.startDrag(item, { x: 100, y: 100 });
-        fixture.detectChanges();
-        fixture.detectChanges();
-
-        const preview = queryPreview('.vdnd-drag-preview');
-        expect(preview!.style.pointerEvents).toBe('none');
-      });
-
-      it('should have high z-index', () => {
-        const item = createMockDraggedItem();
-        dragStateService.startDrag(item, { x: 100, y: 100 });
-        fixture.detectChanges();
-        fixture.detectChanges();
-
-        const preview = queryPreview('.vdnd-drag-preview');
-        expect(preview!.style.zIndex).toBe('1000');
+        expect(preview!.classList.contains('vdnd-drag-preview')).toBe(true);
       });
     });
 

@@ -211,6 +211,14 @@ AutoScrollService → DragStateService, PositionCalculatorService
 - Prefer inline templates for small components
 - Use `class` bindings instead of `ngClass`; `style` bindings instead of `ngStyle`
 
+### Styling: CSS for Static, Bindings for Dynamic
+
+Use CSS rules for values that never change at runtime. Use Angular `[style.*]` bindings **only** for values driven by signals, inputs, or other reactive state.
+
+- **Host styles:** Static properties (`display`, `position`, `overflow`, `pointer-events`) go in `:host` CSS. Only truly dynamic values (e.g., `[style.height.px]="containerHeight()"`) remain as host bindings.
+- **Template styles:** Static properties on inner elements go in named CSS classes (e.g., `.vdnd-viewport-spacer { position: absolute; ... }`). Only dynamic values remain as `[style.*]` bindings on the template element.
+- **No wrapper divs for static styles:** Don't add wrapper `<div>`s just to apply `position: relative` or `width: 100%` — put these on `:host` or an existing element instead.
+
 ### Signal Architecture
 
 ```typescript
@@ -404,6 +412,7 @@ npx playwright test --reporter=list
 - Every assertion must test actual behavior — never use `expect(true).toBe(true)` or equivalent no-op patterns
 - Test behavior, not implementation details
 - Include negative tests (verify things DON'T happen when they shouldn't)
+- Don't assert `element.style.*` for styles applied via CSS rules — jsdom doesn't compute them. Verify the CSS class is present instead (e.g., `expect(el.classList.contains('vdnd-drag-preview')).toBe(true)`). Only use `element.style.*` for dynamically bound inline styles.
 
 ### E2E Patterns
 

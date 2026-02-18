@@ -56,7 +56,6 @@ import {
   imports: [VirtualScrollContainerComponent, DroppableDirective],
   host: {
     class: 'vdnd-sortable-list',
-    '[style.display]': '"block"',
   },
   template: `
     <div

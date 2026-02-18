@@ -15,10 +15,14 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class: 'vdnd-drag-placeholder vdnd-drag-placeholder-visible',
-    '[style.display]': '"block"',
     '[style.height.px]': 'itemHeight()',
-    '[style.pointer-events]': '"none"',
   },
+  styles: `
+    :host {
+      display: block;
+      pointer-events: none;
+    }
+  `,
   template: ``,
 })
 export class DragPlaceholderComponent {

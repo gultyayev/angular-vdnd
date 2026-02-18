@@ -93,50 +93,43 @@ export interface VisibleRangeChange {
   host: {
     class: 'vdnd-virtual-scroll',
     '[style.height.px]': 'containerHeight() ?? null',
-    '[style.overflow]': '"auto"',
-    '[style.position]': '"relative"',
     '[attr.data-item-height]': 'itemHeight()',
     '[attr.data-total-items]': 'items().length',
   },
   template: `
-    <div class="vdnd-virtual-scroll-content">
-      <!-- Single spacer maintains scroll height -->
-      <div class="vdnd-virtual-scroll-spacer" [style.height.px]="totalHeight()"></div>
+    <!-- Single spacer maintains scroll height -->
+    <div class="vdnd-virtual-scroll-spacer" [style.height.px]="totalHeight()"></div>
 
-      <!-- Content wrapper positioned via GPU-accelerated transform -->
-      <div class="vdnd-virtual-scroll-content-wrapper" [style.transform]="contentTransform()">
-        @for (entry of renderedItems(); track trackEntry($index, entry)) {
-          @if (entry.type === 'placeholder') {
-            <vdnd-drag-placeholder [itemHeight]="placeholderHeight()" />
-          } @else {
-            <ng-container
-              *ngTemplateOutlet="
-                itemTemplate();
-                context: {
-                  $implicit: entry.data,
-                  index: entry.index,
-                  isSticky: entry.isSticky,
-                }
-              "
-            >
-            </ng-container>
-          }
+    <!-- Content wrapper positioned via GPU-accelerated transform -->
+    <div class="vdnd-virtual-scroll-content-wrapper" [style.transform]="contentTransform()">
+      @for (entry of renderedItems(); track trackEntry($index, entry)) {
+        @if (entry.type === 'placeholder') {
+          <vdnd-drag-placeholder [itemHeight]="placeholderHeight()" />
+        } @else {
+          <ng-container
+            *ngTemplateOutlet="
+              itemTemplate();
+              context: {
+                $implicit: entry.data,
+                index: entry.index,
+                isSticky: entry.isSticky,
+              }
+            "
+          >
+          </ng-container>
         }
-      </div>
+      }
     </div>
   `,
   styles: `
     :host {
       display: block;
+      overflow: auto;
+      position: relative;
       /* Disable browser scroll anchoring - this prevents scroll position from being
          adjusted when the DOM changes (e.g., when placeholder position updates).
          Without this, autoscroll UP would fight with browser's scroll restoration. */
       overflow-anchor: none;
-    }
-
-    .vdnd-virtual-scroll-content {
-      position: relative;
-      width: 100%;
     }
 
     .vdnd-virtual-scroll-spacer {
