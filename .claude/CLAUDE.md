@@ -198,7 +198,8 @@ AutoScrollService → DragStateService, PositionCalculatorService
 - Do NOT set `standalone: true` in decorators (default in Angular v21+)
 - Use `inject()` function instead of constructor injection
 - Put host bindings in `host` object of decorators (not `@HostBinding`/`@HostListener`)
-- Use `runOutsideAngular` for RAF loops and event listeners
+- Use `runOutsideAngular` for RAF loops, programmatic event listeners, and `ResizeObserver`
+- Avoid template/host event bindings (`(event)`, `host: { '(event)' }`) for high-frequency DOM events (`mousemove`, `pointermove`, `touchmove`, `scroll`, `resize`, `dragover`) — Angular marks the view dirty on every emission, even with OnPush. Use programmatic `addEventListener` inside `runOutsideAngular` instead. Low-frequency initiation events (`mousedown`, `touchstart`, `keydown`, `click`) are fine as template/host bindings.
 - Signal updates do NOT need `ngZone.run()` - signals work across zone boundaries
 - Never use hand made `ngDevMode`. Use `isDevMode()` instead
 
@@ -256,6 +257,7 @@ Use `createBoundListener()` from `lib/utils/event-listener-bindings.ts` to bind/
 - Use native control flow (`@if`, `@for`, `@switch`)
 - Use the async pipe for observables
 - Do not use arrow functions in templates
+- Never bind high-frequency DOM events (`scroll`, `mousemove`, `pointermove`, `touchmove`) in templates — use programmatic listeners outside Angular's zone
 
 ### Services
 
