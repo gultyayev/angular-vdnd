@@ -110,6 +110,65 @@ test.describe('Constrain to Container', () => {
     await expect(demoPage.dragPreview).not.toBeVisible({ timeout: 2000 });
   });
 
+  test('autoscroll works at both edges with constrainToContainer', async ({ page }) => {
+    const containerBox = await demoPage.list1VirtualScroll.boundingBox();
+    if (!containerBox) throw new Error('Could not get container box');
+
+    // Grab the first item near its bottom edge (non-trivial grabOffset.y)
+    const sourceItem = demoPage.list1Items.first();
+    await sourceItem.scrollIntoViewIfNeeded();
+    const sourceBox = await sourceItem.boundingBox();
+    if (!sourceBox) throw new Error('Could not get source item box');
+
+    const grabX = sourceBox.x + sourceBox.width / 2;
+    const grabY = sourceBox.y + sourceBox.height - 5;
+
+    await page.mouse.move(grabX, grabY);
+    await page.mouse.down();
+    await page.mouse.move(grabX + 10, grabY + 10, { steps: 2 });
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+
+    // Move to the container's bottom edge to trigger downward autoscroll
+    const bottomEdgeY = containerBox.y + containerBox.height - 25;
+    await page.mouse.move(grabX, bottomEdgeY, { steps: 15 });
+    await page.mouse.move(grabX, bottomEdgeY);
+
+    // Wait for scrollTop to increase substantially (proves downward autoscroll works)
+    await expect(async () => {
+      const scrollTop = await demoPage.getScrollTop('list1');
+      expect(scrollTop).toBeGreaterThan(100);
+    }).toPass({ timeout: 10000 });
+
+    // Now move to the container's top edge — autoscroll should reverse upward
+    const topEdgeY = containerBox.y + 25;
+    await page.mouse.move(grabX, topEdgeY, { steps: 15 });
+    await page.mouse.move(grabX, topEdgeY);
+
+    // Capture scrollTop after reaching top edge, then assert it decreases
+    // (use toPass to wait for the RAF loop to detect the new cursor position)
+    await expect(async () => {
+      const scrollTop = await demoPage.getScrollTop('list1');
+      expect(scrollTop).toBeGreaterThan(0);
+    }).toPass({ timeout: 2000 });
+
+    const scrollTopAtTopEdge = await demoPage.getScrollTop('list1');
+    await expect(async () => {
+      const scrollTopNow = await demoPage.getScrollTop('list1');
+      expect(scrollTopNow).toBeLessThan(scrollTopAtTopEdge);
+    }).toPass({
+      timeout: 5000,
+      message: 'Autoscroll up should trigger at top edge with non-trivial grabOffset',
+    });
+
+    // Clean up: drop inside the container
+    await page.mouse.move(
+      containerBox.x + containerBox.width / 2,
+      containerBox.y + containerBox.height / 2,
+    );
+    await page.mouse.up();
+    await expect(demoPage.dragPreview).not.toBeVisible({ timeout: 2000 });
+  });
+
   test('preview stays inside container at bottom boundary', async ({ page }) => {
     const sourceItem = demoPage.list1Items.first();
     await sourceItem.scrollIntoViewIfNeeded();

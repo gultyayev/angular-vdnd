@@ -907,6 +907,60 @@ describe('AutoScrollService', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // setCursorOverride
+  // ---------------------------------------------------------------------------
+  describe('setCursorOverride', () => {
+    it('should use override cursor instead of DragState cursor for edge detection', () => {
+      // DragState cursor is in the center (no scroll)
+      setupDrag({ x: 150, y: 300 });
+      service.registerContainer('test-container', mockElement);
+
+      // Override cursor to near bottom edge (should trigger scroll)
+      service.setCursorOverride({ x: 150, y: 480 });
+      service.startMonitoring();
+
+      const before = mockElement.scrollTop;
+      flushRAF();
+
+      expect(mockElement.scrollTop).toBeGreaterThan(before);
+    });
+
+    it('should fall back to DragState cursor when no override is set', () => {
+      // DragState cursor is near bottom edge
+      setupDrag({ x: 150, y: 480 });
+      service.registerContainer('test-container', mockElement);
+      // No setCursorOverride call
+      service.startMonitoring();
+
+      const before = mockElement.scrollTop;
+      flushRAF();
+
+      expect(mockElement.scrollTop).toBeGreaterThan(before);
+    });
+
+    it('should clear override on stopMonitoring', () => {
+      // DragState cursor is in the center (no scroll)
+      setupDrag({ x: 150, y: 300 });
+      service.registerContainer('test-container', mockElement);
+
+      // Override to near edge
+      service.setCursorOverride({ x: 150, y: 480 });
+      service.startMonitoring();
+      flushRAF();
+      expect(service.isScrolling()).toBe(true);
+
+      // Stop clears override
+      service.stopMonitoring();
+
+      // Restart without override — should fall back to DragState center cursor
+      service.startMonitoring();
+      flushRAF();
+
+      expect(service.isScrolling()).toBe(false);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Cursor outside container
   // ---------------------------------------------------------------------------
   describe('cursor outside container', () => {

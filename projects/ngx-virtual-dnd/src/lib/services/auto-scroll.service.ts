@@ -1,4 +1,5 @@
 import { inject, Injectable, NgZone } from '@angular/core';
+import { CursorPosition } from '../models/drag-drop.models';
 import { DragStateService } from './drag-state.service';
 import { PositionCalculatorService } from './position-calculator.service';
 
@@ -48,6 +49,9 @@ export class AutoScrollService {
 
   /** Callback to invoke when scrolling occurs (for placeholder recalculation) */
   #onScrollCallback: (() => void) | null = null;
+
+  /** Optional cursor position override for edge detection (bypasses DragState read) */
+  #cursorOverride: CursorPosition | null = null;
 
   /** Current scroll state */
   #scrollState: {
@@ -109,6 +113,7 @@ export class AutoScrollService {
     }
 
     this.#onScrollCallback = null;
+    this.#cursorOverride = null;
     this.#scrollState = {
       containerId: null,
       direction: { x: 0, y: 0 },
@@ -117,10 +122,20 @@ export class AutoScrollService {
   }
 
   /**
+   * Override the cursor position used for edge detection.
+   * When set, #tick() uses this instead of DragStateService.cursorPosition().
+   * Used by constrainToContainer to provide a position without grabOffset distortion.
+   * @internal
+   */
+  setCursorOverride(position: CursorPosition): void {
+    this.#cursorOverride = position;
+  }
+
+  /**
    * Animation tick - check cursor position and scroll if needed.
    */
   #tick(): void {
-    const cursor = this.#dragState.cursorPosition();
+    const cursor = this.#cursorOverride ?? this.#dragState.cursorPosition();
     const isDragging = this.#dragState.isDragging();
 
     // Stop monitoring if drag ended

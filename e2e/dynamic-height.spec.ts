@@ -302,8 +302,7 @@ test.describe('Dynamic Height Demo', () => {
     const sourceItem = page.locator(`[data-draggable-id="${sourceId}"]`);
     const targetItem = page.locator(`[data-draggable-id="${targetId}"]`);
     const sourceBox = await sourceItem.boundingBox();
-    const targetBox = await targetItem.boundingBox();
-    if (!sourceBox || !targetBox) throw new Error('Could not get bounding boxes');
+    if (!sourceBox) throw new Error('Could not get source bounding box');
 
     await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
     await page.mouse.down();
@@ -312,9 +311,17 @@ test.describe('Dynamic Height Demo', () => {
     const dragPreview = page.locator('.vdnd-drag-preview');
     await expect(dragPreview).toBeVisible({ timeout: 2000 });
 
+    // Get FRESH target coordinates after drag starts (source item is now hidden,
+    // items have shifted). Per E2E.md: "After drag starts, get fresh boundingBox()
+    // of target items — positions shift when the dragged item hides."
+    const freshTargetBox = await targetItem.boundingBox();
+    if (!freshTargetBox) throw new Error('Could not get fresh target bounding box');
+    const targetY = freshTargetBox.y + freshTargetBox.height / 2;
+
     // Move to center of third visible item
-    const targetY = targetBox.y + targetBox.height / 2;
     await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY, { steps: 10 });
+    // Direct move ensures the final position registers (E2E.md rule #6)
+    await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY);
 
     // Wait one rAF before drop
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
@@ -524,6 +531,85 @@ test.describe('Dynamic Height Demo', () => {
 
     // Clean up
     await page.mouse.up();
+  });
+
+  test('should clamp to scroll container when cursor escapes above with constrainToContainer', async ({
+    page,
+  }) => {
+    // Enable constrain-to-container on the droppable element
+    await page.evaluate(() => {
+      const droppable = document.querySelector('[data-droppable-id="tasks"]');
+      if (droppable) {
+        droppable.setAttribute('data-constrain-to-container', '');
+      }
+    });
+
+    // Get the scroll container's bounding box (the constraint boundary)
+    const scrollContainerBox = await page.locator('.scroll-container').boundingBox();
+    if (!scrollContainerBox) throw new Error('Could not get scroll container bounding box');
+
+    // Pick a visible item using atomic source selection (avoids overscan issues)
+    let sourceBox: { x: number; y: number; width: number; height: number } | null = null;
+    await expect(async () => {
+      sourceBox = await page.evaluate(() => {
+        const container = document.querySelector('.scroll-container') as HTMLElement | null;
+        if (!container) return null;
+        const containerRect = container.getBoundingClientRect();
+        const targetY = containerRect.top + containerRect.height * 0.35;
+        const candidates = Array.from(document.querySelectorAll<HTMLElement>('[data-draggable-id]'))
+          .map((el) => {
+            const rect = el.getBoundingClientRect();
+            return {
+              centerY: rect.top + rect.height / 2,
+              visible:
+                rect.bottom > containerRect.top + 12 &&
+                rect.top < containerRect.bottom - 12 &&
+                rect.height > 0 &&
+                rect.width > 0,
+              box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+            };
+          })
+          .filter((item) => item.visible)
+          .sort((a, b) => Math.abs(a.centerY - targetY) - Math.abs(b.centerY - targetY));
+        return candidates[0]?.box ?? null;
+      });
+      expect(sourceBox).not.toBeNull();
+    }).toPass({ timeout: 3000 });
+    if (!sourceBox) throw new Error('Could not get source bounding box');
+
+    // Start drag
+    await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(sourceBox.x + sourceBox.width / 2 + 5, sourceBox.y + 5, { steps: 2 });
+
+    const dragPreview = page.locator('.vdnd-drag-preview');
+    await expect(dragPreview).toBeVisible({ timeout: 2000 });
+
+    // Move cursor far above the scroll container (into the header area)
+    const aboveContainerY = scrollContainerBox.y - 100;
+    const targetX = sourceBox.x + sourceBox.width / 2;
+    await page.mouse.move(targetX, aboveContainerY, { steps: 10 });
+    await page.mouse.move(targetX, aboveContainerY);
+
+    // Wait one rAF for position update
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+
+    // Verify preview is clamped within the scroll container bounds
+    const previewBox = await dragPreview.boundingBox();
+    if (!previewBox) throw new Error('Could not get preview bounding box');
+    expect(previewBox.y).toBeGreaterThanOrEqual(scrollContainerBox.y);
+
+    // Move back inside and drop — should succeed (droppable remained active because cursor was clamped)
+    await page.mouse.move(targetX, scrollContainerBox.y + scrollContainerBox.height / 2, {
+      steps: 5,
+    });
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    await page.mouse.up();
+    await expect(dragPreview).not.toBeVisible({ timeout: 2000 });
+
+    // Verify items still render (no broken state)
+    const itemCount = await page.locator('.task-item').count();
+    expect(itemCount).toBeGreaterThan(0);
   });
 
   test('should reorder correctly with constrainToContainer enabled', async ({ page }) => {

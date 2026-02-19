@@ -144,11 +144,14 @@ export class DraggableDirective implements OnInit, OnDestroy {
   #keyboardHandler!: KeyboardDragHandler;
   #pointerHandler!: PointerDragHandler;
 
-  /** Cached source droppable element for container constraint checks */
-  #sourceDroppableElement: HTMLElement | null = null;
-
   /** Cached constraint flag from source droppable */
   #constrainToContainer = false;
+
+  /** Element whose rect is used for clamping (scroll container or droppable itself) */
+  #constraintElement: HTMLElement | null = null;
+
+  /** Last raw pointer position from pointer move events (not clamped) */
+  #lastRawPosition: CursorPosition | null = null;
 
   /**
    * Update the pending state and emit the change event.
@@ -157,6 +160,18 @@ export class DraggableDirective implements OnInit, OnDestroy {
     if (this.#isPending() !== pending) {
       this.#isPending.set(pending);
     }
+  }
+
+  /**
+   * Find the element to use for container constraint clamping.
+   * If the droppable is inside a scrollable container, use that container's rect
+   * (which represents the visible viewport) instead of the droppable's rect
+   * (which may extend far beyond the viewport in virtual scroll scenarios).
+   */
+  #findConstraintElement(droppableElement: HTMLElement | null): HTMLElement | null {
+    if (!droppableElement) return null;
+    const scrollable = droppableElement.closest('.vdnd-scrollable');
+    return (scrollable as HTMLElement) ?? droppableElement;
   }
 
   ngOnInit(): void {
@@ -186,7 +201,10 @@ export class DraggableDirective implements OnInit, OnDestroy {
       ngZone: this.#ngZone,
       callbacks: {
         onDragStart: (position) => this.#startDrag(position),
-        onDragMove: (position) => this.#updateDrag(position),
+        onDragMove: (position) => {
+          this.#lastRawPosition = position;
+          this.#updateDrag(position);
+        },
         onDragEnd: (cancelled) => this.#endDrag(cancelled),
         onPendingChange: (pending) => this.#setPending(pending),
         isDragging: () => this.isDragging(),
@@ -319,10 +337,12 @@ export class DraggableDirective implements OnInit, OnDestroy {
       groupName,
     );
 
-    // Cache source droppable element and constrain flag for clamping during drag
-    this.#sourceDroppableElement = droppableElement;
+    // Cache constraint flag and element for clamping during drag
     this.#constrainToContainer =
       droppableElement?.hasAttribute('data-constrain-to-container') ?? false;
+    this.#constraintElement = this.#constrainToContainer
+      ? this.#findConstraintElement(droppableElement)
+      : null;
 
     const activeDroppableId = droppableElement
       ? this.#positionCalculator.getDroppableId(droppableElement)
@@ -464,11 +484,11 @@ export class DraggableDirective implements OnInit, OnDestroy {
    * Clamp cursor position to source container boundaries when constrainToContainer is enabled.
    */
   #clampToContainer(position: CursorPosition): CursorPosition {
-    if (!this.#constrainToContainer || !this.#sourceDroppableElement) {
+    if (!this.#constrainToContainer || !this.#constraintElement) {
       return position;
     }
 
-    const containerRect = this.#sourceDroppableElement.getBoundingClientRect();
+    const containerRect = this.#constraintElement.getBoundingClientRect();
     const grabOffset = this.#dragState.grabOffset();
     if (!grabOffset) {
       return position;
@@ -518,6 +538,24 @@ export class DraggableDirective implements OnInit, OnDestroy {
 
     // Apply container clamping after axis locking
     effectivePosition = this.#clampToContainer(effectivePosition);
+
+    // Update autoscroll cursor: use raw pointer position clamped to container
+    // edges (without grabOffset) so autoscroll threshold is reachable regardless
+    // of where the user grabbed the item.
+    if (this.#constrainToContainer && this.#constraintElement && this.#lastRawPosition) {
+      const rect = this.#constraintElement.getBoundingClientRect();
+      let scrollCursor: CursorPosition = this.#lastRawPosition;
+      if (axisLock && startPos) {
+        scrollCursor = {
+          x: axisLock === 'x' ? startPos.x : scrollCursor.x,
+          y: axisLock === 'y' ? startPos.y : scrollCursor.y,
+        };
+      }
+      this.#autoScroll.setCursorOverride({
+        x: Math.max(rect.left, Math.min(scrollCursor.x, rect.right)),
+        y: Math.max(rect.top, Math.min(scrollCursor.y, rect.bottom)),
+      });
+    }
 
     // Find droppable at effective position (respects axis locking and clamping)
     const droppableElement = this.#positionCalculator.findDroppableAtPoint(
@@ -571,8 +609,9 @@ export class DraggableDirective implements OnInit, OnDestroy {
     this.#autoScroll.stopMonitoring();
 
     // Reset cached constraint state
-    this.#sourceDroppableElement = null;
     this.#constrainToContainer = false;
+    this.#constraintElement = null;
+    this.#lastRawPosition = null;
 
     const sourceIndex = this.#dragState.sourceIndex() ?? 0;
     const placeholderIndex = this.#dragState.placeholderIndex();
