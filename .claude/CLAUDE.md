@@ -16,23 +16,17 @@ These rules prevent common mistakes that cause hard-to-debug issues:
 
 5. **Never throw errors in drag/drop operations:** Use early returns and graceful degradation instead.
 
-6. **TDD for every bug fix — no exceptions:** Every bug fix MUST have a test, and the test MUST be written before the fix. The workflow is: (1) Write a failing test that reproduces the bug, (2) Run it — confirm it fails (this proves the bug exists and the test is valid), (3) Implement the fix, (4) Run it again — confirm it passes. Do not write the fix first and the test second. Do not skip step 2. This applies to all bug fixes regardless of scope.
+6. **TDD for every bug fix — no exceptions:** Write a failing test first, run it to confirm it fails (this proves the bug exists), implement the fix, confirm it passes. Never write the fix first.
 
 7. **Run ESLint on changed files:** Before considering a task done, run `npm run lint` or `npx eslint --flag v10_config_lookup_from_file <changed-files>` to catch formatting and style issues. Lefthook pre-commit checks the same rules; running manually catches issues earlier.
 
-8. **Test fails = you broke it:** If a test fails after your changes, you broke it. Fix it. Do not check main. Do not claim "pre-existing." Do not claim "flaky." Do not claim "unrelated to my changes." Fix it.
+8. **Test fails = you broke it:** If a test fails after your changes, fix it before declaring done.
 
 9. **Keep instructions in sync:** Any change to code documented in this file must include a corresponding update in the same commit. This includes: tables (services, directives, components, data attributes, public API, test files), code examples (if a pattern shown changes, update the example), architecture descriptions (if behavior in Architecture or a lazy doc changes, update it), and lazy docs (`.ai/E2E.md`, `.claude/history/*.md`, `.claude/TROUBLESHOOTING.md`, `.claude/demo/DESIGN_SYSTEM.md`).
 
 10. **Never use `expect(true).toBe(true)` or similar no-op assertions:** Every test assertion must verify actual behavior. Tests that always pass regardless of code behavior provide false confidence and zero coverage. If you can't write a meaningful assertion, the test shouldn't exist.
 
 11. **Keep skills in sync with public API:** Any change to the consumer-facing API (new/changed/removed component, directive, input, output, event, utility, token, CSS class, or keyboard shortcut) must update `skills/ngx-virtual-dnd/SKILL.md` and/or `skills/ngx-virtual-dnd/references/api-reference.md` in the same commit. Internal-only changes (bug fixes, refactoring, performance) do not require skill updates unless they change observable consumer behavior.
-
-## Version Requirements
-
-- **Angular:** 21.0.0+
-- **TypeScript:** 5.9+
-- **Node:** 20+
 
 ## Project Structure
 
@@ -133,35 +127,25 @@ AutoScrollService → DragStateService, PositionCalculatorService
 
 ### Test Files
 
-| Source Area             | Unit Test                                    | E2E Tests                                                       |
-| ----------------------- | -------------------------------------------- | --------------------------------------------------------------- |
-| DraggableDirective      | `draggable.directive.spec.ts`                | `drag-drop.spec.ts`, `keyboard-drag/*.spec.ts`                  |
-| KeyboardDragHandler     | `keyboard-drag.handler.spec.ts`              | -                                                               |
-| PointerDragHandler      | `pointer-drag.handler.spec.ts`               | -                                                               |
-| DroppableDirective      | `droppable.directive.spec.ts`                | `drop-accuracy.spec.ts`                                         |
-| DragStateService        | `drag-state.service.spec.ts`                 | -                                                               |
-| AutoScrollService       | `auto-scroll.service.spec.ts`                | `auto-scroll.spec.ts`, `autoscroll-drift.spec.ts`               |
-| DragIndexCalculator     | `drag-index-calculator.service.spec.ts`      | -                                                               |
-| ElementCloneService     | `element-clone.service.spec.ts`              | -                                                               |
-| KeyboardDragService     | `keyboard-drag.service.spec.ts`              | -                                                               |
-| PositionCalculator      | `position-calculator.service.spec.ts`        | -                                                               |
-| DragPreviewComponent    | `drag-preview.component.spec.ts`             | -                                                               |
-| PlaceholderComponent    | `placeholder.component.spec.ts`              | -                                                               |
-| VirtualScrollContainer  | `virtual-scroll-container.component.spec.ts` | -                                                               |
-| VirtualContentComponent | `virtual-content.component.spec.ts`          | -                                                               |
-| VirtualForDirective     | `virtual-for.directive.spec.ts`              | -                                                               |
-| DynamicHeightStrategy   | `dynamic-height.strategy.spec.ts`            | `dynamic-height.spec.ts`                                        |
-| Placeholder logic       | -                                            | `placeholder-behavior.spec.ts`, `placeholder-integrity.spec.ts` |
-| Container constraint    | -                                            | `constrain-to-container.spec.ts`                                |
-| Container resize        | -                                            | `container-resize.spec.ts`                                      |
-| Keyboard drag           | -                                            | `keyboard-drag/*.spec.ts` (6 files)                             |
-| Keyboard navigation     | -                                            | `keyboard-navigation.spec.ts`                                   |
-| Axis lock               | -                                            | `axis-lock.spec.ts`                                             |
-| Disabled elements       | -                                            | `disabled-elements.spec.ts`                                     |
-| Drag UX features        | -                                            | `drag-ux-features.spec.ts`                                      |
-| Empty list              | -                                            | `empty-list.spec.ts`                                            |
-| Page scroll             | -                                            | `page-scroll.spec.ts`                                           |
-| Mobile touch            | -                                            | `touch-scroll.mobile.spec.ts`                                   |
+Unit test filenames mirror source filenames (`foo.service.ts` → `foo.service.spec.ts`). E2E coverage by area:
+
+| Source Area           | E2E Tests                                                       |
+| --------------------- | --------------------------------------------------------------- |
+| DraggableDirective    | `drag-drop.spec.ts`, `keyboard-drag/*.spec.ts`                  |
+| DroppableDirective    | `drop-accuracy.spec.ts`                                         |
+| AutoScrollService     | `auto-scroll.spec.ts`, `autoscroll-drift.spec.ts`               |
+| DynamicHeightStrategy | `dynamic-height.spec.ts`                                        |
+| Placeholder logic     | `placeholder-behavior.spec.ts`, `placeholder-integrity.spec.ts` |
+| Container constraint  | `constrain-to-container.spec.ts`                                |
+| Container resize      | `container-resize.spec.ts`                                      |
+| Keyboard drag         | `keyboard-drag/*.spec.ts` (6 files)                             |
+| Keyboard navigation   | `keyboard-navigation.spec.ts`                                   |
+| Axis lock             | `axis-lock.spec.ts`                                             |
+| Disabled elements     | `disabled-elements.spec.ts`                                     |
+| Drag UX features      | `drag-ux-features.spec.ts`                                      |
+| Empty list            | `empty-list.spec.ts`                                            |
+| Page scroll           | `page-scroll.spec.ts`                                           |
+| Mobile touch          | `touch-scroll.mobile.spec.ts`                                   |
 
 ### Skills (for library consumers)
 
@@ -187,14 +171,12 @@ AutoScrollService → DragStateService, PositionCalculatorService
 
 ### TypeScript
 
-- Use strict type checking; prefer type inference when obvious
 - Avoid `any`; use `unknown` when type is uncertain
 - Use native ESM private members (`#` syntax) instead of TypeScript's `private`
   - Exception: Angular signal queries (`viewChild`, `viewChildren`, `contentChild`, `contentChildren`) cannot use ES private fields - use TypeScript `private` for these
 
 ### Angular
 
-- Always use standalone components (no NgModules)
 - Do NOT set `standalone: true` in decorators (default in Angular v21+)
 - Use `inject()` function instead of constructor injection
 - Put host bindings in `host` object of decorators (not `@HostBinding`/`@HostListener`)
@@ -262,14 +244,8 @@ Use `createBoundListener()` from `lib/utils/event-listener-bindings.ts` to bind/
 
 ### Templates
 
-- Use native control flow (`@if`, `@for`, `@switch`)
-- Use the async pipe for observables
 - Do not use arrow functions in templates
 - Never bind high-frequency DOM events (`scroll`, `mousemove`, `pointermove`, `touchmove`) in templates — use programmatic listeners outside Angular's zone
-
-### Services
-
-- Use `providedIn: 'root'` for singleton services
 
 ### Timing and Rendering
 
@@ -293,11 +269,9 @@ Use `createBoundListener()` from `lib/utils/event-listener-bindings.ts` to bind/
 
 4. **No scroll compensation layers**: Uses raw `scrollTop` directly. Virtual scroll handles spacer adjustments internally.
 
-5. **Consumer simplicity**: Library handles all complexity. Consumers only provide data and handle drop events.
+5. **Gap prevention**: Dragged item hidden with `display: none`. Virtual scroll's `totalHeight` subtracts 1 during drag.
 
-6. **Gap prevention**: Dragged item hidden with `display: none`. Virtual scroll's `totalHeight` subtracts 1 during drag.
-
-7. **Overlay container for drag preview**: `DragPreviewComponent` teleports its host element into a body-level `<div class="vdnd-overlay-container">` via `afterNextRender`. This escapes ancestor CSS `transform`/`perspective`/`filter` that create new containing blocks for `position: fixed` (e.g. Ionic's `ion-page`). Angular change detection works on the logical component tree, so signals/effects/bindings keep working after the DOM move. Unit tests must use `document.querySelector()` instead of `fixture.debugElement.query()` to find the teleported preview.
+6. **Overlay container for drag preview**: `DragPreviewComponent` teleports its host element into a body-level `<div class="vdnd-overlay-container">` via `afterNextRender`. This escapes ancestor CSS `transform`/`perspective`/`filter` that create new containing blocks for `position: fixed` (e.g. Ionic's `ion-page`). Angular change detection works on the logical component tree, so signals/effects/bindings keep working after the DOM move. Unit tests must use `document.querySelector()` instead of `fixture.debugElement.query()` to find the teleported preview.
 
 ### Safari Autoscroll
 
@@ -330,20 +304,7 @@ Load these ONLY when working on specific areas:
 
 ### When to Create Lazy Documentation
 
-**Lazy-loaded file** (not inline in CLAUDE.md) when ANY of these apply:
-
-1. **Specialized knowledge**: Only relevant when working on a specific subsystem
-2. **Debugging/troubleshooting**: Error symptoms, failed approaches, workarounds
-3. **Detailed code examples >10 lines**: Long WRONG/CORRECT patterns belong in the relevant lazy doc
-4. **Historical context**: Why a decision was made, what alternatives were tried
-
-**Inline in CLAUDE.md** when ALL of these apply:
-
-1. **Broadly relevant**: Needed in >20% of conversations (rules, patterns, structure)
-2. **Concise**: Fits in 1-3 lines or a small table row
-3. **Actionable**: Directly tells the agent what to do or not do
-
-**When adding a new lazy doc:** Create the file, add an entry to the Lazy Documentation table with a clear "When to Load" trigger, and replace any inline content with a one-line reference. Never duplicate content between CLAUDE.md and lazy docs.
+Lazy-load when: specialized (one subsystem), debugging/troubleshooting, or historical context. Inline only when broadly relevant (>20% of conversations), concise (≤3 lines), and actionable. Never duplicate between CLAUDE.md and lazy docs — single source of truth.
 
 ## Troubleshooting
 
@@ -351,32 +312,12 @@ See `.claude/TROUBLESHOOTING.md` for common error symptoms, causes, and fixes.
 
 ## Common Tasks
 
-### Adding a new E2E test
-
-1. Read `.ai/E2E.md` first
-2. Create in `e2e/` following Page Object Model pattern
-3. Use `e2e/fixtures/demo.page.ts` fixture for common operations
-4. Test all browsers: `npx playwright test --reporter=dot --max-failures=1`
-
-### Modifying placeholder calculation
-
-1. Read `.claude/history/placeholder-algorithm.md` and `DragIndexCalculatorService` thoroughly
-2. Write E2E test first (TDD)
-3. Run `placeholder-behavior.spec.ts` and `placeholder-integrity.spec.ts`
-4. Run `drag-index-calculator.service.spec.ts` unit tests for index math edge cases
-
-### Updating skills after public API changes
-
-1. Determine if the change affects consumer-facing API (same criteria as README updates)
-2. Update `skills/ngx-virtual-dnd/SKILL.md` patterns if usage patterns changed
-3. Update `skills/ngx-virtual-dnd/references/api-reference.md` tables for new/changed/removed inputs, outputs, events, utilities, tokens, or CSS classes
-
-### Adding documentation for a new subsystem
-
-1. Decide: inline vs. lazy (see "When to Create Lazy Documentation" criteria above)
-2. If lazy: create file, add to Lazy Documentation table, add one-line inline reference
-3. If inline: keep it under 3 lines or a single table row
-4. Never duplicate content between CLAUDE.md and lazy docs — single source of truth
+| Task                           | Load First                                            | Key Tests                                                                                                |
+| ------------------------------ | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| New E2E test                   | `.ai/E2E.md`                                          | All browsers: `npx playwright test --reporter=dot --max-failures=1`                                      |
+| Modify placeholder calc        | `.claude/history/placeholder-algorithm.md`            | `placeholder-behavior.spec.ts`, `placeholder-integrity.spec.ts`, `drag-index-calculator.service.spec.ts` |
+| Update skills after API change | `skills/ngx-virtual-dnd/SKILL.md`, `api-reference.md` | -                                                                                                        |
+| Add new subsystem doc          | See lazy doc criteria above                           | -                                                                                                        |
 
 ## Testing
 
@@ -463,31 +404,9 @@ type(scope): description
 
 ### README.md (`/README.md`)
 
-**Audience:** Library consumers — developers who `npm install ngx-virtual-dnd` and use it in their apps. They care about what the library does, how to use it, and what options they have. They do not care about internal algorithms, service architecture, or implementation mechanics.
+**Update when:** new/removed/changed component, directive, input, output, utility, token, CSS class, keyboard shortcut, event, or configuration option; changed default behavior consumers will observe.
 
-**Public API** is everything consumers interact with: component selectors, directive selectors, inputs, outputs, utility functions, CSS classes, keyboard shortcuts, injection tokens, events, configuration options, and exported TypeScript types/interfaces.
-
-**Update README when a change affects what consumers can do, use, or configure:**
-
-- New or removed component, directive, service, utility, or token
-- New, changed, or removed input, output, or configuration option
-- New or changed CSS class, keyboard shortcut, or event
-- New usage pattern made possible (e.g. page-level scroll support)
-- Changed default behavior that consumers will observe and may need to adapt to
-
-**Do NOT update README for:**
-
-- Bug fixes (consumers don't configure the fix)
-- Internal algorithm changes (displacement thresholds, probe logic, scroll math)
-- Performance improvements (unless they introduce new configuration)
-- Refactoring, test changes, build/tooling changes
-- Anything a consumer cannot control, configure, or opt into
-
-**Content style:** Show what to do, not how it works internally. Use code examples. Describe capabilities and options, not mechanisms.
-
-### JSDoc Comments
-
-Update JSDoc on the actual class, function, and interface definitions (not barrel files) when their signature, behavior, or usage contract changes.
+**Do NOT update for:** bug fixes, internal algorithm changes, performance improvements (unless new config), refactoring, test changes, build/tooling changes.
 
 ### CHANGELOG.md
 
@@ -496,18 +415,6 @@ Auto-generated — do NOT manually edit.
 ## Releasing
 
 Run `npm run release [patch|minor|major]` to release. Use `npm run release:dry-run` to test.
-
-## Quick Reference
-
-| Command                                                                  | Description                             |
-| ------------------------------------------------------------------------ | --------------------------------------- |
-| `npm start`                                                              | Dev server (port 4200)                  |
-| `npm test -- --silent`                                                   | Unit tests (minimal output)             |
-| `npx playwright test --reporter=dot --max-failures=1 --project=chromium` | E2E Chromium only (fast iteration)      |
-| `npx playwright test --reporter=dot --max-failures=1`                    | E2E all browsers (required before done) |
-| `npm run lint`                                                           | Run ESLint                              |
-| `ng build ngx-virtual-dnd`                                               | Build library (required after edits)    |
-| `npm run release`                                                        | Release new version                     |
 
 ## Design System
 
