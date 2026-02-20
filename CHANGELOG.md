@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.0.0](https://github.com/gultyayev/angular-vdnd/compare/v2.0.0...v3.0.0) (2026-02-20)
+
+### ⚠ BREAKING CHANGES
+
+- **lib:** dragMove, dragReadyChange, dragEnter, dragLeave,
+  dragOver, visibleRangeChange, and scrollPositionChange outputs have
+  been removed along with their associated event types. Use
+  DragStateService signals for equivalent reactive state, and the
+  vdnd-drag-pending CSS class instead of dragReadyChange.
+
+### Features
+
+- **lib:** remove 7 unused outputs from public API ([ff680d8](https://github.com/gultyayev/angular-vdnd/commit/ff680d82183e4e95e6b3f61cc3940d8c7962eca8))
+
+### Bug Fixes
+
+- **lib:** clamp constrainToContainer to scroll viewport and fix flaky E2E reorder ([2ac1bd6](https://github.com/gultyayev/angular-vdnd/commit/2ac1bd673f10435b05b7613883b87e2317d89412))
+
 ## [2.0.0](https://github.com/gultyayev/angular-vdnd/compare/v2.0.0-alpha.1...v2.0.0) (2026-02-17)
 
 ## [2.0.0-alpha.1](https://github.com/gultyayev/angular-vdnd/compare/v2.0.0-alpha.0...v2.0.0-alpha.1) (2026-02-14)
