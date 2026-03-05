@@ -20,6 +20,9 @@ export class PositionCalculatorService {
   /** Maximum DOM levels to traverse when looking for parent elements */
   readonly #MAX_PARENT_TRAVERSAL = 15;
 
+  /** Reusable result object for getNearEdge (avoids per-frame allocation) */
+  readonly #nearEdgeResult = { top: false, bottom: false, left: false, right: false };
+
   /**
    * Find the droppable element at a given point.
    *
@@ -38,9 +41,15 @@ export class PositionCalculatorService {
     draggedElement: HTMLElement,
     groupName: string,
   ): HTMLElement | null {
-    // Temporarily hide the dragged element to "see through" it
-    const originalPointerEvents = draggedElement.style.pointerEvents;
-    draggedElement.style.pointerEvents = 'none';
+    // Skip pointerEvents toggle when element is already hidden (display: none during active drag).
+    // offsetParent is null for hidden elements — toggling style would force a style recalculation.
+    const isHidden = draggedElement.offsetParent === null;
+
+    let originalPointerEvents: string | undefined;
+    if (!isHidden) {
+      originalPointerEvents = draggedElement.style.pointerEvents;
+      draggedElement.style.pointerEvents = 'none';
+    }
 
     try {
       const elementAtPoint = document.elementFromPoint(x, y);
@@ -50,8 +59,9 @@ export class PositionCalculatorService {
 
       return this.getDroppableParent(elementAtPoint as HTMLElement, groupName);
     } finally {
-      // Always restore pointer events
-      draggedElement.style.pointerEvents = originalPointerEvents;
+      if (!isHidden) {
+        draggedElement.style.pointerEvents = originalPointerEvents!;
+      }
     }
   }
 
@@ -64,9 +74,13 @@ export class PositionCalculatorService {
    * @returns The draggable element, or null if none found
    */
   findDraggableAtPoint(x: number, y: number, draggedElement: HTMLElement): HTMLElement | null {
-    // Temporarily hide the dragged element
-    const originalPointerEvents = draggedElement.style.pointerEvents;
-    draggedElement.style.pointerEvents = 'none';
+    const isHidden = draggedElement.offsetParent === null;
+
+    let originalPointerEvents: string | undefined;
+    if (!isHidden) {
+      originalPointerEvents = draggedElement.style.pointerEvents;
+      draggedElement.style.pointerEvents = 'none';
+    }
 
     try {
       const elementAtPoint = document.elementFromPoint(x, y);
@@ -76,7 +90,9 @@ export class PositionCalculatorService {
 
       return this.getDraggableParent(elementAtPoint as HTMLElement);
     } finally {
-      draggedElement.style.pointerEvents = originalPointerEvents;
+      if (!isHidden) {
+        draggedElement.style.pointerEvents = originalPointerEvents!;
+      }
     }
   }
 
@@ -186,12 +202,11 @@ export class PositionCalculatorService {
     containerRect: DOMRect,
     threshold: number,
   ): { top: boolean; bottom: boolean; left: boolean; right: boolean } {
-    return {
-      top: position.y - containerRect.top <= threshold,
-      bottom: containerRect.bottom - position.y <= threshold,
-      left: position.x - containerRect.left <= threshold,
-      right: containerRect.right - position.x <= threshold,
-    };
+    this.#nearEdgeResult.top = position.y - containerRect.top <= threshold;
+    this.#nearEdgeResult.bottom = containerRect.bottom - position.y <= threshold;
+    this.#nearEdgeResult.left = position.x - containerRect.left <= threshold;
+    this.#nearEdgeResult.right = containerRect.right - position.x <= threshold;
+    return this.#nearEdgeResult;
   }
 
   /**

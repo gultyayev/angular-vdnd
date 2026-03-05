@@ -53,8 +53,15 @@ export class AutoScrollService {
   /** Optional cursor position override for edge detection (bypasses DragState read) */
   #cursorOverride: CursorPosition | null = null;
 
+  /** Last tick cursor position for stationary detection */
+  #lastTickCursorX = NaN;
+  #lastTickCursorY = NaN;
+
+  /** Reusable direction object for tick loop (avoids per-frame allocation) */
+  readonly #tickDirection = { x: 0, y: 0 };
+
   /** Current scroll state */
-  #scrollState: {
+  readonly #scrollState: {
     containerId: string | null;
     direction: { x: number; y: number };
     speed: number;
@@ -114,11 +121,12 @@ export class AutoScrollService {
 
     this.#onScrollCallback = null;
     this.#cursorOverride = null;
-    this.#scrollState = {
-      containerId: null,
-      direction: { x: 0, y: 0 },
-      speed: 0,
-    };
+    this.#lastTickCursorX = NaN;
+    this.#lastTickCursorY = NaN;
+    this.#scrollState.containerId = null;
+    this.#scrollState.direction.x = 0;
+    this.#scrollState.direction.y = 0;
+    this.#scrollState.speed = 0;
   }
 
   /**
@@ -150,6 +158,18 @@ export class AutoScrollService {
       return;
     }
 
+    // Skip container iteration when cursor hasn't moved and no scrolling is active
+    if (
+      cursor.x === this.#lastTickCursorX &&
+      cursor.y === this.#lastTickCursorY &&
+      !this.isScrolling()
+    ) {
+      this.#animationFrameId = requestAnimationFrame(() => this.#tick());
+      return;
+    }
+    this.#lastTickCursorX = cursor.x;
+    this.#lastTickCursorY = cursor.y;
+
     let scrollPerformed = false;
 
     // Check each container
@@ -166,8 +186,10 @@ export class AutoScrollService {
       // Check edges
       const nearEdge = this.#positionCalculator.getNearEdge(cursor, rect, config.threshold);
 
-      // Calculate scroll direction and speed
-      const direction = { x: 0, y: 0 };
+      // Calculate scroll direction and speed (reuse object to avoid per-frame allocation)
+      const direction = this.#tickDirection;
+      direction.x = 0;
+      direction.y = 0;
       let maxDistance = 0;
 
       if (nearEdge.top) {
@@ -195,7 +217,10 @@ export class AutoScrollService {
           speed = Math.min(config.maxSpeed, Math.max(1, config.maxSpeed * distanceRatio));
         }
 
-        this.#scrollState = { containerId: id, direction, speed };
+        this.#scrollState.containerId = id;
+        this.#scrollState.direction.x = direction.x;
+        this.#scrollState.direction.y = direction.y;
+        this.#scrollState.speed = speed;
         this.#performScroll(element, direction, speed);
         scrollPerformed = true;
         break;
@@ -204,11 +229,10 @@ export class AutoScrollService {
 
     // Reset scroll state if no scrolling was performed
     if (!scrollPerformed) {
-      this.#scrollState = {
-        containerId: null,
-        direction: { x: 0, y: 0 },
-        speed: 0,
-      };
+      this.#scrollState.containerId = null;
+      this.#scrollState.direction.x = 0;
+      this.#scrollState.direction.y = 0;
+      this.#scrollState.speed = 0;
     }
 
     this.#animationFrameId = requestAnimationFrame(() => this.#tick());
