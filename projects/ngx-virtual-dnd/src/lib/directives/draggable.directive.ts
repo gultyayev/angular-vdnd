@@ -608,6 +608,9 @@ export class DraggableDirective implements OnInit, OnDestroy {
     // Stop auto-scroll monitoring
     this.#autoScroll.stopMonitoring();
 
+    // Clear droppable metadata cache from this drag session
+    this.#dragIndexCalculator.clearCache();
+
     // Reset cached constraint state
     this.#constrainToContainer = false;
     this.#constraintElement = null;

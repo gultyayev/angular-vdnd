@@ -192,6 +192,9 @@ export class KeyboardDragHandler {
     // Remove document listener
     this.#cleanupDocumentListener();
 
+    // Clear droppable metadata cache from this drag session
+    this.#deps.dragIndexCalculator.clearCache();
+
     // Emit drag end event
     this.#deps.callbacks.onDragEnd({
       draggableId: ctx.draggableId,
@@ -217,6 +220,9 @@ export class KeyboardDragHandler {
 
     // Remove document listener
     this.#cleanupDocumentListener();
+
+    // Clear droppable metadata cache from this drag session
+    this.#deps.dragIndexCalculator.clearCache();
 
     // Emit drag end event
     this.#deps.callbacks.onDragEnd({

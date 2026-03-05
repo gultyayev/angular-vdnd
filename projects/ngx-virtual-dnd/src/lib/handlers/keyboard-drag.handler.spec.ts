@@ -67,6 +67,7 @@ describe('KeyboardDragHandler', () => {
 
     mockDragIndexCalculator = {
       getTotalItemCount: jest.fn().mockReturnValue(5),
+      clearCache: jest.fn(),
     };
 
     mockElementClone = {

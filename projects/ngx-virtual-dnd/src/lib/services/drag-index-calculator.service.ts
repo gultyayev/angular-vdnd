@@ -3,6 +3,18 @@ import { type CursorPosition, END_OF_LIST, type GrabOffset } from '../models/dra
 import { PositionCalculatorService } from './position-calculator.service';
 import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
 
+interface DroppableCache {
+  droppableId: string | null;
+  containerType: 'virtualScroll' | 'virtualContent' | 'fallback';
+  scrollContainer: HTMLElement;
+  virtualScrollElement: HTMLElement | null;
+  virtualContentElement: HTMLElement | null;
+  scrollableParent: HTMLElement | null;
+  itemHeight: number;
+  isConstrainedToContainer: boolean;
+  strategy: VirtualScrollStrategy | null;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -11,6 +23,9 @@ export class DragIndexCalculatorService {
 
   /** Registered strategies by droppable ID */
   readonly #strategies = new Map<string, VirtualScrollStrategy>();
+
+  /** Cached droppable metadata to avoid repeated DOM queries during drag */
+  readonly #droppableCache = new Map<HTMLElement, DroppableCache>();
 
   /**
    * Register a virtual scroll strategy for a droppable.
@@ -33,6 +48,68 @@ export class DragIndexCalculatorService {
    */
   getStrategyForDroppable(droppableId: string): VirtualScrollStrategy | undefined {
     return this.#strategies.get(droppableId);
+  }
+
+  clearCache(): void {
+    this.#droppableCache.clear();
+  }
+
+  #resolveDroppable(droppableElement: HTMLElement, draggedItemHeight: number): DroppableCache {
+    const cached = this.#droppableCache.get(droppableElement);
+    if (cached) return cached;
+
+    const virtualScrollElement = droppableElement.querySelector(
+      'vdnd-virtual-scroll',
+    ) as HTMLElement | null;
+    const virtualContentElement = (
+      droppableElement.matches('vdnd-virtual-content')
+        ? droppableElement
+        : droppableElement.closest('vdnd-virtual-content')
+    ) as HTMLElement | null;
+
+    let containerType: DroppableCache['containerType'];
+    let scrollContainer: HTMLElement;
+    let scrollableParent: HTMLElement | null = null;
+
+    if (virtualScrollElement) {
+      containerType = 'virtualScroll';
+      scrollContainer = virtualScrollElement;
+    } else if (virtualContentElement) {
+      containerType = 'virtualContent';
+      scrollableParent = virtualContentElement.closest('.vdnd-scrollable') as HTMLElement | null;
+      scrollContainer = scrollableParent ?? virtualContentElement;
+    } else {
+      containerType = 'fallback';
+      scrollContainer = droppableElement;
+    }
+
+    const droppableId = this.#positionCalculator.getDroppableId(droppableElement);
+    const strategy = (droppableId ? this.#strategies.get(droppableId) : null) ?? null;
+
+    const configuredHeight =
+      virtualScrollElement?.getAttribute('data-item-height') ??
+      virtualContentElement?.getAttribute('data-item-height');
+    const parsedHeight = configuredHeight ? parseFloat(configuredHeight) : Number.NaN;
+    const itemHeight = Number.isFinite(parsedHeight)
+      ? parsedHeight
+      : this.#getDraggedItemHeightFallback(draggedItemHeight, 50);
+
+    const isConstrainedToContainer = droppableElement.hasAttribute('data-constrain-to-container');
+
+    const entry: DroppableCache = {
+      droppableId,
+      containerType,
+      scrollContainer,
+      virtualScrollElement,
+      virtualContentElement,
+      scrollableParent,
+      itemHeight,
+      isConstrainedToContainer,
+      strategy,
+    };
+
+    this.#droppableCache.set(droppableElement, entry);
+    return entry;
   }
 
   getTotalItemCount(args: {
@@ -61,59 +138,34 @@ export class DragIndexCalculatorService {
       sourceIndex,
     } = args;
 
-    // Get container and measurements - handle both embedded virtual-scroll and page-level scroll
-    const virtualScroll = droppableElement.querySelector('vdnd-virtual-scroll');
-    const virtualContent = droppableElement.matches('vdnd-virtual-content')
-      ? droppableElement
-      : droppableElement.closest('vdnd-virtual-content');
+    // Resolve cached metadata (DOM queries run once per droppable per drag session)
+    const cache = this.#resolveDroppable(droppableElement, draggedItemHeight);
 
-    let container: HTMLElement;
+    // Live reads: getBoundingClientRect() and scrollTop change during scroll
     let currentScrollTop: number;
     let rect: DOMRect;
 
-    if (virtualScroll) {
-      // Standard virtual scroll component - scroll container is the virtual scroll element
-      container = virtualScroll as HTMLElement;
-      rect = container.getBoundingClientRect();
-      currentScrollTop = container.scrollTop;
-    } else if (virtualContent) {
-      // Page-level scroll: find scrollable parent and get adjusted scroll
-      const scrollableParent = virtualContent.closest('.vdnd-scrollable') as HTMLElement | null;
-      if (scrollableParent) {
-        container = scrollableParent;
-        // Use scroll container rect + content offset to avoid stale virtualContent rects.
-        rect = container.getBoundingClientRect();
-        const contentOffsetAttr = (virtualContent as HTMLElement).getAttribute(
-          'data-content-offset',
-        );
-        const contentOffset = contentOffsetAttr ? parseFloat(contentOffsetAttr) : 0;
-        const offsetValue = Number.isFinite(contentOffset) ? contentOffset : 0;
-        currentScrollTop = container.scrollTop - offsetValue;
-      } else {
-        container = virtualContent as HTMLElement;
-        rect = container.getBoundingClientRect();
-        currentScrollTop = 0;
-      }
+    if (cache.containerType === 'virtualScroll') {
+      rect = cache.scrollContainer.getBoundingClientRect();
+      currentScrollTop = cache.scrollContainer.scrollTop;
+    } else if (cache.containerType === 'virtualContent' && cache.scrollableParent) {
+      rect = cache.scrollContainer.getBoundingClientRect();
+      const contentOffsetAttr = cache.virtualContentElement!.getAttribute('data-content-offset');
+      const contentOffset = contentOffsetAttr ? parseFloat(contentOffsetAttr) : 0;
+      const offsetValue = Number.isFinite(contentOffset) ? contentOffset : 0;
+      currentScrollTop = cache.scrollContainer.scrollTop - offsetValue;
     } else {
-      // Fallback: use droppable element directly
-      container = droppableElement;
-      rect = container.getBoundingClientRect();
-      currentScrollTop = container.scrollTop;
+      rect = cache.scrollContainer.getBoundingClientRect();
+      currentScrollTop =
+        cache.containerType === 'virtualContent' ? 0 : cache.scrollContainer.scrollTop;
     }
 
-    // Check if a registered strategy exists for this droppable
-    const currentDroppableId = this.#positionCalculator.getDroppableId(droppableElement);
-    const strategy = (currentDroppableId ? this.#strategies.get(currentDroppableId) : null) ?? null;
-
-    // Prefer configured item height from virtual scroll/content over actual element height.
-    // This prevents drift when actual element height differs from grid spacing.
-    const configuredHeight =
-      virtualScroll?.getAttribute('data-item-height') ??
-      (virtualContent as HTMLElement | null)?.getAttribute('data-item-height');
-    const parsedHeight = configuredHeight ? parseFloat(configuredHeight) : Number.NaN;
-    const itemHeight = Number.isFinite(parsedHeight)
-      ? parsedHeight
-      : this.#getDraggedItemHeightFallback(draggedItemHeight, 50);
+    const {
+      strategy,
+      itemHeight,
+      droppableId: currentDroppableId,
+      isConstrainedToContainer,
+    } = cache;
 
     // Calculate preview center position mathematically
     // The preview is positioned at: cursorPosition - grabOffset (see drag-preview.component.ts)
@@ -124,7 +176,6 @@ export class DragIndexCalculatorService {
     const previewTopY = position.y - (grabOffset?.y ?? 0);
     const previewBottomY = previewTopY + previewHeight;
     const previewCenterY = previewTopY + previewHeight / 2;
-    const isConstrainedToContainer = droppableElement.hasAttribute('data-constrain-to-container');
 
     // Capped center probe: use preview center but limit how deep the probe reaches.
     // The cap prevents a tall preview (e.g. 120px among 60px items) from overshooting
@@ -171,8 +222,14 @@ export class DragIndexCalculatorService {
       }
     }
 
-    // Get total items for clamping
-    const totalItems = this.#getTotalItemCount(droppableElement, isSameList, draggedItemHeight);
+    // Get total items using cached strategy to avoid duplicate DOM queries
+    let totalItems: number;
+    const cachedItemCount = strategy?.getItemCount();
+    if (cachedItemCount !== undefined && Number.isFinite(cachedItemCount)) {
+      totalItems = Math.max(0, cachedItemCount);
+    } else {
+      totalItems = this.#getTotalItemCount(droppableElement, isSameList, draggedItemHeight);
+    }
 
     // Edge detection: allow dropping at the END of the list when cursor is near bottom edge.
     // Due to max scroll limits, the math alone can't reach totalItems when the list is longer
