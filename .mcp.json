@@ -2,7 +2,7 @@
   "mcpServers": {
     "jetbrains": {
       "type": "sse",
-      "url": "http://localhost:64342/sse"
+      "url": "http://127.0.0.1:64343/sse"
     },
     "angular-cli": {
       "command": "npx",
