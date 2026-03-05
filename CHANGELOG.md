@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.0.1](https://github.com/gultyayev/angular-vdnd/compare/v3.0.0...v3.0.1) (2026-03-05)
+
+### Performance
+
+- **lib:** cache droppable metadata during active drag ([53f9c59](https://github.com/gultyayev/angular-vdnd/commit/53f9c59fd231172cdfe120113dc7abaf320895d7))
+- **lib:** optimize hot-path services for active drag ([6be81b4](https://github.com/gultyayev/angular-vdnd/commit/6be81b4ce4fbd088b9ca739b0058be182973afbc))
+
 ## [3.0.0](https://github.com/gultyayev/angular-vdnd/compare/v2.0.0...v3.0.0) (2026-02-20)
 
 ### ⚠ BREAKING CHANGES
