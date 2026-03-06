@@ -1,0 +1,47 @@
+name: Performance Benchmarks
+
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Angular Library
+        run: npm run build:lib
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run performance benchmarks
+        run: npm run perf
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-results
+          path: perf/results/
+
+      - name: Compare against baseline
+        run: npm run perf:compare -- --threshold 25
+        continue-on-error: true

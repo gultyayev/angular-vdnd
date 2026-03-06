@@ -1,0 +1,299 @@
+{
+  "config": {
+    "configFile": "/Users/crush/Projects/dnd/perf/playwright.perf.config.ts",
+    "rootDir": "/Users/crush/Projects/dnd/perf/scenarios",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      ["list", null],
+      [
+        "json",
+        {
+          "outputFile": "results/latest.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/Users/crush/Projects/dnd/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "/Users/crush/Projects/dnd/perf/scenarios",
+        "testIgnore": [],
+        "testMatch": ["**/*.perf.ts"],
+        "timeout": 120000
+      }
+    ],
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.57.0",
+    "workers": 1,
+    "webServer": {
+      "command": "npm start -- --host 127.0.0.1 --port 4200 -c production",
+      "url": "http://127.0.0.1:4200",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "drag-between-lists.perf.ts",
+      "file": "drag-between-lists.perf.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Drag Between Lists Performance",
+          "file": "drag-between-lists.perf.ts",
+          "line": 10,
+          "column": 6,
+          "specs": [
+            {
+              "title": "drag from list1 to list2 with autoscroll - 1000 items",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 22486,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-06T10:47:04.873Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "drag-between-lists-autoscroll-1000",
+                          "contentType": "application/json",
+                          "body": "ewogICJzY2VuYXJpbyI6ICJkcmFnLWJldHdlZW4tbGlzdHMtYXV0b3Njcm9sbC0xMDAwIiwKICAiY3B1VGhyb3R0bGUiOiA0LAogICJpdGVyYXRpb25zIjogNSwKICAiYXV0b3Njcm9sbEhvbGRNcyI6IDMwMDAsCiAgInRvdGFsQmxvY2tpbmdUaW1lIjogewogICAgIm1lYW4iOiAwLAogICAgIm1lZGlhbiI6IDAsCiAgICAicDk1IjogMCwKICAgICJzdGRkZXYiOiAwLAogICAgIm1pbiI6IDAsCiAgICAibWF4IjogMCwKICAgICJzYW1wbGVzIjogNQogIH0sCiAgImxvbmdUYXNrQ291bnQiOiB7CiAgICAibWVhbiI6IDAsCiAgICAibWVkaWFuIjogMCwKICAgICJwOTUiOiAwLAogICAgInN0ZGRldiI6IDAsCiAgICAibWluIjogMCwKICAgICJtYXgiOiAwLAogICAgInNhbXBsZXMiOiA1CiAgfSwKICAibGF5b3V0Q291bnQiOiB7CiAgICAibWVhbiI6IDcyLAogICAgIm1lZGlhbiI6IDcxLAogICAgInA5NSI6IDc0LAogICAgInN0ZGRldiI6IDEuMjY0OTExMDY0MDY3MzUxOCwKICAgICJtaW4iOiA3MSwKICAgICJtYXgiOiA3NCwKICAgICJzYW1wbGVzIjogNQogIH0sCiAgInJlY2FsY1N0eWxlQ291bnQiOiB7CiAgICAibWVhbiI6IDEwNy42LAogICAgIm1lZGlhbiI6IDEwNywKICAgICJwOTUiOiAxMTAsCiAgICAic3RkZGV2IjogMS4zNTY0NjU5OTY2MjUwNTM2LAogICAgIm1pbiI6IDEwNiwKICAgICJtYXgiOiAxMTAsCiAgICAic2FtcGxlcyI6IDUKICB9LAogICJhdmdGcmFtZVRpbWUiOiB7CiAgICAibWVhbiI6IDguMTkyLAogICAgIm1lZGlhbiI6IDguMzIsCiAgICAicDk1IjogOC4zMywKICAgICJzdGRkZXYiOiAwLjE3MTc0Mzk5NTUyODIyOCwKICAgICJtaW4iOiA3LjksCiAgICAibWF4IjogOC4zMywKICAgICJzYW1wbGVzIjogNQogIH0sCiAgIm1heEZyYW1lR2FwIjogewogICAgIm1lYW4iOiAxMS45LAogICAgIm1lZGlhbiI6IDExLjksCiAgICAicDk1IjogMTMuMSwKICAgICJzdGRkZXYiOiAwLjcwNDI3MjY3NDQ2NjM2MDIsCiAgICAibWluIjogMTEuMSwKICAgICJtYXgiOiAxMy4xLAogICAgInNhbXBsZXMiOiA1CiAgfSwKICAianNIZWFwRGVsdGEiOiB7CiAgICAibWVhbiI6IC02MzcuODA1OTk5OTk5OTk5OSwKICAgICJtZWRpYW4iOiAtMTQ3Mi41NCwKICAgICJwOTUiOiAyMjMxLjA1LAogICAgInN0ZGRldiI6IDE2OTcuNzU1MjEzMjkzMTI5NiwKICAgICJtaW4iOiAtMjYwNy40MywKICAgICJtYXgiOiAyMjMxLjA1LAogICAgInNhbXBsZXMiOiA1CiAgfQp9"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "627006642c7ff841ce75-d042198824336d6b100d",
+              "file": "drag-between-lists.perf.ts",
+              "line": 11,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "drag-within-list.perf.ts",
+      "file": "drag-within-list.perf.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Drag Within List Performance",
+          "file": "drag-within-list.perf.ts",
+          "line": 9,
+          "column": 6,
+          "specs": [
+            {
+              "title": "drag item 0 to item 10 - 1000 items",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5018,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-06T10:47:27.602Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "drag-within-list-1000",
+                          "contentType": "application/json",
+                          "body": "ewogICJzY2VuYXJpbyI6ICJkcmFnLXdpdGhpbi1saXN0LTEwMDAiLAogICJjcHVUaHJvdHRsZSI6IDQsCiAgIml0ZXJhdGlvbnMiOiA1LAogICJ0b3RhbEJsb2NraW5nVGltZSI6IHsKICAgICJtZWFuIjogMCwKICAgICJtZWRpYW4iOiAwLAogICAgInA5NSI6IDAsCiAgICAic3RkZGV2IjogMCwKICAgICJtaW4iOiAwLAogICAgIm1heCI6IDAsCiAgICAic2FtcGxlcyI6IDUKICB9LAogICJsb25nVGFza0NvdW50IjogewogICAgIm1lYW4iOiAwLAogICAgIm1lZGlhbiI6IDAsCiAgICAicDk1IjogMCwKICAgICJzdGRkZXYiOiAwLAogICAgIm1pbiI6IDAsCiAgICAibWF4IjogMCwKICAgICJzYW1wbGVzIjogNQogIH0sCiAgImxheW91dENvdW50IjogewogICAgIm1lYW4iOiA1LAogICAgIm1lZGlhbiI6IDUsCiAgICAicDk1IjogNSwKICAgICJzdGRkZXYiOiAwLAogICAgIm1pbiI6IDUsCiAgICAibWF4IjogNSwKICAgICJzYW1wbGVzIjogNQogIH0sCiAgInJlY2FsY1N0eWxlQ291bnQiOiB7CiAgICAibWVhbiI6IDQ3LjYsCiAgICAibWVkaWFuIjogNDgsCiAgICAicDk1IjogNDksCiAgICAic3RkZGV2IjogMS4wMTk4MDM5MDI3MTg1NTY4LAogICAgIm1pbiI6IDQ2LAogICAgIm1heCI6IDQ5LAogICAgInNhbXBsZXMiOiA1CiAgfSwKICAiYXZnRnJhbWVUaW1lIjogewogICAgIm1lYW4iOiA3Ljk2ODAwMDAwMDAwMDAwMSwKICAgICJtZWRpYW4iOiA4LjAxLAogICAgInA5NSI6IDguMDcsCiAgICAic3RkZGV2IjogMC4wOTg0NjgyNjkwMDA3Mjk2MSwKICAgICJtaW4iOiA3LjgxLAogICAgIm1heCI6IDguMDcsCiAgICAic2FtcGxlcyI6IDUKICB9LAogICJtYXhGcmFtZUdhcCI6IHsKICAgICJtZWFuIjogMTEuMDQwMDAwMDAwMDAwMDAxLAogICAgIm1lZGlhbiI6IDExLAogICAgInA5NSI6IDEyLjIsCiAgICAic3RkZGV2IjogMC42ODg3NjcwMTQzMDg5MDIyLAogICAgIm1pbiI6IDEwLjMsCiAgICAibWF4IjogMTIuMiwKICAgICJzYW1wbGVzIjogNQogIH0sCiAgImpzSGVhcERlbHRhIjogewogICAgIm1lYW4iOiA0MTMuNzMyMDAwMDAwMDAwMSwKICAgICJtZWRpYW4iOiA0MTMuNjEsCiAgICAicDk1IjogNDE2LjY3LAogICAgInN0ZGRldiI6IDEuODA0ODMxMjk0MDU0OTMxNiwKICAgICJtaW4iOiA0MTAuOTgsCiAgICAibWF4IjogNDE2LjY3LAogICAgInNhbXBsZXMiOiA1CiAgfQp9"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a43c3a9bf74f7ffdb398-14fac9bab569ea34b83a",
+              "file": "drag-within-list.perf.ts",
+              "line": 10,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "dynamic-height.perf.ts",
+      "file": "dynamic-height.perf.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Dynamic Height Scroll Performance",
+          "file": "dynamic-height.perf.ts",
+          "line": 8,
+          "column": 6,
+          "specs": [
+            {
+              "title": "scroll through dynamic height list",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 14210,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-06T10:47:32.628Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "dynamic-height-scroll",
+                          "contentType": "application/json",
+                          "body": "ewogICJzY2VuYXJpbyI6ICJkeW5hbWljLWhlaWdodC1zY3JvbGwiLAogICJjcHVUaHJvdHRsZSI6IDQsCiAgIml0ZXJhdGlvbnMiOiA1LAogICJ0b3RhbEJsb2NraW5nVGltZSI6IHsKICAgICJtZWFuIjogMjgsCiAgICAibWVkaWFuIjogMjgsCiAgICAicDk1IjogMjgsCiAgICAic3RkZGV2IjogMCwKICAgICJtaW4iOiAyOCwKICAgICJtYXgiOiAyOCwKICAgICJzYW1wbGVzIjogNQogIH0sCiAgImxvbmdUYXNrQ291bnQiOiB7CiAgICAibWVhbiI6IDIsCiAgICAibWVkaWFuIjogMiwKICAgICJwOTUiOiAyLAogICAgInN0ZGRldiI6IDAsCiAgICAibWluIjogMiwKICAgICJtYXgiOiAyLAogICAgInNhbXBsZXMiOiA1CiAgfSwKICAibGF5b3V0Q291bnQiOiB7CiAgICAibWVhbiI6IDEyOC42LAogICAgIm1lZGlhbiI6IDEyOSwKICAgICJwOTUiOiAxMzAsCiAgICAic3RkZGV2IjogMS4zNTY0NjU5OTY2MjUwNTM2LAogICAgIm1pbiI6IDEyNiwKICAgICJtYXgiOiAxMzAsCiAgICAic2FtcGxlcyI6IDUKICB9LAogICJyZWNhbGNTdHlsZUNvdW50IjogewogICAgIm1lYW4iOiAyNzMuNiwKICAgICJtZWRpYW4iOiAyNzMsCiAgICAicDk1IjogMjc2LAogICAgInN0ZGRldiI6IDEuMzU2NDY1OTk2NjI1MDUzNiwKICAgICJtaW4iOiAyNzIsCiAgICAibWF4IjogMjc2LAogICAgInNhbXBsZXMiOiA1CiAgfSwKICAiYXZnRnJhbWVUaW1lIjogewogICAgIm1lYW4iOiA3Ljg2MTk5OTk5OTk5OTk5OSwKICAgICJtZWRpYW4iOiA3Ljg4LAogICAgInA5NSI6IDcuOSwKICAgICJzdGRkZXYiOiAwLjAzNDg3MTE5MTU0ODMyNTUzNCwKICAgICJtaW4iOiA3LjgsCiAgICAibWF4IjogNy45LAogICAgInNhbXBsZXMiOiA1CiAgfSwKICAibWF4RnJhbWVHYXAiOiB7CiAgICAibWVhbiI6IDExLjQ4LAogICAgIm1lZGlhbiI6IDExLAogICAgInA5NSI6IDEzLjIsCiAgICAic3RkZGV2IjogMC45NTE2MzAxODAyNjk2MjUzLAogICAgIm1pbiI6IDEwLjYsCiAgICAibWF4IjogMTMuMiwKICAgICJzYW1wbGVzIjogNQogIH0sCiAgImpzSGVhcERlbHRhIjogewogICAgIm1lYW4iOiAtMjU5LjM4NCwKICAgICJtZWRpYW4iOiAyODIuMDMsCiAgICAicDk1IjogNDc1Ljg1LAogICAgInN0ZGRldiI6IDgzNi42NTkzNjQwNTY4NDI1LAogICAgIm1pbiI6IC0xNTQ2LjI0LAogICAgIm1heCI6IDQ3NS44NSwKICAgICJzYW1wbGVzIjogNQogIH0KfQ=="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "53b37ba56613b41fa25c-fd0a2c300ba8b1f9765d",
+              "file": "dynamic-height.perf.ts",
+              "line": 9,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "scroll.perf.ts",
+      "file": "scroll.perf.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Scroll Performance",
+          "file": "scroll.perf.ts",
+          "line": 10,
+          "column": 6,
+          "specs": [
+            {
+              "title": "large list scroll - 2000 items",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 14274,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-06T10:47:46.846Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "scroll-2000-items",
+                          "contentType": "application/json",
+                          "body": "ewogICJzY2VuYXJpbyI6ICJzY3JvbGwtMjAwMC1pdGVtcyIsCiAgImNwdVRocm90dGxlIjogNCwKICAiaXRlcmF0aW9ucyI6IDUsCiAgInRvdGFsQmxvY2tpbmdUaW1lIjogewogICAgIm1lYW4iOiAzNywKICAgICJtZWRpYW4iOiAzNywKICAgICJwOTUiOiAzNywKICAgICJzdGRkZXYiOiAwLAogICAgIm1pbiI6IDM3LAogICAgIm1heCI6IDM3LAogICAgInNhbXBsZXMiOiA1CiAgfSwKICAibG9uZ1Rhc2tDb3VudCI6IHsKICAgICJtZWFuIjogMiwKICAgICJtZWRpYW4iOiAyLAogICAgInA5NSI6IDIsCiAgICAic3RkZGV2IjogMCwKICAgICJtaW4iOiAyLAogICAgIm1heCI6IDIsCiAgICAic2FtcGxlcyI6IDUKICB9LAogICJsYXlvdXRDb3VudCI6IHsKICAgICJtZWFuIjogMTIxLjIsCiAgICAibWVkaWFuIjogMTIxLAogICAgInA5NSI6IDEyMiwKICAgICJzdGRkZXYiOiAwLjc0ODMzMTQ3NzM1NDc4ODIsCiAgICAibWluIjogMTIwLAogICAgIm1heCI6IDEyMiwKICAgICJzYW1wbGVzIjogNQogIH0sCiAgInJlY2FsY1N0eWxlQ291bnQiOiB7CiAgICAibWVhbiI6IDEyMS4yLAogICAgIm1lZGlhbiI6IDEyMSwKICAgICJwOTUiOiAxMjIsCiAgICAic3RkZGV2IjogMC43NDgzMzE0NzczNTQ3ODgyLAogICAgIm1pbiI6IDEyMCwKICAgICJtYXgiOiAxMjIsCiAgICAic2FtcGxlcyI6IDUKICB9LAogICJhdmdGcmFtZVRpbWUiOiB7CiAgICAibWVhbiI6IDcuOTA0MDAwMDAwMDAwMDAxLAogICAgIm1lZGlhbiI6IDcuODksCiAgICAicDk1IjogNy45OSwKICAgICJzdGRkZXYiOiAwLjA1MjAwMDAwMDAwMDAwMDA4LAogICAgIm1pbiI6IDcuODMsCiAgICAibWF4IjogNy45OSwKICAgICJzYW1wbGVzIjogNQogIH0sCiAgIm1heEZyYW1lR2FwIjogewogICAgIm1lYW4iOiAxMy4wMiwKICAgICJtZWRpYW4iOiAxMywKICAgICJwOTUiOiAxMy41LAogICAgInN0ZGRldiI6IDAuNDc5MTY1OTQyMDI4NDM3NzYsCiAgICAibWluIjogMTIuMiwKICAgICJtYXgiOiAxMy41LAogICAgInNhbXBsZXMiOiA1CiAgfSwKICAianNIZWFwRGVsdGEiOiB7CiAgICAibWVhbiI6IC05NzcuNTMxOTk5OTk5OTk5OCwKICAgICJtZWRpYW4iOiAtNzY1LjE0LAogICAgInA5NSI6IDQzNTEuMTksCiAgICAic3RkZGV2IjogMzg0NC45OTg5MTE3MjYyNDQsCiAgICAibWluIjogLTU3NTUuODgsCiAgICAibWF4IjogNDM1MS4xOSwKICAgICJzYW1wbGVzIjogNQogIH0KfQ=="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e4444aa54d21dcc13bb1-7b5cf2c5d052bafba4c6",
+              "file": "scroll.perf.ts",
+              "line": 11,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-03-06T10:47:00.475Z",
+    "duration": 60692.924,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
