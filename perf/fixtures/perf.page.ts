@@ -9,6 +9,7 @@ export class PerfPage {
 
   async goto(route = '/'): Promise<void> {
     await this.page.goto(route);
+    await this.page.waitForLoadState('networkidle');
     await this.page.locator('[data-draggable-id]').first().waitFor({ state: 'visible' });
   }
 

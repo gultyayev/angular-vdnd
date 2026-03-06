@@ -1,47 +1,7 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-
-interface AggregatedMetrics {
-  mean: number;
-  median: number;
-  p95: number;
-  stddev: number;
-  min: number;
-  max: number;
-  samples: number;
-}
-
-interface ScenarioReport {
-  scenario: string;
-  [metric: string]: AggregatedMetrics | string | number;
-}
-
-interface Attachment {
-  name: string;
-  body?: string;
-  contentType: string;
-}
-
-interface TestResult {
-  attachments?: Attachment[];
-}
-
-interface TestCase {
-  results?: TestResult[];
-}
-
-interface Spec {
-  tests?: TestCase[];
-}
-
-interface Suite {
-  suites?: Suite[];
-  specs?: Spec[];
-}
-
-interface ResultsFile {
-  suites: Suite[];
-}
+import type { AggregatedMetrics } from './fixtures/statistics.ts';
+import { extractScenarios } from './fixtures/extract-scenarios.ts';
 
 const COMPARISON_METRICS = [
   'totalBlockingTime',
@@ -50,41 +10,10 @@ const COMPARISON_METRICS = [
   'recalcStyleCount',
   'avgFrameTime',
   'maxFrameGap',
+  'droppedFrames',
+  'p99FrameTime',
   'jsHeapDelta',
 ];
-
-function extractScenarios(filePath: string): Map<string, ScenarioReport> {
-  const data: ResultsFile = JSON.parse(readFileSync(filePath, 'utf-8'));
-  const scenarios = new Map<string, ScenarioReport>();
-
-  function traverseSuite(suite: Suite): void {
-    for (const child of suite.suites ?? []) {
-      traverseSuite(child);
-    }
-    for (const spec of suite.specs ?? []) {
-      for (const test of spec.tests ?? []) {
-        for (const result of test.results ?? []) {
-          for (const attachment of result.attachments ?? []) {
-            if (attachment.contentType === 'application/json' && attachment.body) {
-              const report = JSON.parse(
-                Buffer.from(attachment.body, 'base64').toString('utf-8'),
-              ) as ScenarioReport;
-              if (report.scenario) {
-                scenarios.set(report.scenario, report);
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  for (const suite of data.suites ?? []) {
-    traverseSuite(suite);
-  }
-
-  return scenarios;
-}
 
 function percentChange(baseline: number, current: number): number {
   if (baseline === 0) return current === 0 ? 0 : 100;
@@ -118,8 +47,10 @@ function main(): void {
     process.exit(1);
   }
 
-  const baseline = extractScenarios(baselinePath);
-  const latest = extractScenarios(latestPath);
+  const baselineArr = extractScenarios(baselinePath);
+  const latestArr = extractScenarios(latestPath);
+  const baseline = new Map(baselineArr.map((s) => [s.scenario, s]));
+  const latest = new Map(latestArr.map((s) => [s.scenario, s]));
 
   if (baseline.size === 0) {
     console.log('Baseline contains no scenario data. Re-run `npm run perf:baseline`.');

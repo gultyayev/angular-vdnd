@@ -1,49 +1,7 @@
-import { readFileSync, appendFileSync, existsSync } from 'node:fs';
+import { appendFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-
-interface AggregatedMetrics {
-  mean: number;
-  median: number;
-  p95: number;
-  stddev: number;
-  min: number;
-  max: number;
-  samples: number;
-}
-
-interface ScenarioReport {
-  scenario: string;
-  cpuThrottle?: number;
-  iterations?: number;
-  [metric: string]: AggregatedMetrics | string | number | undefined;
-}
-
-interface Attachment {
-  name: string;
-  body?: string;
-  contentType: string;
-}
-
-interface TestResult {
-  attachments?: Attachment[];
-}
-
-interface TestCase {
-  results?: TestResult[];
-}
-
-interface Spec {
-  tests?: TestCase[];
-}
-
-interface Suite {
-  suites?: Suite[];
-  specs?: Spec[];
-}
-
-interface ResultsFile {
-  suites: Suite[];
-}
+import type { AggregatedMetrics } from './fixtures/statistics.ts';
+import { extractScenarios } from './fixtures/extract-scenarios.ts';
 
 const METRIC_LABELS: Record<string, { label: string; unit: string }> = {
   totalBlockingTime: { label: 'Total Blocking Time', unit: 'ms' },
@@ -52,59 +10,28 @@ const METRIC_LABELS: Record<string, { label: string; unit: string }> = {
   recalcStyleCount: { label: 'Style Recalcs', unit: '' },
   avgFrameTime: { label: 'Avg Frame Time', unit: 'ms' },
   maxFrameGap: { label: 'Max Frame Gap', unit: 'ms' },
+  droppedFrames: { label: 'Dropped Frames (>16.7ms)', unit: '' },
+  p99FrameTime: { label: 'p99 Frame Time', unit: 'ms' },
   jsHeapDelta: { label: 'Heap Delta', unit: 'KB' },
 };
-
-function extractScenarios(filePath: string): ScenarioReport[] {
-  const data: ResultsFile = JSON.parse(readFileSync(filePath, 'utf-8'));
-  const scenarios: ScenarioReport[] = [];
-
-  function traverseSuite(suite: Suite): void {
-    for (const child of suite.suites ?? []) {
-      traverseSuite(child);
-    }
-    for (const spec of suite.specs ?? []) {
-      for (const test of spec.tests ?? []) {
-        for (const result of test.results ?? []) {
-          for (const attachment of result.attachments ?? []) {
-            if (attachment.contentType === 'application/json' && attachment.body) {
-              const report = JSON.parse(
-                Buffer.from(attachment.body, 'base64').toString('utf-8'),
-              ) as ScenarioReport;
-              if (report.scenario) {
-                scenarios.push(report);
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  for (const suite of data.suites ?? []) {
-    traverseSuite(suite);
-  }
-
-  return scenarios;
-}
 
 function formatValue(value: number, unit: string): string {
   const rounded = Math.round(value * 10) / 10;
   return unit ? `${rounded} ${unit}` : `${rounded}`;
 }
 
-function generateReport(scenarios: ScenarioReport[]): string {
+function generateReport(scenarios: { scenario: string; [k: string]: unknown }[]): string {
   const lines: string[] = [];
 
   lines.push('## Performance Benchmark Results');
   lines.push('');
-  lines.push(`> CPU throttling: **4x** · Iterations: **5** (1 warmup discarded)`);
+  lines.push(`> CPU throttling: **4x** · Samples: **5** (1 warmup iteration excluded)`);
   lines.push('');
 
   for (const scenario of scenarios) {
     lines.push(`### ${scenario.scenario}`);
     lines.push('');
-    lines.push('| Metric | p95 | Mean | Stddev |');
+    lines.push('| Metric | Max | Mean | Stddev |');
     lines.push('|--------|-----|------|--------|');
 
     for (const [key, meta] of Object.entries(METRIC_LABELS)) {
@@ -112,7 +39,7 @@ function generateReport(scenarios: ScenarioReport[]): string {
       if (!m) continue;
 
       lines.push(
-        `| ${meta.label} | **${formatValue(m.p95, meta.unit)}** | ${formatValue(m.mean, meta.unit)} | ±${formatValue(m.stddev, meta.unit)} |`,
+        `| ${meta.label} | **${formatValue(m.max, meta.unit)}** | ${formatValue(m.mean, meta.unit)} | ±${formatValue(m.stddev, meta.unit)} |`,
       );
     }
 

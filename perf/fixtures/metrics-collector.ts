@@ -24,6 +24,8 @@ export interface ScenarioMetrics {
   frameCount: number;
   avgFrameTime: number;
   maxFrameGap: number;
+  droppedFrames: number;
+  p99FrameTime: number;
 }
 
 export class MetricsCollector {
@@ -45,6 +47,14 @@ export class MetricsCollector {
 
   async clearCpuThrottling(): Promise<void> {
     await this.#cdp!.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  }
+
+  /** Force garbage collection via CDP (requires --js-flags=--expose-gc). */
+  async forceGC(): Promise<void> {
+    await this.#cdp!.send('Runtime.evaluate', {
+      expression: 'typeof gc === "function" && gc()',
+      awaitPromise: false,
+    });
   }
 
   async getSnapshot(): Promise<PerfSnapshot> {
@@ -109,6 +119,7 @@ export class MetricsCollector {
    * then collects all metrics.
    */
   async measureScenario(scenario: () => Promise<void>): Promise<ScenarioMetrics> {
+    await this.forceGC();
     const before = await this.getSnapshot();
     await this.injectObservers();
     const startTime = Date.now();
@@ -127,6 +138,11 @@ export class MetricsCollector {
     const frameCount = frameTimes.length;
     const avgFrameTime = frameCount > 0 ? frameTimes.reduce((a, b) => a + b, 0) / frameCount : 0;
     const maxFrameGap = frameCount > 0 ? Math.max(...frameTimes) : 0;
+    const droppedFrames = frameTimes.filter((t) => t > 16.7).length;
+    const sortedFrames = [...frameTimes].sort((a, b) => a - b);
+    const p99Index = sortedFrames.length > 0 ? Math.ceil(sortedFrames.length * 0.99) - 1 : 0;
+    const p99FrameTime =
+      sortedFrames.length > 0 ? sortedFrames[Math.min(p99Index, sortedFrames.length - 1)] : 0;
 
     return {
       durationMs,
@@ -140,6 +156,8 @@ export class MetricsCollector {
       frameCount,
       avgFrameTime,
       maxFrameGap,
+      droppedFrames,
+      p99FrameTime,
     };
   }
 

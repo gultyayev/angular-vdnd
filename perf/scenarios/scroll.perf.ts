@@ -1,7 +1,7 @@
 import { test } from '@playwright/test';
 import { MetricsCollector, ScenarioMetrics } from '../fixtures/metrics-collector';
 import { PerfPage } from '../fixtures/perf.page';
-import { aggregate, round } from '../fixtures/statistics';
+import { aggregate } from '../fixtures/statistics';
 
 const ITERATIONS = 5;
 const WARMUP_ITERATIONS = 1;
@@ -46,13 +46,15 @@ test.describe('Scroll Performance', () => {
       scenario: 'scroll-2000-items',
       cpuThrottle: CPU_THROTTLE,
       iterations: ITERATIONS,
-      totalBlockingTime: aggregate(results.map((r) => round(r.totalBlockingTime))),
+      totalBlockingTime: aggregate(results.map((r) => r.totalBlockingTime)),
       longTaskCount: aggregate(results.map((r) => r.longTaskCount)),
       layoutCount: aggregate(results.map((r) => r.layoutCount)),
       recalcStyleCount: aggregate(results.map((r) => r.recalcStyleCount)),
-      avgFrameTime: aggregate(results.map((r) => round(r.avgFrameTime))),
-      maxFrameGap: aggregate(results.map((r) => round(r.maxFrameGap))),
-      jsHeapDelta: aggregate(results.map((r) => round(r.jsHeapDelta / 1024))), // KB
+      avgFrameTime: aggregate(results.map((r) => r.avgFrameTime)),
+      maxFrameGap: aggregate(results.map((r) => r.maxFrameGap)),
+      droppedFrames: aggregate(results.map((r) => r.droppedFrames)),
+      p99FrameTime: aggregate(results.map((r) => r.p99FrameTime)),
+      jsHeapDelta: aggregate(results.map((r) => r.jsHeapDelta / 1024)),
     };
 
     testInfo.attach('scroll-2000-items', {
