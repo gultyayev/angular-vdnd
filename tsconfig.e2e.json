@@ -5,5 +5,5 @@
     "outDir": "./out-tsc/e2e",
     "types": ["node"]
   },
-  "include": ["e2e/**/*.ts"]
+  "include": ["e2e/**/*.ts", "perf/**/*.ts"]
 }
