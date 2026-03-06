@@ -101,8 +101,12 @@ function main(): void {
   const threshold = parseFloat(parseArg(args, '--threshold') ?? '25');
   const outputPath = parseArg(args, '--output');
 
-  const baselinePath = resolve(import.meta.dirname, 'baselines/baseline.json');
-  const latestPath = resolve(import.meta.dirname, 'results/latest.json');
+  const baselinePath = resolve(
+    parseArg(args, '--baseline') ?? resolve(import.meta.dirname, 'baselines/baseline.json'),
+  );
+  const latestPath = resolve(
+    parseArg(args, '--current') ?? resolve(import.meta.dirname, 'results/latest.json'),
+  );
 
   if (!existsSync(baselinePath)) {
     console.log('No baseline found. Run `npm run perf:baseline` to create one.');
