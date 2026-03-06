@@ -43,5 +43,5 @@ jobs:
           path: perf/results/
 
       - name: Compare against baseline
-        run: npm run perf:compare -- --threshold 25
+        run: npm run perf:compare -- --threshold 25 --output "$GITHUB_STEP_SUMMARY"
         continue-on-error: true

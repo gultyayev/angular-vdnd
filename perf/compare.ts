@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 interface AggregatedMetrics {
@@ -91,14 +91,15 @@ function percentChange(baseline: number, current: number): number {
   return ((current - baseline) / Math.abs(baseline)) * 100;
 }
 
+function parseArg(args: string[], flag: string): string | undefined {
+  const idx = args.indexOf(flag);
+  return idx !== -1 ? args[idx + 1] : undefined;
+}
+
 function main(): void {
   const args = process.argv.slice(2);
-  let threshold = 25;
-
-  const thresholdIdx = args.indexOf('--threshold');
-  if (thresholdIdx !== -1 && args[thresholdIdx + 1]) {
-    threshold = parseFloat(args[thresholdIdx + 1]);
-  }
+  const threshold = parseFloat(parseArg(args, '--threshold') ?? '25');
+  const outputPath = parseArg(args, '--output');
 
   const baselinePath = resolve(import.meta.dirname, 'baselines/baseline.json');
   const latestPath = resolve(import.meta.dirname, 'results/latest.json');
@@ -121,16 +122,22 @@ function main(): void {
     process.exit(0);
   }
 
-  console.log(`\n## Performance Comparison (threshold: ${threshold}%)\n`);
-  console.log('| Scenario | Metric | Baseline p95 | Current p95 | Change |');
-  console.log('|----------|--------|-------------|------------|--------|');
+  const lines: string[] = [];
+  const emit = (line: string) => {
+    console.log(line);
+    lines.push(line);
+  };
+
+  emit(`\n## Performance Comparison (threshold: ${threshold}%)\n`);
+  emit('| Scenario | Metric | Baseline p95 | Current p95 | Change |');
+  emit('|----------|--------|-------------|------------|--------|');
 
   let hasRegression = false;
 
   for (const [name, baselineReport] of baseline) {
     const currentReport = latest.get(name);
     if (!currentReport) {
-      console.log(`| ${name} | - | - | - | MISSING |`);
+      emit(`| ${name} | - | - | - | MISSING |`);
       continue;
     }
 
@@ -148,19 +155,26 @@ function main(): void {
         hasRegression = true;
       }
 
-      console.log(
+      emit(
         `| ${name} | ${metric} | ${bMetric.p95.toFixed(1)} | ${cMetric.p95.toFixed(1)} | ${changeStr}${flag} |`,
       );
     }
   }
 
-  console.log('');
+  emit('');
 
   if (hasRegression) {
-    console.error(`Performance regression detected (>${threshold}% on p95 values).`);
-    process.exit(1);
+    emit(`**Performance regression detected** (>${threshold}% on p95 values).`);
   } else {
-    console.log('No significant regressions detected.');
+    emit('No significant regressions detected.');
+  }
+
+  if (outputPath) {
+    writeFileSync(outputPath, lines.join('\n') + '\n');
+  }
+
+  if (hasRegression) {
+    process.exit(1);
   }
 }
 
