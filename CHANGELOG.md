@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.1.0](https://github.com/gultyayev/angular-vdnd/compare/v3.0.1...v3.1.0) (2026-06-23)
+
+### Features
+
+- **lib:** allow Angular 22 in peer dependency range ([40db308](https://github.com/gultyayev/angular-vdnd/commit/40db3087867e44bd0698c7940bd278e44135549f))
+
 ## [3.0.1](https://github.com/gultyayev/angular-vdnd/compare/v3.0.0...v3.0.1) (2026-03-05)
 
 ### Performance
