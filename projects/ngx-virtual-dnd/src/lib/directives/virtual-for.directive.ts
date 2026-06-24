@@ -529,20 +529,21 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
     const trackByFn = this.vdndVirtualForTrackBy();
     const itemsToRender: RenderEntry<T>[] = [];
 
+    // Track placeholder insertion with a flag instead of re-scanning itemsToRender
+    // with `.some()` on every iteration (which made the build loop O(n²)).
+    let placeholderInserted = false;
+
     // Build render list for visible range
     for (let i = start; i <= end && i < items.length; i++) {
       // Insert placeholder before item at placeholderIndex
-      if (
-        showPlaceholder &&
-        placeholderIndex === i &&
-        !itemsToRender.some((r) => r.type === 'placeholder')
-      ) {
+      if (showPlaceholder && placeholderIndex === i && !placeholderInserted) {
         itemsToRender.push({
           type: 'placeholder',
           key: '__placeholder__',
           context: null,
           visualIndex: placeholderIndex,
         });
+        placeholderInserted = true;
       }
 
       const item = items[i];
@@ -561,11 +562,7 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
     }
 
     // Add placeholder at end if needed
-    if (
-      showPlaceholder &&
-      placeholderIndex >= items.length &&
-      !itemsToRender.some((r) => r.type === 'placeholder')
-    ) {
+    if (showPlaceholder && placeholderIndex >= items.length && !placeholderInserted) {
       itemsToRender.push({
         type: 'placeholder',
         key: '__placeholder__',
@@ -774,16 +771,11 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
     const container = this.#viewContainer.element.nativeElement.parentElement;
     if (!container) return;
 
-    // Find children excluding spacers and placeholder itself
-    const children = Array.from(container.children).filter((el) => {
-      const element = el as Element;
-      return (
-        !element.classList.contains('vdnd-drag-placeholder') &&
-        !element.classList.contains('vdnd-virtual-for-spacer') &&
-        !element.classList.contains('vdnd-content-spacer')
-      );
-    });
-    const insertBeforeEl = children[placeholderDomPosition] ?? null;
+    // The placeholder goes immediately before the item view at placeholderDomPosition
+    // (the reconcile pass counts item views only, so this index maps directly to a
+    // ViewContainerRef view). Reading the reference node from that view avoids
+    // re-querying and filtering container.children on every placeholder move.
+    const insertBeforeEl = this.#getViewReferenceNode(placeholderDomPosition);
 
     if (!this.#placeholderInDom) {
       // First insertion
@@ -804,6 +796,30 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
         }
       }
     }
+  }
+
+  /**
+   * Resolve the DOM node the placeholder should be inserted before, given the
+   * item-view index produced by the reconcile pass. Returns null when the index
+   * is past the last view (placeholder belongs at the end → append).
+   */
+  #getViewReferenceNode(viewIndex: number): Element | null {
+    if (viewIndex < 0 || viewIndex >= this.#viewContainer.length) {
+      return null;
+    }
+    const view = this.#viewContainer.get(viewIndex) as
+      | EmbeddedViewRef<VirtualForContext<T>>
+      | null
+      | undefined;
+    if (!view) {
+      return null;
+    }
+    for (const node of view.rootNodes) {
+      if (node instanceof HTMLElement) {
+        return node;
+      }
+    }
+    return null;
   }
 
   /**
