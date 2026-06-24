@@ -17,6 +17,7 @@ import { AutoScrollService } from '../services/auto-scroll.service';
 import { ElementCloneService } from '../services/element-clone.service';
 import { KeyboardDragService } from '../services/keyboard-drag.service';
 import { DragIndexCalculatorService } from '../services/drag-index-calculator.service';
+import { OverlayContainerService } from '../services/overlay-container.service';
 import {
   CursorPosition,
   DragEndEvent,
@@ -79,6 +80,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
   readonly #elementClone = inject(ElementCloneService);
   readonly #keyboardDrag = inject(KeyboardDragService);
   readonly #dragIndexCalculator = inject(DragIndexCalculatorService);
+  readonly #overlayContainer = inject(OverlayContainerService);
   readonly #ngZone = inject(NgZone);
   readonly #envInjector = inject(EnvironmentInjector);
   readonly #parentGroup = inject(VDND_GROUP_TOKEN, { optional: true });
@@ -181,6 +183,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
       positionCalculator: this.#positionCalculator,
       dragIndexCalculator: this.#dragIndexCalculator,
       elementClone: this.#elementClone,
+      overlayContainer: this.#overlayContainer,
       ngZone: this.#ngZone,
       envInjector: this.#envInjector,
       callbacks: {
@@ -317,8 +320,12 @@ export class DraggableDirective implements OnInit, OnDestroy {
       y: startPos.y - rect.top,
     };
 
-    // Clone element BEFORE updating drag state (which triggers display:none via host binding)
-    const clonedElement = this.#elementClone.cloneElement(element);
+    // Clone element BEFORE updating drag state (which triggers display:none via host binding).
+    // Template-first: skip the costly getComputedStyle deep-walk when a template-based
+    // preview is mounted, since that clone would never be rendered.
+    const clonedElement = this.#overlayContainer.hasTemplatePreview()
+      ? undefined
+      : this.#elementClone.cloneElement(element);
 
     const parentDroppableId = this.#getParentDroppableId();
 

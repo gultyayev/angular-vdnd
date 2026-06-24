@@ -1,4 +1,4 @@
-import { Injectable, OnDestroy } from '@angular/core';
+import { computed, Injectable, OnDestroy, signal } from '@angular/core';
 
 /**
  * Service that manages a shared overlay container appended to `document.body`.
@@ -15,6 +15,26 @@ import { Injectable, OnDestroy } from '@angular/core';
 })
 export class OverlayContainerService implements OnDestroy {
   #containerElement: HTMLElement | null = null;
+
+  /** Number of mounted drag previews currently rendering via a custom template. */
+  readonly #templatePreviewCount = signal(0);
+
+  /**
+   * Whether at least one mounted drag preview renders via a custom template.
+   *
+   * When true, DraggableDirective/KeyboardDragHandler skip the expensive
+   * drag-start element clone: the clone would never be shown because the
+   * template takes precedence (see DragPreviewComponent).
+   */
+  readonly hasTemplatePreview = computed(() => this.#templatePreviewCount() > 0);
+
+  /**
+   * Register (`active = true`) or unregister (`active = false`) a preview that
+   * renders via a custom template. Calls must be balanced per preview instance.
+   */
+  setTemplatePreviewActive(active: boolean): void {
+    this.#templatePreviewCount.update((count) => Math.max(0, count + (active ? 1 : -1)));
+  }
 
   /**
    * Returns the shared overlay container element, lazily creating it on first access.

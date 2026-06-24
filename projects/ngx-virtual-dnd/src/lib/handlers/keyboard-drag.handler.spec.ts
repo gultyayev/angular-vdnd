@@ -100,6 +100,7 @@ describe('KeyboardDragHandler', () => {
       positionCalculator: mockPositionCalculator,
       dragIndexCalculator: mockDragIndexCalculator,
       elementClone: mockElementClone,
+      overlayContainer: { hasTemplatePreview: jest.fn().mockReturnValue(false) },
       ngZone: mockNgZone,
       envInjector: mockEnvInjector,
       callbacks: mockCallbacks,
@@ -139,6 +140,34 @@ describe('KeyboardDragHandler', () => {
         5, // totalItemCount
         'list-1', // droppableId
       );
+    });
+
+    it('should skip cloning when a template-based preview is active', () => {
+      const cloneSpy = jest.fn().mockReturnValue(createElement());
+      const templateHandler = new KeyboardDragHandler({
+        dragState: mockDragState,
+        keyboardDrag: mockKeyboardDrag,
+        positionCalculator: mockPositionCalculator,
+        dragIndexCalculator: mockDragIndexCalculator,
+        elementClone: { cloneElement: cloneSpy },
+        overlayContainer: { hasTemplatePreview: jest.fn().mockReturnValue(true) },
+        ngZone: mockNgZone,
+        envInjector: mockEnvInjector,
+        callbacks: mockCallbacks,
+        getContext: () => mockContext,
+      } as unknown as KeyboardDragDeps);
+
+      templateHandler.activate();
+
+      expect(cloneSpy).not.toHaveBeenCalled();
+      expect(mockKeyboardDrag.startKeyboardDrag).toHaveBeenCalledWith(
+        expect.objectContaining({ clonedElement: undefined }),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+      );
+
+      templateHandler.destroy();
     });
 
     it('should add document keydown listener', () => {
