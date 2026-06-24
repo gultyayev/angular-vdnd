@@ -22,10 +22,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24' # Or your preferred version
           cache: 'npm'
@@ -44,12 +44,12 @@ jobs:
         # If it's a user/org site (repo named username.github.io), use --base-href "/"
 
       - name: Configure GitHub Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v6
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: dist/dnd/browser # Replace with your app's output path (check angular.json > projects > my-app-name > architect > build > options > outputPath)
 
       - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
