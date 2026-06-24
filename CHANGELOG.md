@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.1.1](https://github.com/gultyayev/angular-vdnd/compare/v3.1.0...v3.1.1) (2026-06-24)
+
+### Performance
+
+- **lib:** drag-and-drop hot-path optimizations ([#18](https://github.com/gultyayev/angular-vdnd/issues/18)) ([7f07562](https://github.com/gultyayev/angular-vdnd/commit/7f075621c78886ae1ced105f3835b2844c11cb5b))
+
 ## [3.1.0](https://github.com/gultyayev/angular-vdnd/compare/v3.0.1...v3.1.0) (2026-06-23)
 
 ### Features
