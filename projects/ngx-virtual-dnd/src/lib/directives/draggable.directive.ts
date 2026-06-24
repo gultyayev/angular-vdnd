@@ -330,6 +330,11 @@ export class DraggableDirective implements OnInit, OnDestroy {
       this.#pointerHandler.cleanup();
       return;
     }
+
+    // Snapshot droppable rects for this drag session so subsequent hit-testing is
+    // pure geometry (no elementFromPoint layout flush per pointermove).
+    this.#positionCalculator.beginDragSession(groupName);
+
     const droppableElement = this.#positionCalculator.findDroppableAtPoint(
       position.x,
       position.y,
@@ -476,6 +481,10 @@ export class DraggableDirective implements OnInit, OnDestroy {
       return;
     }
 
+    // Autoscroll just moved a scroll container; the scroll event has not fired yet,
+    // so force the cached droppable rects to be re-read on the next hit-test.
+    this.#positionCalculator.invalidateDroppableRects();
+
     // Recalculate placeholder based on current scroll position
     this.#updateDrag(cursorPosition);
   }
@@ -607,6 +616,9 @@ export class DraggableDirective implements OnInit, OnDestroy {
     // No ngZone.run() needed - signals work outside zone and effects react automatically
     // Stop auto-scroll monitoring
     this.#autoScroll.stopMonitoring();
+
+    // Tear down the geometric hit-testing snapshot + its viewport listeners
+    this.#positionCalculator.endDragSession();
 
     // Clear droppable metadata cache from this drag session
     this.#dragIndexCalculator.clearCache();
