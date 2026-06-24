@@ -147,12 +147,48 @@ hand-built `Record<string, Signal>`.
 
 ### Phase 0 — Internal, non-breaking (ship in 3.x first; de-risks everything)
 
-1. Cached-rect geometric hit-testing → kills the CRITICAL layout-thrash. _(perf)_
-2. `DragSchedulerService` with read→compute→write phase split; fold autoscroll /
+**Status: LANDED on branch `claude/phase-zero-execution` (2026-06-24), except item 3c
+which was reclassified — see "Phase 0 status" below.**
+
+1. ✅ Cached-rect geometric hit-testing → kills the CRITICAL layout-thrash. _(perf)_
+2. ✅ `DragSchedulerService` with read→compute→write phase split; fold autoscroll /
    scroll-only fast path into it. _(perf)_
-3. `placeholderIndex` → own signal; placeholder via `transform`; remove `.some()`-in-loop
-   scans and `container.children` re-queries. _(perf)_
-4. Template-first preview path + precomputed clone keys. _(perf)_
+3. Split as landed:
+   - ✅ 3a `placeholderIndex`/`placeholderId`/`activeDroppableId` → own signals.
+   - ✅ 3b Remove `.some()`-in-loop scans and `container.children` re-queries.
+   - ⏸️ 3c **Placeholder via `transform` (zero DOM mutation)** — DEFERRED (see below).
+4. ✅ Template-first preview path + precomputed clone keys. _(perf)_
+
+#### Phase 0 status & where to continue (zero-context handoff)
+
+Everything in Phase 0 is done and validated (494 unit, 472 E2E all-browser, lint, build)
+**except item 3c**, which was deferred for a concrete architectural reason, not omission:
+
+- **Why 3c is bigger than its one-liner implied.** The placeholder's visual gap is
+  created two different ways. In **viewport mode** (`<vdnd-virtual-viewport>` /
+  `<vdnd-sortable-list>` — the 90% path) item views render in **normal document flow**
+  inside `.vdnd-viewport-content` (a single wrapper `translateY`); the placeholder
+  `<div>` opens its gap **by occupying flow space** (`virtual-for.directive.ts`
+  `#positionPlaceholder`, `insertBefore`). Items there are deliberately _not_ individually
+  positioned. So a pure-`transform`, out-of-flow placeholder **removes the gap** — to keep
+  it you must instead shift the rendered items at/after the placeholder index themselves
+  (the CDK `transform`-sort model). That's bounded (~15–25 rendered views, not all items)
+  but it's a **rewrite of the viewport's flow-based layout**, and every
+  `placeholder-behavior` / `placeholder-integrity` assertion (DOM order/position) must be
+  re-validated. High risk relative to the rest of Phase 0.
+- **Why deferring is safe.** The cheap wins 3c was bundled with (3a/3b) already landed.
+  The current placeholder path **already avoids per-frame DOM churn** — `#positionPlaceholder`
+  mutates only when the index actually changes; the O(n²) scans and `container.children`
+  re-query the plan flagged are gone. The remaining win from "pure transform" is
+  compositor-only (no layout on placeholder _move_), not eliminating per-frame work that
+  still exists. It is a genuine "big bet," not a hot-path fix.
+- **Where 3c goes now.** Reclassified as a **standalone internal/non-breaking follow-up**
+  that can ship in any 3.x release independent of the 4.0 sequence (it does NOT depend on
+  the Phase 1 group registry). Treat it as its own PR. Starting point: convert viewport-mode
+  item layout from flow to a transform-shift of the rendered window; make the placeholder a
+  persistent element positioned by `transform: translateY`; re-validate all placeholder E2E
+  suites. Begin with failing E2E that asserts no DOM insert/remove of the placeholder across
+  a placeholder move (TDD).
 
 ### Phase 1 — Foundation for 4.0 (mostly internal)
 

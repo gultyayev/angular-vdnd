@@ -56,3 +56,6 @@ storybook-static
 /perf/results/*.json
 
 .codemie
+
+# Local-only Playwright config pointing at a provisioned browser binary
+e2e.local.config.ts

@@ -1,4 +1,22 @@
-import { Injectable, isDevMode } from '@angular/core';
+import { inject, Injectable, isDevMode, NgZone } from '@angular/core';
+
+/**
+ * Snapshot of the candidate droppables for an active drag session.
+ * Rects are cached so per-pointermove hit-testing is pure geometry, avoiding the
+ * forced layout flush that `document.elementFromPoint` (plus the pointer-events
+ * style write it required) imposed on the hottest drag loop.
+ */
+interface DragSessionSnapshot {
+  groupName: string;
+  /** Candidate droppables in document order (document order === default paint order). */
+  candidates: HTMLElement[];
+  /** Cached bounding rects, parallel to `candidates`. */
+  rects: DOMRect[];
+  /** When true, rects are re-read on the next hit-test (set on scroll/resize). */
+  dirty: boolean;
+  /** Bound scroll/resize listener used to mark rects dirty. */
+  onViewportChange: () => void;
+}
 
 /**
  * Service for calculating drop positions and finding elements at cursor positions.
@@ -8,6 +26,8 @@ import { Injectable, isDevMode } from '@angular/core';
   providedIn: 'root',
 })
 export class PositionCalculatorService {
+  readonly #ngZone = inject(NgZone);
+
   /** Data attribute used to identify droppable elements */
   readonly #DROPPABLE_ID_ATTR = 'data-droppable-id';
 
@@ -23,46 +43,165 @@ export class PositionCalculatorService {
   /** Reusable result object for getNearEdge (avoids per-frame allocation) */
   readonly #nearEdgeResult = { top: false, bottom: false, left: false, right: false };
 
+  /** Active drag session rect snapshot, or null when no drag is in progress. */
+  #session: DragSessionSnapshot | null = null;
+
+  /**
+   * Begin a drag session: snapshot the candidate droppables for `groupName` and
+   * their rects once, then watch for viewport changes (scroll/resize) that would
+   * invalidate those rects. While a session is active, `findDroppableAtPoint`
+   * runs as pure geometry against the cached rects instead of `elementFromPoint`.
+   *
+   * Safe to call repeatedly — a new call replaces any previous session.
+   */
+  beginDragSession(groupName: string): void {
+    this.endDragSession();
+
+    const candidates = this.#queryDroppables(groupName);
+    const onViewportChange = () => {
+      if (this.#session) {
+        this.#session.dirty = true;
+      }
+    };
+
+    this.#session = {
+      groupName,
+      candidates,
+      rects: candidates.map((el) => el.getBoundingClientRect()),
+      dirty: false,
+      onViewportChange,
+    };
+
+    // Capture-phase scroll catches scrolling on any ancestor scroller (scroll does
+    // not bubble); resize covers viewport changes. Both only mark rects dirty —
+    // the actual re-read is deferred to the next hit-test.
+    if (typeof window !== 'undefined') {
+      this.#ngZone.runOutsideAngular(() => {
+        window.addEventListener('scroll', onViewportChange, { capture: true, passive: true });
+        window.addEventListener('resize', onViewportChange, { passive: true });
+      });
+    }
+  }
+
+  /**
+   * End the current drag session and detach viewport listeners.
+   * Safe to call when no session is active.
+   */
+  endDragSession(): void {
+    const session = this.#session;
+    if (!session) {
+      return;
+    }
+    this.#session = null;
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('scroll', session.onViewportChange, { capture: true });
+      window.removeEventListener('resize', session.onViewportChange);
+    }
+  }
+
+  /**
+   * Mark the cached droppable rects as stale so they are re-read on the next
+   * hit-test. Called explicitly from the autoscroll recalculation path, where the
+   * scroll event has not yet fired but the container has already moved.
+   */
+  invalidateDroppableRects(): void {
+    if (this.#session) {
+      this.#session.dirty = true;
+    }
+  }
+
   /**
    * Find the droppable element at a given point.
    *
-   * This works by temporarily hiding the dragged element, then using
-   * document.elementFromPoint to find what's underneath the cursor.
+   * Uses pure geometric hit-testing against snapshotted droppable rects. When a
+   * drag session is active (see {@link beginDragSession}) the rects are cached and
+   * reused across frames; otherwise a one-shot DOM query is performed. The
+   * `draggedElement` parameter is retained for API compatibility but no longer
+   * needs to be hidden — geometry does not depend on cursor occlusion.
    *
    * @param x - Cursor X coordinate
    * @param y - Cursor Y coordinate
-   * @param draggedElement - The element being dragged (will be temporarily hidden)
+   * @param _draggedElement - The element being dragged (unused; kept for compatibility)
    * @param groupName - The drag-and-drop group name to filter by
    * @returns The droppable element, or null if none found
    */
   findDroppableAtPoint(
     x: number,
     y: number,
-    draggedElement: HTMLElement,
+    _draggedElement: HTMLElement,
     groupName: string,
   ): HTMLElement | null {
-    // Skip pointerEvents toggle when element is already hidden (display: none during active drag).
-    // offsetParent is null for hidden elements — toggling style would force a style recalculation.
-    const isHidden = draggedElement.offsetParent === null;
-
-    let originalPointerEvents: string | undefined;
-    if (!isHidden) {
-      originalPointerEvents = draggedElement.style.pointerEvents;
-      draggedElement.style.pointerEvents = 'none';
+    const session = this.#session;
+    if (session && session.groupName === groupName) {
+      if (session.dirty) {
+        for (let i = 0; i < session.candidates.length; i++) {
+          session.rects[i] = session.candidates[i].getBoundingClientRect();
+        }
+        session.dirty = false;
+      }
+      return this.#hitTest(x, y, session.candidates, session.rects);
     }
 
-    try {
-      const elementAtPoint = document.elementFromPoint(x, y);
-      if (!elementAtPoint) {
-        return null;
-      }
+    // No active session: one-shot geometric query (still avoids elementFromPoint).
+    const candidates = this.#queryDroppables(groupName);
+    const rects = candidates.map((el) => el.getBoundingClientRect());
+    return this.#hitTest(x, y, candidates, rects);
+  }
 
-      return this.getDroppableParent(elementAtPoint as HTMLElement, groupName);
-    } finally {
-      if (!isHidden) {
-        draggedElement.style.pointerEvents = originalPointerEvents!;
+  /**
+   * Look up a droppable element by its ID.
+   *
+   * When a drag session is active, searches the cached candidate list (O(n), avoids a DOM
+   * query). Falls back to `document.querySelector` when no session is active.
+   *
+   * Intended for the autoscroll scroll-only fast path, where the active droppable is already
+   * known and only the placeholder index needs recalculation.
+   */
+  getDroppableById(id: string): HTMLElement | null {
+    if (this.#session) {
+      for (const candidate of this.#session.candidates) {
+        if (candidate.getAttribute(this.#DROPPABLE_ID_ATTR) === id) {
+          return candidate;
+        }
+      }
+      return null;
+    }
+
+    if (typeof document === 'undefined') {
+      return null;
+    }
+    const escaped = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(id) : id;
+    return document.querySelector<HTMLElement>(`[${this.#DROPPABLE_ID_ATTR}="${escaped}"]`);
+  }
+
+  /**
+   * Query all droppable elements belonging to a group, in document order.
+   */
+  #queryDroppables(groupName: string): HTMLElement[] {
+    if (typeof document === 'undefined') {
+      return [];
+    }
+    const escaped = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(groupName) : groupName;
+    return Array.from(
+      document.querySelectorAll<HTMLElement>(`[${this.#DROPPABLE_GROUP_ATTR}="${escaped}"]`),
+    );
+  }
+
+  /**
+   * Geometric hit-test: return the last candidate (in document order) whose rect
+   * contains the point. "Last in document order" reproduces the painter's-order
+   * tie-break that `elementFromPoint` provided for free — a nested or later
+   * overlapping droppable is painted on top of an earlier/ancestor one.
+   */
+  #hitTest(x: number, y: number, candidates: HTMLElement[], rects: DOMRect[]): HTMLElement | null {
+    let match: HTMLElement | null = null;
+    for (let i = 0; i < candidates.length; i++) {
+      const r = rects[i];
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+        match = candidates[i];
       }
     }
+    return match;
   }
 
   /**

@@ -17,6 +17,8 @@ import { AutoScrollService } from '../services/auto-scroll.service';
 import { ElementCloneService } from '../services/element-clone.service';
 import { KeyboardDragService } from '../services/keyboard-drag.service';
 import { DragIndexCalculatorService } from '../services/drag-index-calculator.service';
+import { OverlayContainerService } from '../services/overlay-container.service';
+import { DragSchedulerService } from '../services/drag-scheduler.service';
 import {
   CursorPosition,
   DragEndEvent,
@@ -79,6 +81,8 @@ export class DraggableDirective implements OnInit, OnDestroy {
   readonly #elementClone = inject(ElementCloneService);
   readonly #keyboardDrag = inject(KeyboardDragService);
   readonly #dragIndexCalculator = inject(DragIndexCalculatorService);
+  readonly #overlayContainer = inject(OverlayContainerService);
+  readonly #scheduler = inject(DragSchedulerService);
   readonly #ngZone = inject(NgZone);
   readonly #envInjector = inject(EnvironmentInjector);
   readonly #parentGroup = inject(VDND_GROUP_TOKEN, { optional: true });
@@ -181,6 +185,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
       positionCalculator: this.#positionCalculator,
       dragIndexCalculator: this.#dragIndexCalculator,
       elementClone: this.#elementClone,
+      overlayContainer: this.#overlayContainer,
       ngZone: this.#ngZone,
       envInjector: this.#envInjector,
       callbacks: {
@@ -202,8 +207,10 @@ export class DraggableDirective implements OnInit, OnDestroy {
       callbacks: {
         onDragStart: (position) => this.#startDrag(position),
         onDragMove: (position) => {
+          // Record raw position synchronously (needed for autoscroll cursor override)
+          // then queue into the scheduler's RAF loop for coalesced frame-rate processing.
           this.#lastRawPosition = position;
-          this.#updateDrag(position);
+          this.#scheduler.queueCursorUpdate(position);
         },
         onDragEnd: (cancelled) => this.#endDrag(cancelled),
         onPendingChange: (pending) => this.#setPending(pending),
@@ -317,8 +324,12 @@ export class DraggableDirective implements OnInit, OnDestroy {
       y: startPos.y - rect.top,
     };
 
-    // Clone element BEFORE updating drag state (which triggers display:none via host binding)
-    const clonedElement = this.#elementClone.cloneElement(element);
+    // Clone element BEFORE updating drag state (which triggers display:none via host binding).
+    // Template-first: skip the costly getComputedStyle deep-walk when a template-based
+    // preview is mounted, since that clone would never be rendered.
+    const clonedElement = this.#overlayContainer.hasTemplatePreview()
+      ? undefined
+      : this.#elementClone.cloneElement(element);
 
     const parentDroppableId = this.#getParentDroppableId();
 
@@ -330,6 +341,11 @@ export class DraggableDirective implements OnInit, OnDestroy {
       this.#pointerHandler.cleanup();
       return;
     }
+
+    // Snapshot droppable rects for this drag session so subsequent hit-testing is
+    // pure geometry (no elementFromPoint layout flush per pointermove).
+    this.#positionCalculator.beginDragSession(groupName);
+
     const droppableElement = this.#positionCalculator.findDroppableAtPoint(
       position.x,
       position.y,
@@ -395,7 +411,15 @@ export class DraggableDirective implements OnInit, OnDestroy {
       lockAxis ? startPos : undefined,
     );
 
-    // Start auto-scroll monitoring with a callback to recalculate placeholder
+    // Start the scheduler RAF loop (drives pointer-move updates + autoscroll participant).
+    // onTick is called each frame: when cursor is dirty, run full #updateDrag.
+    this.#scheduler.start((cursor, cursorDirty) => {
+      if (cursorDirty && cursor && this.isDragging()) {
+        this.#updateDrag(cursor);
+      }
+    });
+
+    // Start auto-scroll monitoring — registers as a scheduler participant.
     this.#autoScroll.startMonitoring(() => this.#recalculatePlaceholder());
 
     // Emit drag start event
@@ -469,6 +493,15 @@ export class DraggableDirective implements OnInit, OnDestroy {
 
   /**
    * Recalculate placeholder position (called during auto-scroll).
+   *
+   * Scroll-only fast path: the cursor has not moved — only `scrollTop` changed.
+   * When the active droppable is already known, skip hit-testing entirely and
+   * recalculate only the placeholder index within that droppable. This avoids the
+   * `findDroppableAtPoint` geometry scan + the `invalidateDroppableRects` DOM round-trip
+   * on every autoscroll frame while still recomputing the correct insertion index.
+   *
+   * Falls back to the full `#updateDrag` pipeline when no droppable is active (e.g.
+   * cursor drifted outside all droppables before the scroll tick fired).
    */
   #recalculatePlaceholder(): void {
     const cursorPosition = this.#dragState.cursorPosition();
@@ -476,7 +509,28 @@ export class DraggableDirective implements OnInit, OnDestroy {
       return;
     }
 
-    // Recalculate placeholder based on current scroll position
+    const activeDroppableId = this.#dragState.activeDroppableId();
+    if (activeDroppableId) {
+      const droppableElement = this.#positionCalculator.getDroppableById(activeDroppableId);
+      if (droppableElement) {
+        const draggedItemHeight = this.#dragState.draggedItem()?.height ?? 50;
+        const indexResult = this.#dragIndexCalculator.calculatePlaceholderIndex({
+          droppableElement,
+          position: cursorPosition,
+          previousPosition: cursorPosition,
+          grabOffset: this.#dragState.grabOffset(),
+          draggedItemHeight,
+          sourceDroppableId: this.#dragState.sourceDroppableId(),
+          sourceIndex: this.#dragState.sourceIndex(),
+        });
+        this.#dragState.updateScrollOnlyPlaceholder(indexResult.placeholderId, indexResult.index);
+        return;
+      }
+    }
+
+    // Fallback: full recalculation when no active droppable is known.
+    // Mark rects dirty first since autoscroll moved the container before the scroll event fires.
+    this.#positionCalculator.invalidateDroppableRects();
     this.#updateDrag(cursorPosition);
   }
 
@@ -604,9 +658,12 @@ export class DraggableDirective implements OnInit, OnDestroy {
    * End the drag operation.
    */
   #endDrag(cancelled: boolean): void {
-    // No ngZone.run() needed - signals work outside zone and effects react automatically
-    // Stop auto-scroll monitoring
+    // Stop the scheduler RAF loop first, then remove the autoscroll participant.
+    this.#scheduler.stop();
     this.#autoScroll.stopMonitoring();
+
+    // Tear down the geometric hit-testing snapshot + its viewport listeners
+    this.#positionCalculator.endDragSession();
 
     // Clear droppable metadata cache from this drag session
     this.#dragIndexCalculator.clearCache();

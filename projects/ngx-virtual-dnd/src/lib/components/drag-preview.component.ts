@@ -101,6 +101,9 @@ export class DragPreviewComponent<T = unknown> implements OnDestroy {
   /** Reference to the clone container element (cannot use ES private with viewChild) */
   private readonly cloneContainer = viewChild<ElementRef<HTMLElement>>('cloneContainer');
 
+  /** Whether this preview's template registration is currently counted (kept balanced). */
+  #templateRegistered = false;
+
   /** The cloned element from drag state (used when no custom template is provided) */
   protected readonly clonedElement = computed(() => {
     if (this.previewTemplate()) {
@@ -116,6 +119,19 @@ export class DragPreviewComponent<T = unknown> implements OnDestroy {
       const container = this.#overlayContainer.getContainerElement();
       if (container) {
         container.appendChild(this.#elementRef.nativeElement);
+      }
+    });
+
+    // Publish whether this preview renders via a custom template so the drag
+    // directives can skip the drag-start element clone when it won't be shown.
+    effect(() => {
+      const hasTemplate = !!this.previewTemplate();
+      if (hasTemplate && !this.#templateRegistered) {
+        this.#overlayContainer.setTemplatePreviewActive(true);
+        this.#templateRegistered = true;
+      } else if (!hasTemplate && this.#templateRegistered) {
+        this.#overlayContainer.setTemplatePreviewActive(false);
+        this.#templateRegistered = false;
       }
     });
 
@@ -138,6 +154,10 @@ export class DragPreviewComponent<T = unknown> implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.#templateRegistered) {
+      this.#overlayContainer.setTemplatePreviewActive(false);
+      this.#templateRegistered = false;
+    }
     this.#elementRef.nativeElement.remove();
   }
 

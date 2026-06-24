@@ -1,7 +1,8 @@
-import { inject, Injectable, NgZone } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { CursorPosition } from '../models/drag-drop.models';
 import { DragStateService } from './drag-state.service';
 import { PositionCalculatorService } from './position-calculator.service';
+import { DragSchedulerService } from './drag-scheduler.service';
 
 /**
  * Configuration for auto-scroll behavior.
@@ -33,7 +34,7 @@ const DEFAULT_CONFIG: AutoScrollConfig = {
 export class AutoScrollService {
   readonly #dragState = inject(DragStateService);
   readonly #positionCalculator = inject(PositionCalculatorService);
-  readonly #ngZone = inject(NgZone);
+  readonly #scheduler = inject(DragSchedulerService);
 
   /** Currently registered scrollable containers */
   #scrollableContainers = new Map<
@@ -44,8 +45,8 @@ export class AutoScrollService {
     }
   >();
 
-  /** Active animation frame ID */
-  #animationFrameId: number | null = null;
+  /** Bound reference to #participantTick for stable add/remove with the scheduler. */
+  readonly #boundParticipantTick: () => void = () => this.#participantTick();
 
   /** Callback to invoke when scrolling occurs (for placeholder recalculation) */
   #onScrollCallback: (() => void) | null = null;
@@ -94,31 +95,22 @@ export class AutoScrollService {
 
   /**
    * Start monitoring for auto-scroll.
-   * Call this when a drag starts.
+   * Registers this service as a tick participant in DragSchedulerService.
+   * The scheduler drives the RAF loop; this service handles scroll logic each frame.
    * @param onScroll Optional callback to invoke when scrolling occurs (for placeholder recalculation)
    */
   startMonitoring(onScroll?: () => void): void {
-    if (this.#animationFrameId !== null) {
-      return;
-    }
-
     this.#onScrollCallback = onScroll ?? null;
-
-    this.#ngZone.runOutsideAngular(() => {
-      this.#tick();
-    });
+    this.#scheduler.addParticipant(this.#boundParticipantTick);
   }
 
   /**
    * Stop monitoring for auto-scroll.
+   * Removes this service from the scheduler's participant list.
    * Call this when a drag ends.
    */
   stopMonitoring(): void {
-    if (this.#animationFrameId !== null) {
-      cancelAnimationFrame(this.#animationFrameId);
-      this.#animationFrameId = null;
-    }
-
+    this.#scheduler.removeParticipant(this.#boundParticipantTick);
     this.#onScrollCallback = null;
     this.#cursorOverride = null;
     this.#lastTickCursorX = NaN;
@@ -140,31 +132,26 @@ export class AutoScrollService {
   }
 
   /**
-   * Animation tick - check cursor position and scroll if needed.
+   * Participant tick — called by DragSchedulerService each RAF frame.
+   *
+   * Runs the edge-scroll check and, if a scroll is performed, synchronously
+   * invokes #onScrollCallback (the placeholder recalculator) in the same frame.
+   * No RAF scheduling here — the scheduler owns the loop.
    */
-  #tick(): void {
+  #participantTick(): void {
     const cursor = this.#cursorOverride ?? this.#dragState.cursorPosition();
-    const isDragging = this.#dragState.isDragging();
 
-    // Stop monitoring if drag ended
-    if (!isDragging) {
-      this.stopMonitoring();
-      return;
-    }
-
-    // Skip this frame if no cursor position yet, but continue monitoring
+    // No cursor yet — nothing to scroll toward.
     if (!cursor) {
-      this.#animationFrameId = requestAnimationFrame(() => this.#tick());
       return;
     }
 
-    // Skip container iteration when cursor hasn't moved and no scrolling is active
+    // Skip the container iteration when cursor hasn't moved and scroll is idle.
     if (
       cursor.x === this.#lastTickCursorX &&
       cursor.y === this.#lastTickCursorY &&
       !this.isScrolling()
     ) {
-      this.#animationFrameId = requestAnimationFrame(() => this.#tick());
       return;
     }
     this.#lastTickCursorX = cursor.x;
@@ -172,21 +159,17 @@ export class AutoScrollService {
 
     let scrollPerformed = false;
 
-    // Check each container
     for (const [id, { element, config }] of this.#scrollableContainers) {
       const rect = element.getBoundingClientRect();
-
-      // Check if cursor is inside this container
       const isInside = this.#positionCalculator.isInsideContainer(cursor, rect);
 
       if (!isInside) {
         continue;
       }
 
-      // Check edges
       const nearEdge = this.#positionCalculator.getNearEdge(cursor, rect, config.threshold);
 
-      // Calculate scroll direction and speed (reuse object to avoid per-frame allocation)
+      // Reuse the per-frame direction object to avoid allocation.
       const direction = this.#tickDirection;
       direction.x = 0;
       direction.y = 0;
@@ -208,9 +191,7 @@ export class AutoScrollService {
         maxDistance = Math.max(maxDistance, config.threshold - (rect.right - cursor.x));
       }
 
-      // If near an edge, start scrolling
       if (direction.x !== 0 || direction.y !== 0) {
-        // Calculate speed (accelerate based on distance from edge)
         let speed = config.maxSpeed;
         if (config.accelerate) {
           const distanceRatio = maxDistance / config.threshold;
@@ -227,15 +208,12 @@ export class AutoScrollService {
       }
     }
 
-    // Reset scroll state if no scrolling was performed
     if (!scrollPerformed) {
       this.#scrollState.containerId = null;
       this.#scrollState.direction.x = 0;
       this.#scrollState.direction.y = 0;
       this.#scrollState.speed = 0;
     }
-
-    this.#animationFrameId = requestAnimationFrame(() => this.#tick());
   }
 
   /**

@@ -4,6 +4,7 @@ import { KeyboardDragService } from '../services/keyboard-drag.service';
 import { PositionCalculatorService } from '../services/position-calculator.service';
 import { DragIndexCalculatorService } from '../services/drag-index-calculator.service';
 import { ElementCloneService } from '../services/element-clone.service';
+import { OverlayContainerService } from '../services/overlay-container.service';
 import { DragEndEvent, DragStartEvent } from '../models/drag-drop.models';
 
 /**
@@ -35,6 +36,7 @@ export interface KeyboardDragDeps {
   positionCalculator: PositionCalculatorService;
   dragIndexCalculator: DragIndexCalculatorService;
   elementClone: ElementCloneService;
+  overlayContainer: OverlayContainerService;
   ngZone: NgZone;
   envInjector: EnvironmentInjector;
   callbacks: KeyboardDragCallbacks;
@@ -106,8 +108,11 @@ export class KeyboardDragHandler {
       draggedItemHeight: rect.height,
     });
 
-    // Clone element BEFORE updating drag state
-    const clonedElement = this.#deps.elementClone.cloneElement(element);
+    // Clone element BEFORE updating drag state.
+    // Template-first: skip the clone when a template-based preview is mounted.
+    const clonedElement = this.#deps.overlayContainer.hasTemplatePreview()
+      ? undefined
+      : this.#deps.elementClone.cloneElement(element);
 
     // Start keyboard drag
     this.#deps.keyboardDrag.startKeyboardDrag(

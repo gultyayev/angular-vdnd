@@ -16,33 +16,33 @@ describe('PositionCalculatorService', () => {
   describe('calculateDropIndex', () => {
     it('should calculate index 0 when cursor is at top of container', () => {
       const index = service.calculateDropIndex(
-        0,    // scrollTop
-        100,  // cursorY
-        100,  // containerTop
-        50,   // itemHeight
-        10    // totalItems
+        0, // scrollTop
+        100, // cursorY
+        100, // containerTop
+        50, // itemHeight
+        10, // totalItems
       );
       expect(index).toBe(0);
     });
 
     it('should calculate correct index based on cursor position', () => {
       const index = service.calculateDropIndex(
-        0,    // scrollTop
-        200,  // cursorY (100px into content = 2 items)
-        100,  // containerTop
-        50,   // itemHeight
-        10    // totalItems
+        0, // scrollTop
+        200, // cursorY (100px into content = 2 items)
+        100, // containerTop
+        50, // itemHeight
+        10, // totalItems
       );
       expect(index).toBe(2);
     });
 
     it('should account for scroll offset', () => {
       const index = service.calculateDropIndex(
-        100,  // scrollTop (scrolled down 2 items)
-        150,  // cursorY (50px into viewport)
-        100,  // containerTop
-        50,   // itemHeight
-        10    // totalItems
+        100, // scrollTop (scrolled down 2 items)
+        150, // cursorY (50px into viewport)
+        100, // containerTop
+        50, // itemHeight
+        10, // totalItems
       );
       // relativeY = 150 - 100 + 100 = 150
       // index = floor(150 / 50) = 3
@@ -51,22 +51,22 @@ describe('PositionCalculatorService', () => {
 
     it('should clamp index to 0 when cursor is above container', () => {
       const index = service.calculateDropIndex(
-        0,    // scrollTop
-        50,   // cursorY (above containerTop)
-        100,  // containerTop
-        50,   // itemHeight
-        10    // totalItems
+        0, // scrollTop
+        50, // cursorY (above containerTop)
+        100, // containerTop
+        50, // itemHeight
+        10, // totalItems
       );
       expect(index).toBe(0);
     });
 
     it('should clamp index to totalItems when cursor is below all items', () => {
       const index = service.calculateDropIndex(
-        0,    // scrollTop
-        700,  // cursorY (way below)
-        100,  // containerTop
-        50,   // itemHeight
-        10    // totalItems
+        0, // scrollTop
+        700, // cursorY (way below)
+        100, // containerTop
+        50, // itemHeight
+        10, // totalItems
       );
       expect(index).toBe(10);
     });
@@ -74,10 +74,10 @@ describe('PositionCalculatorService', () => {
     it('should handle edge case of very large scroll offset', () => {
       const index = service.calculateDropIndex(
         5000, // scrollTop
-        150,  // cursorY
-        100,  // containerTop
-        50,   // itemHeight
-        200   // totalItems
+        150, // cursorY
+        100, // containerTop
+        50, // itemHeight
+        200, // totalItems
       );
       // relativeY = 150 - 100 + 5000 = 5050
       // index = floor(5050 / 50) = 101
@@ -234,6 +234,164 @@ describe('PositionCalculatorService', () => {
     it('should get droppable ID from element', () => {
       const id = service.getDroppableId(droppable);
       expect(id).toBe('test-droppable');
+    });
+  });
+
+  describe('geometric hit-testing (cached rects)', () => {
+    // jsdom has no layout engine, so getBoundingClientRect() returns zeros and
+    // elementFromPoint() returns null. We stub rects to exercise the pure-geometry
+    // hit-testing path that replaces elementFromPoint.
+    const created: HTMLElement[] = [];
+
+    function makeDroppable(id: string, group: string, rect: Partial<DOMRect>): HTMLElement {
+      const el = document.createElement('div');
+      el.setAttribute('data-droppable-id', id);
+      el.setAttribute('data-droppable-group', group);
+      stubRect(el, rect);
+      document.body.appendChild(el);
+      created.push(el);
+      return el;
+    }
+
+    function stubRect(el: HTMLElement, rect: Partial<DOMRect>): void {
+      const full = {
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: 0,
+        height: 0,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+        ...rect,
+      } as DOMRect;
+      el.getBoundingClientRect = () => full;
+    }
+
+    afterEach(() => {
+      service.endDragSession();
+      created.forEach((el) => el.remove());
+      created.length = 0;
+    });
+
+    it('returns the droppable whose snapshot rect contains the point', () => {
+      const dragged = document.createElement('div');
+      const drop = makeDroppable('list', 'g', { top: 100, left: 100, right: 300, bottom: 400 });
+
+      service.beginDragSession('g');
+      const result = service.findDroppableAtPoint(200, 250, dragged, 'g');
+      expect(result).toBe(drop);
+    });
+
+    it('returns null when the point is outside every droppable', () => {
+      const dragged = document.createElement('div');
+      makeDroppable('list', 'g', { top: 100, left: 100, right: 300, bottom: 400 });
+
+      service.beginDragSession('g');
+      expect(service.findDroppableAtPoint(50, 50, dragged, 'g')).toBeNull();
+    });
+
+    it('only considers droppables in the requested group', () => {
+      const dragged = document.createElement('div');
+      makeDroppable('other', 'other-group', { top: 100, left: 100, right: 300, bottom: 400 });
+      const mine = makeDroppable('mine', 'g', { top: 100, left: 100, right: 300, bottom: 400 });
+
+      service.beginDragSession('g');
+      expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBe(mine);
+    });
+
+    it('prefers the nested (inner) droppable via painter-order tie-break', () => {
+      const dragged = document.createElement('div');
+      const outer = makeDroppable('outer', 'g', { top: 0, left: 0, right: 400, bottom: 400 });
+      const inner = document.createElement('div');
+      inner.setAttribute('data-droppable-id', 'inner');
+      inner.setAttribute('data-droppable-group', 'g');
+      stubRect(inner, { top: 100, left: 100, right: 300, bottom: 300 });
+      outer.appendChild(inner);
+      created.push(inner);
+
+      service.beginDragSession('g');
+      // Point inside both outer and inner — inner is later in document order (painted on top).
+      expect(service.findDroppableAtPoint(200, 200, dragged, 'g')).toBe(inner);
+    });
+
+    it('prefers the later overlapping sibling via painter-order tie-break', () => {
+      const dragged = document.createElement('div');
+      makeDroppable('a', 'g', { top: 0, left: 0, right: 200, bottom: 200 });
+      const b = makeDroppable('b', 'g', { top: 50, left: 50, right: 250, bottom: 250 });
+
+      service.beginDragSession('g');
+      // Point (100,100) is inside both A and B; B comes later in the DOM.
+      expect(service.findDroppableAtPoint(100, 100, dragged, 'g')).toBe(b);
+    });
+
+    it('re-reads rects after invalidateDroppableRects (scroll/resize)', () => {
+      const dragged = document.createElement('div');
+      const drop = makeDroppable('list', 'g', { top: 100, left: 100, right: 300, bottom: 400 });
+
+      service.beginDragSession('g');
+      expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBe(drop);
+
+      // Simulate the container scrolling up by 100px (rect moves up).
+      stubRect(drop, { top: 0, left: 100, right: 300, bottom: 300 });
+      // Without invalidation the cached rect (top:100) still matches y=250...
+      // After invalidation the fresh rect (top:0..bottom:300) is used.
+      service.invalidateDroppableRects();
+      expect(service.findDroppableAtPoint(200, 350, dragged, 'g')).toBeNull();
+      expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBe(drop);
+    });
+
+    it('falls back to a one-shot geometric query when no session is active', () => {
+      const dragged = document.createElement('div');
+      const drop = makeDroppable('list', 'g', { top: 100, left: 100, right: 300, bottom: 400 });
+
+      // No beginDragSession() — lazy path queries the DOM directly.
+      expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBe(drop);
+    });
+  });
+
+  describe('getDroppableById', () => {
+    const createdById: HTMLElement[] = [];
+
+    function makeDroppableById(id: string, group: string): HTMLElement {
+      const el = document.createElement('div');
+      el.setAttribute('data-droppable-id', id);
+      el.setAttribute('data-droppable-group', group);
+      document.body.appendChild(el);
+      createdById.push(el);
+      return el;
+    }
+
+    afterEach(() => {
+      service.endDragSession();
+      createdById.forEach((el) => el.remove());
+      createdById.length = 0;
+    });
+
+    it('returns the element from session candidates when a session is active', () => {
+      const drop = makeDroppableById('list-1', 'g');
+      service.beginDragSession('g');
+
+      expect(service.getDroppableById('list-1')).toBe(drop);
+    });
+
+    it('returns null when the ID is not in the session candidates', () => {
+      makeDroppableById('list-1', 'g');
+      service.beginDragSession('g');
+
+      expect(service.getDroppableById('list-999')).toBeNull();
+    });
+
+    it('falls back to a DOM query when no session is active', () => {
+      const drop = makeDroppableById('list-1', 'g');
+
+      // No session active — should still find via querySelector.
+      expect(service.getDroppableById('list-1')).toBe(drop);
+    });
+
+    it('returns null when the element does not exist in the DOM (no session)', () => {
+      expect(service.getDroppableById('nonexistent')).toBeNull();
     });
   });
 });

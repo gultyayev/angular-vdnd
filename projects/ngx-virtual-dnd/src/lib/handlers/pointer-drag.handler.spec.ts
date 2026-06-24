@@ -312,27 +312,31 @@ describe('PointerDragHandler', () => {
     });
   });
 
-  describe('RAF throttling', () => {
-    beforeEach(() => {
-      jest.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
-        cb(0);
-        return 1;
-      });
-    });
-
-    it('should throttle move callbacks through requestAnimationFrame', () => {
+  describe('drag move notification', () => {
+    it('should call onDragMove directly on each pointer move while dragging', () => {
+      // The handler no longer owns a RAF — it calls onDragMove synchronously so that
+      // DragSchedulerService can coalesce multiple moves into one RAF per frame.
       handler.onPointerDown(createMouseDown(150, 220), false);
 
       // Trigger drag start
       document.dispatchEvent(createMouseEvent('mousemove', 160, 220));
-
       expect(mockCallbacks.onDragStart).toHaveBeenCalled();
 
-      // Subsequent move should go through RAF
+      // Subsequent move — onDragMove is called directly (no RAF in the handler)
       document.dispatchEvent(createMouseEvent('mousemove', 170, 230));
-
-      expect(globalThis.requestAnimationFrame).toHaveBeenCalled();
       expect(mockCallbacks.onDragMove).toHaveBeenCalledWith({ x: 170, y: 230 });
+    });
+
+    it('should call onDragMove on every move event (RAF coalescing is done by DragSchedulerService)', () => {
+      handler.onPointerDown(createMouseDown(150, 220), false);
+      // Move 1 triggers drag start AND the first onDragMove (position is now dragging)
+      document.dispatchEvent(createMouseEvent('mousemove', 160, 220));
+      // Moves 2 and 3 each produce a direct onDragMove call
+      document.dispatchEvent(createMouseEvent('mousemove', 170, 230));
+      document.dispatchEvent(createMouseEvent('mousemove', 180, 240));
+
+      expect(mockCallbacks.onDragMove).toHaveBeenCalledTimes(3);
+      expect(mockCallbacks.onDragMove).toHaveBeenLastCalledWith({ x: 180, y: 240 });
     });
   });
 
@@ -400,21 +404,6 @@ describe('PointerDragHandler', () => {
       expect(removeSpy).toHaveBeenCalledWith('mousemove', expect.any(Function));
       expect(removeSpy).toHaveBeenCalledWith('mouseup', expect.any(Function));
       expect(removeSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
-    });
-
-    it('should cancel pending RAF', () => {
-      const cancelSpy = jest.spyOn(globalThis, 'cancelAnimationFrame');
-      jest.spyOn(globalThis, 'requestAnimationFrame').mockReturnValue(42);
-
-      handler.onPointerDown(createMouseDown(150, 220), false);
-
-      // Start drag then trigger a move (which schedules RAF)
-      document.dispatchEvent(createMouseEvent('mousemove', 160, 220));
-      document.dispatchEvent(createMouseEvent('mousemove', 170, 230));
-
-      handler.cleanup();
-
-      expect(cancelSpy).toHaveBeenCalled();
     });
 
     it('should reset start position', () => {

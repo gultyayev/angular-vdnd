@@ -37,15 +37,16 @@ These rules prevent common mistakes that cause hard-to-debug issues:
 
 ### Services
 
-| Service                    | Path                                            | Purpose                                    |
-| -------------------------- | ----------------------------------------------- | ------------------------------------------ |
-| DragStateService           | `lib/services/drag-state.service.ts`            | Central signals-based drag state           |
-| PositionCalculatorService  | `lib/services/position-calculator.service.ts`   | DOM hit-testing, drop index calculation    |
-| AutoScrollService          | `lib/services/auto-scroll.service.ts`           | RAF-based edge scrolling                   |
-| ElementCloneService        | `lib/services/element-clone.service.ts`         | Clone elements for drag preview            |
-| KeyboardDragService        | `lib/services/keyboard-drag.service.ts`         | Keyboard drag state management             |
-| DragIndexCalculatorService | `lib/services/drag-index-calculator.service.ts` | Placeholder index with virtual scroll math |
-| OverlayContainerService    | `lib/services/overlay-container.service.ts`     | Body-level container for overlay elements  |
+| Service                    | Path                                            | Purpose                                                                                                        |
+| -------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| DragStateService           | `lib/services/drag-state.service.ts`            | Central signals-based drag state                                                                               |
+| PositionCalculatorService  | `lib/services/position-calculator.service.ts`   | DOM hit-testing, drop index calculation                                                                        |
+| DragSchedulerService       | `lib/services/drag-scheduler.service.ts`        | Single RAF loop with read→compute→write phases; coordinates pointer-move coalescing and autoscroll participant |
+| AutoScrollService          | `lib/services/auto-scroll.service.ts`           | Edge-scroll logic registered as a DragSchedulerService participant                                             |
+| ElementCloneService        | `lib/services/element-clone.service.ts`         | Clone elements for drag preview                                                                                |
+| KeyboardDragService        | `lib/services/keyboard-drag.service.ts`         | Keyboard drag state management                                                                                 |
+| DragIndexCalculatorService | `lib/services/drag-index-calculator.service.ts` | Placeholder index with virtual scroll math                                                                     |
+| OverlayContainerService    | `lib/services/overlay-container.service.ts`     | Body-level container for overlay elements                                                                      |
 
 _All paths relative to `/projects/ngx-virtual-dnd/src/`_
 
