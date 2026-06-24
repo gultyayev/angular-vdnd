@@ -3,19 +3,25 @@ import { CursorPosition, DraggedItem, DragState, GrabOffset } from '../models/dr
 
 /**
  * Internal state type without high-frequency fields.
- * `cursorPosition` and `keyboardTargetIndex` are split into dedicated signals
- * so that 60fps cursor updates don't trigger re-evaluation of rarely-changing computeds.
+ * `cursorPosition`, `keyboardTargetIndex`, `activeDroppableId`, `placeholderId`
+ * and `placeholderIndex` are split into dedicated signals so that high-frequency
+ * pointer/placeholder updates don't trigger re-evaluation of rarely-changing
+ * computeds (or rebuild the core state object every frame).
  */
-type CoreDragState = Omit<DragState, 'cursorPosition' | 'keyboardTargetIndex'>;
+type CoreDragState = Omit<
+  DragState,
+  | 'cursorPosition'
+  | 'keyboardTargetIndex'
+  | 'activeDroppableId'
+  | 'placeholderId'
+  | 'placeholderIndex'
+>;
 
 const INITIAL_CORE_STATE: CoreDragState = {
   isDragging: false,
   draggedItem: null,
   sourceDroppableId: null,
   sourceIndex: null,
-  activeDroppableId: null,
-  placeholderId: null,
-  placeholderIndex: null,
   grabOffset: null,
   initialPosition: null,
   lockAxis: null,
@@ -26,10 +32,12 @@ const INITIAL_CORE_STATE: CoreDragState = {
  * Central service for managing drag-and-drop state.
  * Uses signals for reactive state management.
  *
- * Architecture: High-frequency fields (`cursorPosition`, `keyboardTargetIndex`)
- * are stored in dedicated signals, separate from the core state. This prevents
- * 60fps cursor updates from triggering re-evaluation of the 10+ computeds
- * that only depend on rarely-changing properties (isDragging, draggedItem, etc.).
+ * Architecture: High-frequency fields (`cursorPosition`, `keyboardTargetIndex`,
+ * `activeDroppableId`, `placeholderId`, `placeholderIndex`) are stored in dedicated
+ * signals, separate from the core state. This prevents 60fps cursor and
+ * placeholder updates from rebuilding the core state object or re-evaluating the
+ * 8+ computeds that only depend on rarely-changing properties (isDragging,
+ * draggedItem, etc.).
  */
 @Injectable({
   providedIn: 'root',
@@ -43,6 +51,15 @@ export class DragStateService {
 
   /** High-frequency keyboard target index — updated on each arrow key press */
   readonly #keyboardTargetIndex = signal<number | null>(null);
+
+  /** ID of the droppable currently being hovered over — changes on droppable crossings */
+  readonly #activeDroppableId = signal<string | null>(null);
+
+  /** ID of the item the placeholder should appear before */
+  readonly #placeholderId = signal<string | null>(null);
+
+  /** Index where the placeholder should be inserted — updated on each placeholder move */
+  readonly #placeholderIndex = signal<number | null>(null);
 
   /** Flag indicating if the last drag was cancelled (not dropped) */
   readonly #wasCancelled = signal<boolean>(false);
@@ -66,13 +83,13 @@ export class DragStateService {
   readonly sourceIndex = computed(() => this.#state().sourceIndex);
 
   /** ID of the droppable currently being hovered over */
-  readonly activeDroppableId = computed(() => this.#state().activeDroppableId);
+  readonly activeDroppableId = this.#activeDroppableId.asReadonly();
 
   /** ID of the item the placeholder should appear before */
-  readonly placeholderId = computed(() => this.#state().placeholderId);
+  readonly placeholderId = this.#placeholderId.asReadonly();
 
   /** Index where the placeholder should be inserted */
-  readonly placeholderIndex = computed(() => this.#state().placeholderIndex);
+  readonly placeholderIndex = this.#placeholderIndex.asReadonly();
 
   /** Current cursor position */
   readonly cursorPosition = this.#cursorPosition.asReadonly();
@@ -136,14 +153,14 @@ export class DragStateService {
     this.#wasCancelled.set(false);
     this.#cursorPosition.set(cursorPosition ?? null);
     this.#keyboardTargetIndex.set(isKeyboardDrag ? (sourceIndex ?? 0) : null);
+    this.#activeDroppableId.set(activeDroppableId ?? null);
+    this.#placeholderId.set(placeholderId ?? null);
+    this.#placeholderIndex.set(placeholderIndex ?? null);
     this.#state.set({
       isDragging: true,
       draggedItem: item,
       sourceDroppableId: item.droppableId,
       sourceIndex: sourceIndex ?? null,
-      activeDroppableId: activeDroppableId ?? null,
-      placeholderId: placeholderId ?? null,
-      placeholderIndex: placeholderIndex ?? null,
       grabOffset: grabOffset ?? null,
       initialPosition: axisLockPosition ?? cursorPosition ?? null,
       lockAxis: lockAxis ?? null,
@@ -167,20 +184,12 @@ export class DragStateService {
     // Write cursor to dedicated high-frequency signal
     this.#cursorPosition.set(update.cursorPosition);
 
-    // Only update core state if droppable/placeholder actually changed
-    const current = this.#state();
-    if (
-      current.activeDroppableId !== update.activeDroppableId ||
-      current.placeholderId !== update.placeholderId ||
-      current.placeholderIndex !== update.placeholderIndex
-    ) {
-      this.#state.update((state) => ({
-        ...state,
-        activeDroppableId: update.activeDroppableId,
-        placeholderId: update.placeholderId,
-        placeholderIndex: update.placeholderIndex,
-      }));
-    }
+    // Each target lives in its own signal, so a placeholder-only frame never
+    // rebuilds the core state object or re-fires the rarely-changing computeds.
+    // Signals already no-op on identical values, so unconditional sets are safe.
+    this.#activeDroppableId.set(update.activeDroppableId);
+    this.#placeholderId.set(update.placeholderId);
+    this.#placeholderIndex.set(update.placeholderIndex);
   }
 
   /**
@@ -191,10 +200,7 @@ export class DragStateService {
       return;
     }
 
-    this.#state.update((state) => ({
-      ...state,
-      activeDroppableId: droppableId,
-    }));
+    this.#activeDroppableId.set(droppableId);
   }
 
   /**
@@ -205,10 +211,7 @@ export class DragStateService {
       return;
     }
 
-    this.#state.update((state) => ({
-      ...state,
-      placeholderId,
-    }));
+    this.#placeholderId.set(placeholderId);
   }
 
   /**
@@ -216,8 +219,7 @@ export class DragStateService {
    */
   endDrag(): void {
     this.#wasCancelled.set(false);
-    this.#cursorPosition.set(null);
-    this.#keyboardTargetIndex.set(null);
+    this.#resetHighFrequencySignals();
     this.#state.set(INITIAL_CORE_STATE);
   }
 
@@ -226,16 +228,26 @@ export class DragStateService {
    */
   cancelDrag(): void {
     this.#wasCancelled.set(true);
+    this.#resetHighFrequencySignals();
+    this.#state.set(INITIAL_CORE_STATE);
+  }
+
+  /**
+   * Reset the dedicated high-frequency signals to their initial null state.
+   */
+  #resetHighFrequencySignals(): void {
     this.#cursorPosition.set(null);
     this.#keyboardTargetIndex.set(null);
-    this.#state.set(INITIAL_CORE_STATE);
+    this.#activeDroppableId.set(null);
+    this.#placeholderId.set(null);
+    this.#placeholderIndex.set(null);
   }
 
   /**
    * Check if a specific droppable is currently active.
    */
   isDroppableActive(droppableId: string): boolean {
-    return this.#state().activeDroppableId === droppableId;
+    return this.#activeDroppableId() === droppableId;
   }
 
   /**
@@ -244,6 +256,9 @@ export class DragStateService {
   getStateSnapshot(): DragState {
     return {
       ...this.#state(),
+      activeDroppableId: this.#activeDroppableId(),
+      placeholderId: this.#placeholderId(),
+      placeholderIndex: this.#placeholderIndex(),
       cursorPosition: this.#cursorPosition(),
       keyboardTargetIndex: this.#keyboardTargetIndex(),
     };
@@ -262,7 +277,7 @@ export class DragStateService {
     // Same-list adjustment: if target is at or after source, add 1
     // This accounts for the hidden item shifting everything up visually
     const sourceDroppableId = state.draggedItem?.droppableId;
-    const activeDroppableId = state.activeDroppableId;
+    const activeDroppableId = this.#activeDroppableId();
     const isSameList = sourceDroppableId === activeDroppableId;
     const sourceIndex = state.sourceIndex ?? -1;
 
@@ -272,10 +287,7 @@ export class DragStateService {
     }
 
     this.#keyboardTargetIndex.set(targetIndex);
-    this.#state.update((s) => ({
-      ...s,
-      placeholderIndex,
-    }));
+    this.#placeholderIndex.set(placeholderIndex);
   }
 
   /**
@@ -298,10 +310,7 @@ export class DragStateService {
     }
 
     this.#keyboardTargetIndex.set(targetIndex);
-    this.#state.update((s) => ({
-      ...s,
-      activeDroppableId: droppableId,
-      placeholderIndex,
-    }));
+    this.#activeDroppableId.set(droppableId);
+    this.#placeholderIndex.set(placeholderIndex);
   }
 }
