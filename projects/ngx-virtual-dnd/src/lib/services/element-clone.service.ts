@@ -7,41 +7,43 @@ import { Injectable } from '@angular/core';
 @Injectable({ providedIn: 'root' })
 export class ElementCloneService {
   /**
-   * CSS properties to copy from source to clone.
-   * These are the visual properties that affect appearance.
+   * CSS properties to copy from source to clone, pre-stored in kebab-case.
+   * These are the visual properties that affect appearance. Keeping them
+   * kebab-case avoids a camelCase→kebab conversion on every property of every
+   * node during the recursive clone walk (a drag-start hot path).
    */
-  readonly #stylesToCopy = [
+  readonly #stylePropsToCopy: readonly string[] = [
     'background',
-    'backgroundColor',
-    'backgroundImage',
+    'background-color',
+    'background-image',
     'border',
-    'borderRadius',
-    'boxShadow',
+    'border-radius',
+    'box-shadow',
     'color',
     'font',
-    'fontFamily',
-    'fontSize',
-    'fontWeight',
-    'lineHeight',
+    'font-family',
+    'font-size',
+    'font-weight',
+    'line-height',
     'padding',
     'margin',
     'display',
-    'flexDirection',
-    'alignItems',
-    'justifyContent',
+    'flex-direction',
+    'align-items',
+    'justify-content',
     'gap',
-    'textAlign',
-    'textDecoration',
+    'text-align',
+    'text-decoration',
     'width',
     'height',
-    'minWidth',
-    'minHeight',
-    'maxWidth',
-    'maxHeight',
+    'min-width',
+    'min-height',
+    'max-width',
+    'max-height',
     'overflow',
     'opacity',
     'transform',
-    'boxSizing',
+    'box-sizing',
   ];
 
   /**
@@ -70,11 +72,11 @@ export class ElementCloneService {
   #applyComputedStyles(source: HTMLElement, target: HTMLElement): void {
     const computed = window.getComputedStyle(source);
 
-    // Copy essential visual properties
-    for (const prop of this.#stylesToCopy) {
-      const value = computed.getPropertyValue(this.#camelToKebab(prop));
+    // Copy essential visual properties (keys are already kebab-case)
+    for (const prop of this.#stylePropsToCopy) {
+      const value = computed.getPropertyValue(prop);
       if (value) {
-        target.style.setProperty(this.#camelToKebab(prop), value);
+        target.style.setProperty(prop, value);
       }
     }
 
@@ -210,12 +212,5 @@ export class ElementCloneService {
     // Remove focus styling classes that might interfere
     clone.classList.remove('vdnd-draggable-dragging');
     clone.classList.remove('vdnd-draggable-disabled');
-  }
-
-  /**
-   * Convert camelCase to kebab-case for CSS properties.
-   */
-  #camelToKebab(str: string): string {
-    return str.replace(/([A-Z])/g, '-$1').toLowerCase();
   }
 }
