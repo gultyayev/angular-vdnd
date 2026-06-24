@@ -149,6 +149,32 @@ export class PositionCalculatorService {
   }
 
   /**
+   * Look up a droppable element by its ID.
+   *
+   * When a drag session is active, searches the cached candidate list (O(n), avoids a DOM
+   * query). Falls back to `document.querySelector` when no session is active.
+   *
+   * Intended for the autoscroll scroll-only fast path, where the active droppable is already
+   * known and only the placeholder index needs recalculation.
+   */
+  getDroppableById(id: string): HTMLElement | null {
+    if (this.#session) {
+      for (const candidate of this.#session.candidates) {
+        if (candidate.getAttribute(this.#DROPPABLE_ID_ATTR) === id) {
+          return candidate;
+        }
+      }
+      return null;
+    }
+
+    if (typeof document === 'undefined') {
+      return null;
+    }
+    const escaped = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(id) : id;
+    return document.querySelector<HTMLElement>(`[${this.#DROPPABLE_ID_ATTR}="${escaped}"]`);
+  }
+
+  /**
    * Query all droppable elements belonging to a group, in document order.
    */
   #queryDroppables(groupName: string): HTMLElement[] {

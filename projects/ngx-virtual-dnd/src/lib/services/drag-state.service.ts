@@ -215,6 +215,22 @@ export class DragStateService {
   }
 
   /**
+   * Update only the placeholder signals without touching cursor position or active droppable.
+   *
+   * Used by the autoscroll scroll-only fast path: when a scroll fires, the cursor has not
+   * moved, so only the placeholder index needs recalculation. Skipping the cursor and
+   * active-droppable writes avoids spurious re-evaluation of computeds that read those signals.
+   */
+  updateScrollOnlyPlaceholder(placeholderId: string | null, placeholderIndex: number | null): void {
+    if (!this.#state().isDragging) {
+      return;
+    }
+
+    this.#placeholderId.set(placeholderId);
+    this.#placeholderIndex.set(placeholderIndex);
+  }
+
+  /**
    * End the drag operation and reset state (normal drop).
    */
   endDrag(): void {

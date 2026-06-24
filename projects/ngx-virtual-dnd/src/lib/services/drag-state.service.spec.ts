@@ -409,6 +409,36 @@ describe('DragStateService', () => {
     });
   });
 
+  describe('updateScrollOnlyPlaceholder', () => {
+    it('updates placeholderId and placeholderIndex when dragging', () => {
+      const item = createMockDraggedItem();
+      service.startDrag(item, { x: 50, y: 50 }, undefined, null, 'list-1', 'item-0', 0);
+
+      service.updateScrollOnlyPlaceholder('item-3', 3);
+
+      expect(service.placeholderId()).toBe('item-3');
+      expect(service.placeholderIndex()).toBe(3);
+    });
+
+    it('does not change cursorPosition or activeDroppableId', () => {
+      const item = createMockDraggedItem();
+      const cursor: CursorPosition = { x: 50, y: 50 };
+      service.startDrag(item, cursor, undefined, null, 'list-1', 'item-0', 0);
+
+      service.updateScrollOnlyPlaceholder('item-5', 5);
+
+      expect(service.cursorPosition()).toEqual(cursor);
+      expect(service.activeDroppableId()).toBe('list-1');
+    });
+
+    it('is a no-op when not dragging', () => {
+      service.updateScrollOnlyPlaceholder('item-1', 1);
+
+      expect(service.placeholderId()).toBeNull();
+      expect(service.placeholderIndex()).toBeNull();
+    });
+  });
+
   describe('getStateSnapshot', () => {
     it('should return current state', () => {
       expect(service.getStateSnapshot()).toEqual(INITIAL_DRAG_STATE);

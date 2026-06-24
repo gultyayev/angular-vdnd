@@ -350,4 +350,48 @@ describe('PositionCalculatorService', () => {
       expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBe(drop);
     });
   });
+
+  describe('getDroppableById', () => {
+    const createdById: HTMLElement[] = [];
+
+    function makeDroppableById(id: string, group: string): HTMLElement {
+      const el = document.createElement('div');
+      el.setAttribute('data-droppable-id', id);
+      el.setAttribute('data-droppable-group', group);
+      document.body.appendChild(el);
+      createdById.push(el);
+      return el;
+    }
+
+    afterEach(() => {
+      service.endDragSession();
+      createdById.forEach((el) => el.remove());
+      createdById.length = 0;
+    });
+
+    it('returns the element from session candidates when a session is active', () => {
+      const drop = makeDroppableById('list-1', 'g');
+      service.beginDragSession('g');
+
+      expect(service.getDroppableById('list-1')).toBe(drop);
+    });
+
+    it('returns null when the ID is not in the session candidates', () => {
+      makeDroppableById('list-1', 'g');
+      service.beginDragSession('g');
+
+      expect(service.getDroppableById('list-999')).toBeNull();
+    });
+
+    it('falls back to a DOM query when no session is active', () => {
+      const drop = makeDroppableById('list-1', 'g');
+
+      // No session active — should still find via querySelector.
+      expect(service.getDroppableById('list-1')).toBe(drop);
+    });
+
+    it('returns null when the element does not exist in the DOM (no session)', () => {
+      expect(service.getDroppableById('nonexistent')).toBeNull();
+    });
+  });
 });

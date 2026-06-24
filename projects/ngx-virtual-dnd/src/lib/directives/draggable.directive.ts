@@ -481,6 +481,15 @@ export class DraggableDirective implements OnInit, OnDestroy {
 
   /**
    * Recalculate placeholder position (called during auto-scroll).
+   *
+   * Scroll-only fast path: the cursor has not moved — only `scrollTop` changed.
+   * When the active droppable is already known, skip hit-testing entirely and
+   * recalculate only the placeholder index within that droppable. This avoids the
+   * `findDroppableAtPoint` geometry scan + the `invalidateDroppableRects` DOM round-trip
+   * on every autoscroll frame while still recomputing the correct insertion index.
+   *
+   * Falls back to the full `#updateDrag` pipeline when no droppable is active (e.g.
+   * cursor drifted outside all droppables before the scroll tick fired).
    */
   #recalculatePlaceholder(): void {
     const cursorPosition = this.#dragState.cursorPosition();
@@ -488,11 +497,28 @@ export class DraggableDirective implements OnInit, OnDestroy {
       return;
     }
 
-    // Autoscroll just moved a scroll container; the scroll event has not fired yet,
-    // so force the cached droppable rects to be re-read on the next hit-test.
-    this.#positionCalculator.invalidateDroppableRects();
+    const activeDroppableId = this.#dragState.activeDroppableId();
+    if (activeDroppableId) {
+      const droppableElement = this.#positionCalculator.getDroppableById(activeDroppableId);
+      if (droppableElement) {
+        const draggedItemHeight = this.#dragState.draggedItem()?.height ?? 50;
+        const indexResult = this.#dragIndexCalculator.calculatePlaceholderIndex({
+          droppableElement,
+          position: cursorPosition,
+          previousPosition: cursorPosition,
+          grabOffset: this.#dragState.grabOffset(),
+          draggedItemHeight,
+          sourceDroppableId: this.#dragState.sourceDroppableId(),
+          sourceIndex: this.#dragState.sourceIndex(),
+        });
+        this.#dragState.updateScrollOnlyPlaceholder(indexResult.placeholderId, indexResult.index);
+        return;
+      }
+    }
 
-    // Recalculate placeholder based on current scroll position
+    // Fallback: full recalculation when no active droppable is known.
+    // Mark rects dirty first since autoscroll moved the container before the scroll event fires.
+    this.#positionCalculator.invalidateDroppableRects();
     this.#updateDrag(cursorPosition);
   }
 
