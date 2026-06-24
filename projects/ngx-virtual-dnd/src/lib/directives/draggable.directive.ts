@@ -18,6 +18,7 @@ import { ElementCloneService } from '../services/element-clone.service';
 import { KeyboardDragService } from '../services/keyboard-drag.service';
 import { DragIndexCalculatorService } from '../services/drag-index-calculator.service';
 import { OverlayContainerService } from '../services/overlay-container.service';
+import { DragSchedulerService } from '../services/drag-scheduler.service';
 import {
   CursorPosition,
   DragEndEvent,
@@ -81,6 +82,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
   readonly #keyboardDrag = inject(KeyboardDragService);
   readonly #dragIndexCalculator = inject(DragIndexCalculatorService);
   readonly #overlayContainer = inject(OverlayContainerService);
+  readonly #scheduler = inject(DragSchedulerService);
   readonly #ngZone = inject(NgZone);
   readonly #envInjector = inject(EnvironmentInjector);
   readonly #parentGroup = inject(VDND_GROUP_TOKEN, { optional: true });
@@ -205,8 +207,10 @@ export class DraggableDirective implements OnInit, OnDestroy {
       callbacks: {
         onDragStart: (position) => this.#startDrag(position),
         onDragMove: (position) => {
+          // Record raw position synchronously (needed for autoscroll cursor override)
+          // then queue into the scheduler's RAF loop for coalesced frame-rate processing.
           this.#lastRawPosition = position;
-          this.#updateDrag(position);
+          this.#scheduler.queueCursorUpdate(position);
         },
         onDragEnd: (cancelled) => this.#endDrag(cancelled),
         onPendingChange: (pending) => this.#setPending(pending),
@@ -407,7 +411,15 @@ export class DraggableDirective implements OnInit, OnDestroy {
       lockAxis ? startPos : undefined,
     );
 
-    // Start auto-scroll monitoring with a callback to recalculate placeholder
+    // Start the scheduler RAF loop (drives pointer-move updates + autoscroll participant).
+    // onTick is called each frame: when cursor is dirty, run full #updateDrag.
+    this.#scheduler.start((cursor, cursorDirty) => {
+      if (cursorDirty && cursor && this.isDragging()) {
+        this.#updateDrag(cursor);
+      }
+    });
+
+    // Start auto-scroll monitoring — registers as a scheduler participant.
     this.#autoScroll.startMonitoring(() => this.#recalculatePlaceholder());
 
     // Emit drag start event
@@ -646,8 +658,8 @@ export class DraggableDirective implements OnInit, OnDestroy {
    * End the drag operation.
    */
   #endDrag(cancelled: boolean): void {
-    // No ngZone.run() needed - signals work outside zone and effects react automatically
-    // Stop auto-scroll monitoring
+    // Stop the scheduler RAF loop first, then remove the autoscroll participant.
+    this.#scheduler.stop();
     this.#autoScroll.stopMonitoring();
 
     // Tear down the geometric hit-testing snapshot + its viewport listeners

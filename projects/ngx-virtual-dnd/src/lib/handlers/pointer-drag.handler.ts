@@ -58,9 +58,6 @@ export class PointerDragHandler {
   #boundPointerUp: ((e: MouseEvent | TouchEvent) => void) | null = null;
   #boundKeyDown: ((e: KeyboardEvent) => void) | null = null;
 
-  /** Request animation frame ID for drag updates */
-  #rafId: number | null = null;
-
   /** Timer ID for drag delay */
   #delayTimerId: ReturnType<typeof setTimeout> | null = null;
 
@@ -162,7 +159,7 @@ export class PointerDragHandler {
   }
 
   /**
-   * Remove listeners + cancel timers + cancel RAF.
+   * Remove listeners + cancel timers.
    * Called after pointer up or when cancelling.
    */
   cleanup(): void {
@@ -170,11 +167,6 @@ export class PointerDragHandler {
     this.#startPosition = null;
     this.#deps.callbacks.onPendingChange(false); // Clear pending state on cleanup
     this.#cancelDelayTimer();
-
-    if (this.#rafId !== null) {
-      cancelAnimationFrame(this.#rafId);
-      this.#rafId = null;
-    }
 
     // Remove event listeners
     if (this.#boundPointerMove) {
@@ -242,15 +234,9 @@ export class PointerDragHandler {
       return;
     }
 
-    // Throttle drag updates with requestAnimationFrame
-    if (this.#rafId !== null) {
-      cancelAnimationFrame(this.#rafId);
-    }
-
-    this.#rafId = requestAnimationFrame(() => {
-      this.#deps.callbacks.onDragMove(position);
-      this.#rafId = null;
-    });
+    // Notify the directive of the new position — it queues this into the scheduler
+    // (DragSchedulerService) which coalesces multiple moves per frame into one RAF tick.
+    this.#deps.callbacks.onDragMove(position);
   }
 
   /**
