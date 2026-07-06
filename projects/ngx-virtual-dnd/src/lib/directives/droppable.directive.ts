@@ -6,7 +6,6 @@ import {
   inject,
   input,
   OnDestroy,
-  OnInit,
   output,
 } from '@angular/core';
 import { DragStateService } from '../services/drag-state.service';
@@ -14,6 +13,7 @@ import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.ser
 import { DragState, DropEvent, END_OF_LIST } from '../models/drag-drop.models';
 import { VDND_GROUP_TOKEN } from './droppable-group.directive';
 import { createEffectiveGroupSignal } from '../utils/group-resolution';
+import { createAutoScrollRegistration } from '../utils/auto-scroll-registration';
 
 /**
  * Marks an element as a valid drop target within the virtual scroll drag-and-drop system.
@@ -48,7 +48,7 @@ import { createEffectiveGroupSignal } from '../utils/group-resolution';
     '[class.vdnd-droppable-disabled]': 'disabled()',
   },
 })
-export class DroppableDirective implements OnInit, OnDestroy {
+export class DroppableDirective implements OnDestroy {
   readonly #elementRef = inject(ElementRef<HTMLElement>);
   readonly #dragState = inject(DragStateService);
   readonly #autoScroll = inject(AutoScrollService);
@@ -113,23 +113,6 @@ export class DroppableDirective implements OnInit, OnDestroy {
   /** Cached state for handling drop (since state is cleared before effect fires) */
   #cachedDragState: DragState | null = null;
 
-  ngOnInit(): void {
-    // Without a group, this droppable can't participate in DnD (fail gracefully).
-    if (!this.effectiveGroup()) {
-      return;
-    }
-
-    // Register with auto-scroll service only if this element is actually scrollable
-    // (i.e., has overflow: auto/scroll and content taller than container)
-    if (this.autoScrollEnabled() && this.#isScrollable()) {
-      this.#autoScroll.registerContainer(
-        this.vdndDroppable(),
-        this.#elementRef.nativeElement,
-        this.autoScrollConfig(),
-      );
-    }
-  }
-
   /**
    * Check if this element is actually scrollable.
    */
@@ -155,6 +138,15 @@ export class DroppableDirective implements OnInit, OnDestroy {
   }
 
   constructor() {
+    createAutoScrollRegistration({
+      autoScrollService: this.#autoScroll,
+      getElement: () => this.#elementRef.nativeElement,
+      getId: () => this.vdndDroppable(),
+      enabled: () => this.autoScrollEnabled(),
+      config: () => this.autoScrollConfig(),
+      canRegister: () => Boolean(this.effectiveGroup()) && this.#isScrollable(),
+    });
+
     // React to state changes and handle drop events
     effect(() => {
       const active = this.isActive();

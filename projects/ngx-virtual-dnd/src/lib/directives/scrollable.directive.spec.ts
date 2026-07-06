@@ -1,7 +1,7 @@
 import { Component, provideZonelessChangeDetection, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { VirtualViewportComponent } from './virtual-viewport.component';
+import { ScrollableDirective } from './scrollable.directive';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
 
 class MockResizeObserver {
@@ -12,25 +12,27 @@ class MockResizeObserver {
 
 @Component({
   template: `
-    <vdnd-virtual-viewport
-      [itemHeight]="50"
+    <div
+      vdndScrollable
       [scrollContainerId]="scrollContainerId()"
       [autoScrollEnabled]="autoScrollEnabled()"
       [autoScrollConfig]="autoScrollConfig()"
-    />
+    >
+      Content
+    </div>
   `,
-  imports: [VirtualViewportComponent],
+  imports: [ScrollableDirective],
 })
 class TestHostComponent {
-  scrollContainerId = signal<string | undefined>('viewport-scroll');
+  scrollContainerId = signal<string | undefined>('scrollable-container');
   autoScrollEnabled = signal(false);
   autoScrollConfig = signal<Partial<AutoScrollConfig>>({});
 }
 
-describe('VirtualViewportComponent', () => {
+describe('ScrollableDirective', () => {
   let fixture: ComponentFixture<TestHostComponent>;
   let hostComponent: TestHostComponent;
-  let component: VirtualViewportComponent;
+  let scrollableEl: HTMLElement;
   let autoScrollService: AutoScrollService;
   let originalResizeObserver: typeof ResizeObserver;
 
@@ -52,8 +54,9 @@ describe('VirtualViewportComponent', () => {
     fixture = TestBed.createComponent(TestHostComponent);
     hostComponent = fixture.componentInstance;
     fixture.detectChanges();
-    component = fixture.debugElement.query(By.directive(VirtualViewportComponent))
-      .componentInstance as VirtualViewportComponent;
+
+    scrollableEl = fixture.debugElement.query(By.directive(ScrollableDirective))
+      .nativeElement as HTMLElement;
     autoScrollService = TestBed.inject(AutoScrollService);
   });
 
@@ -61,28 +64,16 @@ describe('VirtualViewportComponent', () => {
     fixture.destroy();
   });
 
-  it('should update fixed-height content transform when excluded index changes', () => {
-    component.setRenderStartIndex(10);
-    fixture.detectChanges();
-
-    expect(component.contentTransform()).toBe('translateY(500px)');
-
-    component.strategy.setExcludedIndex(2);
-    fixture.detectChanges();
-
-    expect(component.contentTransform()).toBe('translateY(450px)');
-  });
-
   it('should register when autoScrollEnabled changes to true after init', () => {
     const registerSpy = jest.spyOn(autoScrollService, 'registerContainer');
     registerSpy.mockClear();
 
-    hostComponent.autoScrollConfig.set({ maxSpeed: 25 });
+    hostComponent.autoScrollConfig.set({ threshold: 75 });
     hostComponent.autoScrollEnabled.set(true);
     fixture.detectChanges();
 
-    expect(registerSpy).toHaveBeenCalledWith('viewport-scroll', component.nativeElement, {
-      maxSpeed: 25,
+    expect(registerSpy).toHaveBeenCalledWith('scrollable-container', scrollableEl, {
+      threshold: 75,
     });
   });
 
@@ -95,14 +86,10 @@ describe('VirtualViewportComponent', () => {
     registerSpy.mockClear();
     unregisterSpy.mockClear();
 
-    hostComponent.scrollContainerId.set('updated-viewport-scroll');
+    hostComponent.scrollContainerId.set('updated-scrollable-container');
     fixture.detectChanges();
 
-    expect(unregisterSpy).toHaveBeenCalledWith('viewport-scroll');
-    expect(registerSpy).toHaveBeenCalledWith(
-      'updated-viewport-scroll',
-      component.nativeElement,
-      {},
-    );
+    expect(unregisterSpy).toHaveBeenCalledWith('scrollable-container');
+    expect(registerSpy).toHaveBeenCalledWith('updated-scrollable-container', scrollableEl, {});
   });
 });

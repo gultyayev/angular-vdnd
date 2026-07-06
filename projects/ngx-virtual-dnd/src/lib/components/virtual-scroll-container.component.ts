@@ -24,6 +24,7 @@ import {
   bindRafThrottledScrollTopSignal,
   bindResizeObserverHeightSignal,
 } from '../utils/dom-signal-bindings';
+import { createAutoScrollRegistration } from '../utils/auto-scroll-registration';
 import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
 import { FixedHeightStrategy } from '../strategies/fixed-height.strategy';
 import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
@@ -482,6 +483,14 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   #previousTotalHeight = 0;
 
   constructor() {
+    createAutoScrollRegistration({
+      autoScrollService: this.#autoScrollService,
+      getElement: () => this.#elementRef.nativeElement,
+      getId: () => this.scrollContainerId() ?? this.#generatedScrollId,
+      enabled: () => this.autoScrollEnabled(),
+      config: () => this.autoScrollConfig(),
+    });
+
     // Keep strategy item keys in sync
     effect(() => {
       const items = this.items();
@@ -612,16 +621,6 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   }
 
   ngOnInit(): void {
-    // Register with auto-scroll service
-    if (this.autoScrollEnabled()) {
-      const id = this.scrollContainerId() ?? this.#generatedScrollId;
-      this.#autoScrollService.registerContainer(
-        id,
-        this.#elementRef.nativeElement,
-        this.autoScrollConfig(),
-      );
-    }
-
     // Set up ResizeObserver for dynamic height measurement
     if (this.dynamicItemHeight()) {
       this.#setupItemResizeObserver();
@@ -661,10 +660,6 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
     }
     this.#observedElementByKey.clear();
     this.#itemResizeObserver?.disconnect();
-
-    // Unregister from auto-scroll service
-    const id = this.scrollContainerId() ?? this.#generatedScrollId;
-    this.#autoScrollService.unregisterContainer(id);
   }
 
   /**

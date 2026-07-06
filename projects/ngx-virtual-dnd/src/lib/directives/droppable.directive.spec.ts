@@ -3,15 +3,15 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { DroppableDirective } from './droppable.directive';
 import { DragStateService } from '../services/drag-state.service';
-import { AutoScrollService, AutoScrollConfig } from '../services/auto-scroll.service';
+import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
 import { PositionCalculatorService } from '../services/position-calculator.service';
-import { DropEvent, DraggedItem } from '../models/drag-drop.models';
+import { DraggedItem, DropEvent } from '../models/drag-drop.models';
 
 // Test host component
 @Component({
   template: `
     <div
-      vdndDroppable="test-list"
+      [vdndDroppable]="droppableId()"
       vdndDroppableGroup="test-group"
       [vdndDroppableData]="listData"
       [disabled]="disabled()"
@@ -31,6 +31,7 @@ import { DropEvent, DraggedItem } from '../models/drag-drop.models';
 })
 class TestHostComponent {
   listData = { listId: 'list-1' };
+  droppableId = signal('test-list');
   items = [
     { id: 'item-1', name: 'Item 1' },
     { id: 'item-2', name: 'Item 2' },
@@ -65,6 +66,16 @@ describe('DroppableDirective', () => {
     data: { id: 'item-1', name: 'Item 1' },
     ...overrides,
   });
+
+  const makeScrollable = (element: HTMLElement): void => {
+    element.style.overflowY = 'auto';
+    Object.defineProperties(element, {
+      scrollHeight: { configurable: true, value: 600 },
+      clientHeight: { configurable: true, value: 300 },
+      scrollWidth: { configurable: true, value: 200 },
+      clientWidth: { configurable: true, value: 200 },
+    });
+  };
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -289,6 +300,55 @@ describe('DroppableDirective', () => {
   });
 
   describe('auto-scroll integration', () => {
+    it('should register when autoScrollEnabled changes to true after init', () => {
+      const registerSpy = jest.spyOn(autoScrollService, 'registerContainer');
+      registerSpy.mockClear();
+
+      const newFixture = TestBed.createComponent(TestHostComponent);
+      newFixture.componentInstance.autoScrollEnabled.set(false);
+      newFixture.detectChanges();
+
+      const newDroppableEl = newFixture.debugElement.query(By.directive(DroppableDirective))
+        .nativeElement as HTMLElement;
+      makeScrollable(newDroppableEl);
+      newFixture.componentInstance.autoScrollConfig.set({ threshold: 80 });
+
+      newFixture.componentInstance.autoScrollEnabled.set(true);
+      newFixture.detectChanges();
+
+      expect(registerSpy).toHaveBeenCalledWith('test-list', newDroppableEl, { threshold: 80 });
+
+      newFixture.destroy();
+    });
+
+    it('should re-register when droppable ID changes', () => {
+      const registerSpy = jest.spyOn(autoScrollService, 'registerContainer');
+      const unregisterSpy = jest.spyOn(autoScrollService, 'unregisterContainer');
+      registerSpy.mockClear();
+      unregisterSpy.mockClear();
+
+      const newFixture = TestBed.createComponent(TestHostComponent);
+      newFixture.componentInstance.autoScrollEnabled.set(false);
+      newFixture.detectChanges();
+
+      const newDroppableEl = newFixture.debugElement.query(By.directive(DroppableDirective))
+        .nativeElement as HTMLElement;
+      makeScrollable(newDroppableEl);
+
+      newFixture.componentInstance.autoScrollEnabled.set(true);
+      newFixture.detectChanges();
+      registerSpy.mockClear();
+      unregisterSpy.mockClear();
+
+      newFixture.componentInstance.droppableId.set('updated-list');
+      newFixture.detectChanges();
+
+      expect(unregisterSpy).toHaveBeenCalledWith('test-list');
+      expect(registerSpy).toHaveBeenCalledWith('updated-list', newDroppableEl, {});
+
+      newFixture.destroy();
+    });
+
     it('should unregister from auto-scroll on destroy', () => {
       const unregisterSpy = jest.spyOn(autoScrollService, 'unregisterContainer');
 

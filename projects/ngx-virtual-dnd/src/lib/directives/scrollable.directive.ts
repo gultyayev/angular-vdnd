@@ -14,6 +14,7 @@ import {
   bindRafThrottledScrollTopSignal,
   bindResizeObserverHeightSignal,
 } from '../utils/dom-signal-bindings';
+import { createAutoScrollRegistration } from '../utils/auto-scroll-registration';
 
 /**
  * Directive that marks an element as a scrollable container for virtual scrolling.
@@ -92,6 +93,16 @@ export class ScrollableDirective implements VdndScrollContainer, OnInit, OnDestr
 
   // ========== VdndScrollContainer Implementation ==========
 
+  constructor() {
+    createAutoScrollRegistration({
+      autoScrollService: this.#autoScrollService,
+      getElement: () => this.nativeElement,
+      getId: () => this.scrollContainerId() ?? this.#generatedScrollId,
+      enabled: () => this.autoScrollEnabled(),
+      config: () => this.autoScrollConfig(),
+    });
+  }
+
   get nativeElement(): HTMLElement {
     return this.#elementRef.nativeElement;
   }
@@ -128,13 +139,11 @@ export class ScrollableDirective implements VdndScrollContainer, OnInit, OnDestr
   ngOnInit(): void {
     this.#setupScrollListener();
     this.#setupResizeObserver();
-    this.#registerAutoScroll();
   }
 
   ngOnDestroy(): void {
     this.#scrollCleanup?.();
     this.#resizeCleanup?.();
-    this.#unregisterAutoScroll();
   }
 
   // ========== Private Methods ==========
@@ -158,17 +167,5 @@ export class ScrollableDirective implements VdndScrollContainer, OnInit, OnDestr
       height: this.#containerHeight,
       minDeltaPx: 1,
     });
-  }
-
-  #registerAutoScroll(): void {
-    if (this.autoScrollEnabled()) {
-      const id = this.scrollContainerId() ?? this.#generatedScrollId;
-      this.#autoScrollService.registerContainer(id, this.nativeElement, this.autoScrollConfig());
-    }
-  }
-
-  #unregisterAutoScroll(): void {
-    const id = this.scrollContainerId() ?? this.#generatedScrollId;
-    this.#autoScrollService.unregisterContainer(id);
   }
 }

@@ -6,7 +6,7 @@ import {
   VirtualScrollItemContext,
 } from './virtual-scroll-container.component';
 import { DragStateService } from '../services/drag-state.service';
-import { AutoScrollService } from '../services/auto-scroll.service';
+import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
 import { PositionCalculatorService } from '../services/position-calculator.service';
 import { DraggedItem } from '../models/drag-drop.models';
 
@@ -49,6 +49,7 @@ interface TestItem {
       [itemTemplate]="itemTpl"
       [scrollContainerId]="scrollContainerId()"
       [autoScrollEnabled]="autoScrollEnabled()"
+      [autoScrollConfig]="autoScrollConfig()"
     >
     </vdnd-virtual-scroll>
   `,
@@ -63,6 +64,7 @@ class TestHostComponent {
   stickyItemIds = signal<string[]>([]);
   scrollContainerId = signal<string | undefined>('test-scroll');
   autoScrollEnabled = signal(true);
+  autoScrollConfig = signal<Partial<AutoScrollConfig>>({});
 
   readonly itemIdFn = (item: TestItem): string => item.id;
   readonly trackByFn = (_: number, item: TestItem): string => item.id;
@@ -398,6 +400,33 @@ describe('VirtualScrollContainerComponent', () => {
       fixture.destroy();
 
       expect(unregisterSpy).toHaveBeenCalledWith('test-scroll');
+    });
+
+    it('should unregister when autoScrollEnabled changes to false', () => {
+      const unregisterSpy = jest.spyOn(autoScrollService, 'unregisterContainer');
+      unregisterSpy.mockClear();
+
+      component.autoScrollEnabled.set(false);
+      fixture.detectChanges();
+
+      expect(unregisterSpy).toHaveBeenCalledWith('test-scroll');
+    });
+
+    it('should re-register when scroll ID and auto-scroll config change', () => {
+      const registerSpy = jest.spyOn(autoScrollService, 'registerContainer');
+      const unregisterSpy = jest.spyOn(autoScrollService, 'unregisterContainer');
+      registerSpy.mockClear();
+      unregisterSpy.mockClear();
+
+      component.autoScrollConfig.set({ threshold: 90, maxSpeed: 25 });
+      component.scrollContainerId.set('updated-scroll');
+      fixture.detectChanges();
+
+      expect(unregisterSpy).toHaveBeenCalledWith('test-scroll');
+      expect(registerSpy).toHaveBeenCalledWith('updated-scroll', virtualScrollEl, {
+        threshold: 90,
+        maxSpeed: 25,
+      });
     });
 
     it('should not register if autoScrollEnabled is false', () => {

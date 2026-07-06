@@ -17,6 +17,7 @@ import {
   bindRafThrottledScrollTopSignal,
   bindResizeObserverHeightSignal,
 } from '../utils/dom-signal-bindings';
+import { createAutoScrollRegistration } from '../utils/auto-scroll-registration';
 import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
 import { FixedHeightStrategy } from '../strategies/fixed-height.strategy';
 import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
@@ -233,16 +234,24 @@ export class VirtualViewportComponent
 
   // ========== Lifecycle ==========
 
+  constructor() {
+    createAutoScrollRegistration({
+      autoScrollService: this.#autoScrollService,
+      getElement: () => this.nativeElement,
+      getId: () => this.scrollContainerId() ?? this.#generatedScrollId,
+      enabled: () => this.autoScrollEnabled(),
+      config: () => this.autoScrollConfig(),
+    });
+  }
+
   ngOnInit(): void {
     this.#setupScrollListener();
     this.#setupResizeObserver();
-    this.#registerAutoScroll();
   }
 
   ngOnDestroy(): void {
     this.#scrollCleanup?.();
     this.#resizeCleanup?.();
-    this.#unregisterAutoScroll();
   }
 
   // ========== Private Methods ==========
@@ -266,17 +275,5 @@ export class VirtualViewportComponent
       height: this.#containerHeight,
       minDeltaPx: 1,
     });
-  }
-
-  #registerAutoScroll(): void {
-    if (this.autoScrollEnabled()) {
-      const id = this.scrollContainerId() ?? this.#generatedScrollId;
-      this.#autoScrollService.registerContainer(id, this.nativeElement, this.autoScrollConfig());
-    }
-  }
-
-  #unregisterAutoScroll(): void {
-    const id = this.scrollContainerId() ?? this.#generatedScrollId;
-    this.#autoScrollService.unregisterContainer(id);
   }
 }
