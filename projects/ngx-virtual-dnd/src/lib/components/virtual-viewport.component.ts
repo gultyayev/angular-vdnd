@@ -183,6 +183,7 @@ export class VirtualViewportComponent
   readonly contentTransform = computed(() => {
     const startIndex = this.#renderStartIndex();
     const s = this.#strategy();
+    s.version();
     const offset = s.getOffsetForIndex(startIndex);
     return `translateY(${offset}px)`;
   });

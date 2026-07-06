@@ -1,6 +1,5 @@
-import { Component, signal } from '@angular/core';
+import { Component, provideZonelessChangeDetection, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideZonelessChangeDetection } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { VirtualContentComponent } from './virtual-content.component';
 import { ContentHeaderDirective } from '../directives/content-header.directive';
@@ -118,6 +117,21 @@ describe('VirtualContentComponent', () => {
     it('should have effectiveContentOffset of 0', () => {
       const virtualContent = fixture.debugElement.query(By.directive(VirtualContentComponent));
       expect(virtualContent.nativeElement.getAttribute('data-content-offset')).toBe('0');
+    });
+
+    it('should update fixed-height content transform when excluded index changes', () => {
+      const virtualContent = fixture.debugElement.query(By.directive(VirtualContentComponent))
+        .componentInstance as VirtualContentComponent;
+
+      virtualContent.setRenderStartIndex(10);
+      fixture.detectChanges();
+
+      expect(virtualContent.contentTransform()).toBe('translateY(500px)');
+
+      virtualContent.strategy.setExcludedIndex(2);
+      fixture.detectChanges();
+
+      expect(virtualContent.contentTransform()).toBe('translateY(450px)');
     });
   });
 
