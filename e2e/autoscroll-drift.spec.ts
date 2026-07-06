@@ -1,5 +1,36 @@
-import { expect, test } from '@playwright/test';
+import { expect, Page, test } from '@playwright/test';
 import { DemoPage } from './fixtures/demo.page';
+
+interface DriftSnapshot {
+  placeholder: string;
+  actualIndex: number;
+  expectedIndex: number;
+  scrollTop: number;
+  indexDrift: number;
+}
+
+async function getDriftSnapshot(
+  page: Page,
+  demoPage: DemoPage,
+  list: 'list1' | 'list2',
+  getExpectedIndex: (scrollTop: number) => number,
+): Promise<DriftSnapshot> {
+  const scrollTop = await demoPage.getScrollTop(list);
+  const dragState = await page.getByTestId('drag-state-debug').textContent();
+  const indexMatch = dragState?.match(/"placeholderIndex":\s*(\d+)/);
+  const actualIndex = indexMatch ? parseInt(indexMatch[1], 10) : -1;
+  const placeholderMatch = dragState?.match(/"placeholder":\s*"([^"]+)"/);
+  const placeholder = placeholderMatch ? placeholderMatch[1] : 'unknown';
+  const expectedIndex = getExpectedIndex(scrollTop);
+
+  return {
+    placeholder,
+    actualIndex,
+    expectedIndex,
+    scrollTop,
+    indexDrift: Math.abs(expectedIndex - actualIndex),
+  };
+}
 
 test.describe('Autoscroll Placeholder Drift', () => {
   let demoPage: DemoPage;
@@ -37,40 +68,35 @@ test.describe('Autoscroll Placeholder Drift', () => {
     const nearBottomY = containerBox.y + containerBox.height - 20;
     await page.mouse.move(containerBox.x + 100, nearBottomY, { steps: 10 });
 
-    // Intentional delay: accumulate autoscroll distance (~3s should scroll ~60 items)
-    await page.waitForTimeout(3000);
+    await expect(async () => {
+      const driftSnapshot = await getDriftSnapshot(
+        page,
+        demoPage,
+        'list2',
+        (scrollTop) => Math.floor(scrollTop / 50) + 7,
+      );
+      expect(
+        driftSnapshot.scrollTop,
+        `ScrollTop should exceed 1200, current: ${driftSnapshot.scrollTop}`,
+      ).toBeGreaterThan(1200);
+      expect(driftSnapshot.indexDrift).toBeLessThan(3);
+    }).toPass({ timeout: 10000 });
 
-    const scrollTop = await demoPage.getScrollTop('list2');
-
-    // Get the actual placeholderIndex from drag state - this is the authoritative source
-    const dragState = await page.evaluate(() => {
-      const stateEl = document.querySelector('h3 + pre, .drag-state');
-      if (stateEl) return stateEl.textContent;
-      return document.body.innerText;
-    });
-
-    // Calculate expected placeholder index based on scroll position and cursor
-    // Cursor is near bottom of container, so expected index should be near scrollTop/50 + visible items
-    const expectedIndex = Math.floor(scrollTop / 50) + 7; // 7 visible items, cursor near bottom
-
-    // Extract actual placeholderIndex from drag state (numeric value, not the string ID)
-    const indexMatch = dragState?.match(/"placeholderIndex":\s*(\d+)/);
-    const actualPlaceholderIndex = indexMatch ? parseInt(indexMatch[1], 10) : -1;
-
-    // Also get placeholderId for logging
-    const placeholderMatch = dragState?.match(/"placeholder":\s*"([^"]+)"/);
-    const placeholderValue = placeholderMatch ? placeholderMatch[1] : 'unknown';
-
-    const indexDrift = Math.abs(expectedIndex - actualPlaceholderIndex);
+    const snapshot = await getDriftSnapshot(
+      page,
+      demoPage,
+      'list2',
+      (scrollTop) => Math.floor(scrollTop / 50) + 7,
+    );
 
     testInfo.attach('list2-extended-drift', {
       body: JSON.stringify(
         {
-          placeholder: placeholderValue,
-          actualIndex: actualPlaceholderIndex,
-          expectedIndex,
-          scrollTop,
-          indexDrift,
+          placeholder: snapshot.placeholder,
+          actualIndex: snapshot.actualIndex,
+          expectedIndex: snapshot.expectedIndex,
+          scrollTop: snapshot.scrollTop,
+          indexDrift: snapshot.indexDrift,
         },
         null,
         2,
@@ -79,11 +105,11 @@ test.describe('Autoscroll Placeholder Drift', () => {
     });
 
     // Should scroll through most of the list (WebKit scrolls slightly slower than Chromium)
-    expect(scrollTop).toBeGreaterThan(1200);
+    expect(snapshot.scrollTop).toBeGreaterThan(1200);
 
     // INDEX drift is the real bug - placeholder index should match cursor position
     // After Safari drift fix, allow tight tolerance of 3 items for edge cases
-    expect(indexDrift).toBeLessThan(3);
+    expect(snapshot.indexDrift).toBeLessThan(3);
 
     await page.mouse.up();
   });
@@ -107,39 +133,35 @@ test.describe('Autoscroll Placeholder Drift', () => {
     const nearBottomY = containerBox.y + containerBox.height - 25;
     await page.mouse.move(containerBox.x + 100, nearBottomY);
 
-    // Intentional delay: accumulate autoscroll distance (~3s should scroll 60+ items)
-    await page.waitForTimeout(3000);
+    await expect(async () => {
+      const driftSnapshot = await getDriftSnapshot(
+        page,
+        demoPage,
+        'list1',
+        (scrollTop) => Math.floor(scrollTop / 50) + 7,
+      );
+      expect(
+        driftSnapshot.scrollTop,
+        `ScrollTop should exceed 500, current: ${driftSnapshot.scrollTop}`,
+      ).toBeGreaterThan(500);
+      expect(driftSnapshot.indexDrift).toBeLessThan(3);
+    }).toPass({ timeout: 10000 });
 
-    const scrollTop = await demoPage.getScrollTop('list1');
-
-    // Get the actual placeholderIndex from drag state
-    const dragState = await page.evaluate(() => {
-      const stateEl = document.querySelector('h3 + pre, .drag-state');
-      if (stateEl) return stateEl.textContent;
-      return document.body.innerText;
-    });
-
-    // Calculate expected placeholder index based on scroll position and cursor
-    const expectedIndex = Math.floor(scrollTop / 50) + 7;
-
-    // Extract actual placeholderIndex from drag state (numeric value)
-    const indexMatch = dragState?.match(/"placeholderIndex":\s*(\d+)/);
-    const actualPlaceholderIndex = indexMatch ? parseInt(indexMatch[1], 10) : -1;
-
-    // Also get placeholderId for logging
-    const placeholderMatch = dragState?.match(/"placeholder":\s*"([^"]+)"/);
-    const placeholderValue = placeholderMatch ? placeholderMatch[1] : 'unknown';
-
-    const indexDrift = Math.abs(expectedIndex - actualPlaceholderIndex);
+    const snapshot = await getDriftSnapshot(
+      page,
+      demoPage,
+      'list1',
+      (scrollTop) => Math.floor(scrollTop / 50) + 7,
+    );
 
     testInfo.attach('list1-down-drift', {
       body: JSON.stringify(
         {
-          placeholder: placeholderValue,
-          actualIndex: actualPlaceholderIndex,
-          expectedIndex,
-          scrollTop,
-          indexDrift,
+          placeholder: snapshot.placeholder,
+          actualIndex: snapshot.actualIndex,
+          expectedIndex: snapshot.expectedIndex,
+          scrollTop: snapshot.scrollTop,
+          indexDrift: snapshot.indexDrift,
         },
         null,
         2,
@@ -148,10 +170,10 @@ test.describe('Autoscroll Placeholder Drift', () => {
     });
 
     // Verify we scrolled at least some amount (test validity check)
-    expect(scrollTop).toBeGreaterThan(500);
+    expect(snapshot.scrollTop).toBeGreaterThan(500);
 
     // Index drift should be minimal - after Safari drift fix, allow tight tolerance
-    expect(indexDrift).toBeLessThan(3);
+    expect(snapshot.indexDrift).toBeLessThan(3);
 
     await page.mouse.up();
   });
@@ -173,39 +195,35 @@ test.describe('Autoscroll Placeholder Drift', () => {
     const nearBottomY = containerBox.y + containerBox.height - 25;
     await page.mouse.move(containerBox.x + 100, nearBottomY);
 
-    // Intentional delay: 5 seconds of autoscroll to maximize drift potential
-    await page.waitForTimeout(5000);
+    await expect(async () => {
+      const driftSnapshot = await getDriftSnapshot(
+        page,
+        demoPage,
+        'list1',
+        (scrollTop) => Math.floor(scrollTop / 50) + 7,
+      );
+      expect(
+        driftSnapshot.scrollTop,
+        `ScrollTop should exceed 1500, current: ${driftSnapshot.scrollTop}`,
+      ).toBeGreaterThan(1500);
+      expect(driftSnapshot.indexDrift).toBeLessThan(3);
+    }).toPass({ timeout: 15000 });
 
-    const scrollTop = await demoPage.getScrollTop('list1');
-
-    // Get the actual placeholderIndex from drag state
-    const dragState = await page.evaluate(() => {
-      const stateEl = document.querySelector('h3 + pre, .drag-state');
-      if (stateEl) return stateEl.textContent;
-      return document.body.innerText;
-    });
-
-    // Calculate expected placeholder index
-    const expectedIndex = Math.floor(scrollTop / 50) + 7;
-
-    // Extract actual placeholderIndex from drag state (numeric value)
-    const indexMatch = dragState?.match(/"placeholderIndex":\s*(\d+)/);
-    const actualPlaceholderIndex = indexMatch ? parseInt(indexMatch[1], 10) : -1;
-
-    // Also get placeholderId for logging
-    const placeholderMatch = dragState?.match(/"placeholder":\s*"([^"]+)"/);
-    const placeholderValue = placeholderMatch ? placeholderMatch[1] : 'unknown';
-
-    const indexDrift = Math.abs(expectedIndex - actualPlaceholderIndex);
+    const snapshot = await getDriftSnapshot(
+      page,
+      demoPage,
+      'list1',
+      (scrollTop) => Math.floor(scrollTop / 50) + 7,
+    );
 
     testInfo.attach('extended-drift', {
       body: JSON.stringify(
         {
-          placeholder: placeholderValue,
-          actualIndex: actualPlaceholderIndex,
-          expectedIndex,
-          scrollTop,
-          indexDrift,
+          placeholder: snapshot.placeholder,
+          actualIndex: snapshot.actualIndex,
+          expectedIndex: snapshot.expectedIndex,
+          scrollTop: snapshot.scrollTop,
+          indexDrift: snapshot.indexDrift,
         },
         null,
         2,
@@ -214,7 +232,7 @@ test.describe('Autoscroll Placeholder Drift', () => {
     });
 
     // Same tolerance even after extended scroll - drift should not grow
-    expect(indexDrift).toBeLessThan(3);
+    expect(snapshot.indexDrift).toBeLessThan(3);
 
     await page.mouse.up();
   });
@@ -242,39 +260,29 @@ test.describe('Autoscroll Placeholder Drift', () => {
     const nearTopY = containerBox.y + 25;
     await page.mouse.move(containerBox.x + 100, nearTopY);
 
-    // Intentional delay: accumulate autoscroll distance upward
-    await page.waitForTimeout(3000);
+    await expect(async () => {
+      const driftSnapshot = await getDriftSnapshot(page, demoPage, 'list1', (scrollTop) =>
+        Math.floor(scrollTop / 50),
+      );
+      expect(
+        driftSnapshot.scrollTop,
+        `ScrollTop should drop below 1000, current: ${driftSnapshot.scrollTop}`,
+      ).toBeLessThan(1000);
+      expect(driftSnapshot.indexDrift).toBeLessThan(3);
+    }).toPass({ timeout: 10000 });
 
-    const scrollTop = await demoPage.getScrollTop('list1');
-
-    // Get the actual placeholderIndex from drag state
-    const dragState = await page.evaluate(() => {
-      const stateEl = document.querySelector('h3 + pre, .drag-state');
-      if (stateEl) return stateEl.textContent;
-      return document.body.innerText;
-    });
-
-    // Calculate expected placeholder index - cursor at top of viewport
-    const expectedIndex = Math.floor(scrollTop / 50);
-
-    // Extract actual placeholderIndex from drag state (numeric value)
-    const indexMatch = dragState?.match(/"placeholderIndex":\s*(\d+)/);
-    const actualPlaceholderIndex = indexMatch ? parseInt(indexMatch[1], 10) : -1;
-
-    // Also get placeholderId for logging
-    const placeholderMatch = dragState?.match(/"placeholder":\s*"([^"]+)"/);
-    const placeholderValue = placeholderMatch ? placeholderMatch[1] : 'unknown';
-
-    const indexDrift = Math.abs(expectedIndex - actualPlaceholderIndex);
+    const snapshot = await getDriftSnapshot(page, demoPage, 'list1', (scrollTop) =>
+      Math.floor(scrollTop / 50),
+    );
 
     testInfo.attach('up-drift', {
       body: JSON.stringify(
         {
-          placeholder: placeholderValue,
-          actualIndex: actualPlaceholderIndex,
-          expectedIndex,
-          scrollTop,
-          indexDrift,
+          placeholder: snapshot.placeholder,
+          actualIndex: snapshot.actualIndex,
+          expectedIndex: snapshot.expectedIndex,
+          scrollTop: snapshot.scrollTop,
+          indexDrift: snapshot.indexDrift,
         },
         null,
         2,
@@ -283,7 +291,7 @@ test.describe('Autoscroll Placeholder Drift', () => {
     });
 
     // Index drift should be minimal - after Safari drift fix, allow tight tolerance
-    expect(indexDrift).toBeLessThan(3);
+    expect(snapshot.indexDrift).toBeLessThan(3);
 
     await page.mouse.up();
   });
@@ -302,14 +310,19 @@ test.describe('Autoscroll Placeholder Drift', () => {
 
     // Move to bottom and wait for autoscroll to reach absolute end
     await page.mouse.move(containerBox.x + 100, containerBox.y + containerBox.height - 20);
-    // Intentional delay: long wait for autoscroll to reach the end of the list
-    await page.waitForTimeout(8000);
+    await expect(async () => {
+      const scrollInfo = await demoPage.list1VirtualScroll.evaluate((el) => ({
+        scrollTop: el.scrollTop,
+        scrollHeight: el.scrollHeight,
+        clientHeight: el.clientHeight,
+      }));
+      expect(scrollInfo.scrollTop + scrollInfo.clientHeight).toBeGreaterThanOrEqual(
+        scrollInfo.scrollHeight - 2,
+      );
+    }).toPass({ timeout: 15000 });
 
     // Get the drag state
-    const dragState = await page.evaluate(() => {
-      const stateEl = document.querySelector('h3 + pre, .drag-state');
-      return stateEl?.textContent;
-    });
+    const dragState = await page.getByTestId('drag-state-debug').textContent();
 
     const indexMatch = dragState?.match(/"placeholderIndex":\s*(\d+)/);
     const placeholderIndex = indexMatch ? parseInt(indexMatch[1], 10) : -1;
@@ -362,17 +375,22 @@ test.describe('Autoscroll Placeholder Drift', () => {
     // Perform 5 up-down cycles (more aggressive test)
     for (let cycle = 0; cycle < 5; cycle++) {
       // Move to bottom, wait for autoscroll to reach bottom
+      const bottomStartScrollTop = await demoPage.getScrollTop('list1');
       await page.mouse.move(centerX, nearBottomY, { steps: 5 });
-      // Intentional delay: accumulate autoscroll distance downward
-      await page.waitForTimeout(3000);
+      await expect(async () => {
+        const currentScrollTop = await demoPage.getScrollTop('list1');
+        expect(currentScrollTop).toBeGreaterThan(Math.max(bottomStartScrollTop + 300, 1000));
+      }).toPass({ timeout: 10000 });
 
       const bottomScrollTop = await demoPage.getScrollTop('list1');
       const bottomItems = await demoPage.list1Items.count();
 
       // Move to top, wait for autoscroll to reach top
       await page.mouse.move(centerX, nearTopY, { steps: 5 });
-      // Intentional delay: accumulate autoscroll distance upward
-      await page.waitForTimeout(3000);
+      await expect(async () => {
+        const currentScrollTop = await demoPage.getScrollTop('list1');
+        expect(currentScrollTop).toBeLessThan(bottomScrollTop - 300);
+      }).toPass({ timeout: 10000 });
 
       const topScrollTop = await demoPage.getScrollTop('list1');
       const topItems = await demoPage.list1Items.count();
@@ -412,10 +430,7 @@ test.describe('Autoscroll Placeholder Drift', () => {
     expect(visibleItems).toBeGreaterThan(0);
 
     // Get drag state
-    const dragState = await page.evaluate(() => {
-      const stateEl = document.querySelector('h3 + pre, .drag-state');
-      return stateEl?.textContent;
-    });
+    const dragState = await page.getByTestId('drag-state-debug').textContent();
 
     // Verify placeholder index is reasonable (within list bounds)
     const indexMatch = dragState?.match(/"placeholderIndex":\s*(\d+)/);
@@ -460,21 +475,19 @@ test.describe('Autoscroll Placeholder Drift', () => {
 
     // Helper to get current placeholder index and preview position
     const getState = async () => {
-      const state = await page.evaluate(() => {
-        const stateEl = document.querySelector('h3 + pre');
-        const preview = document.querySelector('.vdnd-drag-preview');
-        const previewRect = preview?.getBoundingClientRect();
+      const dragState = await page.getByTestId('drag-state-debug').textContent();
+      const preview = await demoPage.dragPreview.evaluate((el) => {
+        const previewRect = el.getBoundingClientRect();
         return {
-          dragState: stateEl?.textContent,
           previewTop: previewRect?.top ?? 0,
           previewBottom: previewRect?.bottom ?? 0,
         };
       });
-      const indexMatch = state.dragState?.match(/"placeholderIndex":\s*(\d+)/);
+      const indexMatch = dragState?.match(/"placeholderIndex":\s*(\d+)/);
       return {
         placeholderIndex: indexMatch ? parseInt(indexMatch[1], 10) : -1,
-        previewTop: state.previewTop,
-        previewBottom: state.previewBottom,
+        previewTop: preview.previewTop,
+        previewBottom: preview.previewBottom,
       };
     };
 
@@ -488,26 +501,30 @@ test.describe('Autoscroll Placeholder Drift', () => {
       const currentY = cycle === 0 ? startY : topEdge + 30;
       for (let y = currentY; y < bottomEdge - 15; y += 20) {
         await page.mouse.move(startX, y, { steps: 3 });
-        // Intentional short delay: simulate real user slowly moving the mouse
-        await page.waitForTimeout(100);
+        await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
       }
 
       // Stay at bottom edge for autoscroll
+      const bottomStartScroll = await demoPage.getScrollTop('list2');
       await page.mouse.move(startX, bottomEdge - 15, { steps: 3 });
-      // Intentional delay: accumulate autoscroll distance downward
-      await page.waitForTimeout(4000);
+      await expect(async () => {
+        const currentScrollTop = await demoPage.getScrollTop('list2');
+        expect(currentScrollTop).toBeGreaterThan(bottomStartScroll + 500);
+      }).toPass({ timeout: 10000 });
 
       // Slowly approach top edge
       for (let y = bottomEdge - 15; y > topEdge + 15; y -= 20) {
         await page.mouse.move(startX, y, { steps: 3 });
-        // Intentional short delay: simulate real user slowly moving the mouse
-        await page.waitForTimeout(100);
+        await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
       }
 
       // Stay at top edge for autoscroll
+      const topStartScroll = await demoPage.getScrollTop('list2');
       await page.mouse.move(startX, topEdge + 15, { steps: 3 });
-      // Intentional delay: accumulate autoscroll distance upward
-      await page.waitForTimeout(4000);
+      await expect(async () => {
+        const currentScrollTop = await demoPage.getScrollTop('list2');
+        expect(currentScrollTop).toBeLessThan(topStartScroll - 300);
+      }).toPass({ timeout: 10000 });
 
       const topState = await getState();
       const topScroll = await demoPage.getScrollTop('list2');
@@ -561,36 +578,43 @@ test.describe('Autoscroll Placeholder Drift', () => {
       // Rapid direction changes - this is where Safari drift is most visible
       for (let i = 0; i < 3; i++) {
         // Quick move to bottom
+        const bottomStartScroll = await demoPage.getScrollTop('list1');
         await page.mouse.move(centerX, nearBottomY, { steps: 3 });
-        // Intentional delay: accumulate some autoscroll before direction change
-        await page.waitForTimeout(800);
+        await expect(async () => {
+          const currentScrollTop = await demoPage.getScrollTop('list1');
+          expect(currentScrollTop).toBeGreaterThan(bottomStartScroll + 50);
+        }).toPass({ timeout: 5000 });
 
         // Quick move to top
+        const topStartScroll = await demoPage.getScrollTop('list1');
         await page.mouse.move(centerX, nearTopY, { steps: 3 });
-        // Intentional delay: accumulate some autoscroll before direction change
-        await page.waitForTimeout(800);
+        await expect(async () => {
+          const currentScrollTop = await demoPage.getScrollTop('list1');
+          expect(currentScrollTop).toBeLessThan(topStartScroll - 50);
+        }).toPass({ timeout: 5000 });
       }
 
       // Check final drift
-      const scrollTop = await demoPage.getScrollTop('list1');
-      const dragState = await page.evaluate(() => {
-        const stateEl = document.querySelector('h3 + pre');
-        return stateEl?.textContent;
-      });
-
-      const indexMatch = dragState?.match(/"placeholderIndex":\s*(\d+)/);
-      const actualIndex = indexMatch ? parseInt(indexMatch[1], 10) : -1;
-      const expectedIndex = Math.floor(scrollTop / 50);
-
-      const drift = Math.abs(expectedIndex - actualIndex);
+      const snapshot = await getDriftSnapshot(page, demoPage, 'list1', (scrollTop) =>
+        Math.floor(scrollTop / 50),
+      );
 
       testInfo.attach('safari-rapid-direction-drift', {
-        body: JSON.stringify({ drift, actualIndex, expectedIndex, scrollTop }, null, 2),
+        body: JSON.stringify(
+          {
+            drift: snapshot.indexDrift,
+            actualIndex: snapshot.actualIndex,
+            expectedIndex: snapshot.expectedIndex,
+            scrollTop: snapshot.scrollTop,
+          },
+          null,
+          2,
+        ),
         contentType: 'application/json',
       });
 
       // After fix, drift should be minimal even with rapid direction changes
-      expect(drift).toBeLessThan(3);
+      expect(snapshot.indexDrift).toBeLessThan(3);
 
       await page.mouse.up();
     });
@@ -605,14 +629,8 @@ test.describe('Autoscroll Placeholder Drift', () => {
       expect(scrollTop).toBeGreaterThan(1000);
     }).toPass({ timeout: 2000 });
 
-    // Wait for items to stabilize after scroll, then pick a visible item near the bottom
-    let itemCoords: { x: number; y: number; width: number; height: number } | null = null;
-    await expect(async () => {
-      itemCoords = await page.evaluate(() => {
-        const container = document.querySelector(
-          '[data-droppable-id="list-1"] vdnd-virtual-scroll',
-        );
-        if (!container) return null;
+    const getVisibleBottomItem = async () =>
+      demoPage.list1VirtualScroll.evaluate((container) => {
         const containerRect = container.getBoundingClientRect();
         const items = container.querySelectorAll('[data-draggable-id]');
         // Pick the last visible item
@@ -629,8 +647,14 @@ test.describe('Autoscroll Placeholder Drift', () => {
         }
         return bestItem;
       });
+
+    // Wait for items to stabilize after scroll, then pick a visible item near the bottom
+    await expect(async () => {
+      const itemCoords = await getVisibleBottomItem();
       expect(itemCoords).not.toBeNull();
     }).toPass({ timeout: 3000 });
+
+    const itemCoords = await getVisibleBottomItem();
     if (!itemCoords) throw new Error('Could not find visible item near bottom');
 
     await page.mouse.move(

@@ -198,7 +198,7 @@
               [dragDelay]="dragDelay()"
               [dragHandle]="useDragHandle() ? '.item-handle' : undefined"
             >
-              <span class="item-handle">
+              <span class="item-handle" data-testid="demo-item-handle">
                 <svg viewBox="0 0 24 24" fill="currentColor">
                   <circle cx="9" cy="6" r="1.5" />
                   <circle cx="15" cy="6" r="1.5" />
@@ -208,14 +208,14 @@
                   <circle cx="15" cy="18" r="1.5" />
                 </svg>
               </span>
-              <span class="item-text">{{ item.name }}</span>
+              <span class="item-text" data-testid="demo-item-text">{{ item.name }}</span>
             </div>
           </ng-template>
 
-          <div class="list-card">
+          <div class="list-card" data-testid="list-1-card">
             <div class="list-header">
               <h3 class="list-title">List 1</h3>
-              <span class="list-badge">{{ list1().length }}</span>
+              <span class="list-badge" data-testid="list-1-count">{{ list1().length }}</span>
             </div>
             <vdnd-sortable-list
               class="list"
@@ -231,10 +231,10 @@
             />
           </div>
 
-          <div class="list-card">
+          <div class="list-card" data-testid="list-2-card">
             <div class="list-header">
               <h3 class="list-title">List 2</h3>
-              <span class="list-badge">{{ list2().length }}</span>
+              <span class="list-badge" data-testid="list-2-count">{{ list2().length }}</span>
             </div>
             <vdnd-sortable-list
               class="list"
@@ -265,7 +265,7 @@
               [dragDelay]="dragDelay()"
               [dragHandle]="useDragHandle() ? '.item-handle' : undefined"
             >
-              <span class="item-handle">
+              <span class="item-handle" data-testid="demo-item-handle">
                 <svg viewBox="0 0 24 24" fill="currentColor">
                   <circle cx="9" cy="6" r="1.5" />
                   <circle cx="15" cy="6" r="1.5" />
@@ -275,14 +275,14 @@
                   <circle cx="15" cy="18" r="1.5" />
                 </svg>
               </span>
-              <span class="item-text">{{ item.name }}</span>
+              <span class="item-text" data-testid="demo-item-text">{{ item.name }}</span>
             </div>
           </ng-template>
 
-          <div class="list-card">
+          <div class="list-card" data-testid="list-1-card">
             <div class="list-header">
               <h3 class="list-title">List 1</h3>
-              <span class="list-badge">{{ list1().length }}</span>
+              <span class="list-badge" data-testid="list-1-count">{{ list1().length }}</span>
             </div>
             <div
               class="list"
@@ -304,10 +304,10 @@
             </div>
           </div>
 
-          <div class="list-card">
+          <div class="list-card" data-testid="list-2-card">
             <div class="list-header">
               <h3 class="list-title">List 2</h3>
-              <span class="list-badge">{{ list2().length }}</span>
+              <span class="list-badge" data-testid="list-2-count">{{ list2().length }}</span>
             </div>
             <div
               class="list"
@@ -354,7 +354,9 @@
         </span>
       </button>
       @if (debugExpanded()) {
-        <pre class="debug-content drag-state">{{ debugState() | json }}</pre>
+        <pre class="debug-content drag-state" data-testid="drag-state-debug">
+          {{ debugState() | json }}
+        </pre>
       }
     </section>
   </main>

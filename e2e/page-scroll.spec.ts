@@ -1,9 +1,12 @@
 import { expect, test } from '@playwright/test';
+import { TaskDemoPage, taskDemoSelectors } from './fixtures/task-demo.page';
 
 test.describe('Page Scroll Demo', () => {
+  let taskDemo: TaskDemoPage;
   let consoleErrors: string[] = [];
 
   test.beforeEach(async ({ page }) => {
+    taskDemo = new TaskDemoPage(page);
     consoleErrors = [];
 
     // Collect console errors
@@ -13,9 +16,7 @@ test.describe('Page Scroll Demo', () => {
       }
     });
 
-    await page.goto('/page-scroll');
-    // Wait for initial render
-    await page.locator('.task-item').first().waitFor({ state: 'visible' });
+    await taskDemo.goto('/page-scroll');
   });
 
   test.afterEach(async () => {
@@ -26,38 +27,29 @@ test.describe('Page Scroll Demo', () => {
     expect(realErrors, 'Unexpected console errors detected').toHaveLength(0);
   });
 
-  test('should display tasks', async ({ page }) => {
-    const taskItems = page.locator('.task-item');
-    const count = await taskItems.count();
+  test('should display tasks', async () => {
+    const count = await taskDemo.items.count();
     expect(count).toBeGreaterThan(0);
   });
 
-  test('should filter tasks by category', async ({ page }) => {
+  test('should filter tasks by category', async () => {
     // Click on "Work" chip
-    await page.locator('ion-chip').filter({ hasText: 'Work' }).click();
+    await taskDemo.categoryFilter('work').click();
 
     // Wait for filter to apply by checking that only work badges are shown
     await expect(async () => {
-      const badges = page.locator('.task-item ion-badge');
-      const count = await badges.count();
-      expect(count).toBeGreaterThan(0);
-      for (let i = 0; i < count; i++) {
-        const text = await badges.nth(i).textContent();
-        expect(text?.trim()).toBe('work');
-      }
+      const categories = await taskDemo.getTaskCategoryTexts();
+      expect(categories.length).toBeGreaterThan(0);
+      expect(categories.every((text) => text === 'work')).toBe(true);
     }).toPass({ timeout: 2000 });
   });
 
   test('should reorder tasks within the list via drag and drop', async ({ page }) => {
     // Get second item text for verification
-    const secondItemText = await page
-      .locator('.task-item')
-      .nth(1)
-      .locator('.task-title')
-      .textContent();
+    const secondItemText = await taskDemo.getTaskTitle(1);
 
     // Get the first item's bounding box
-    const sourceItem = page.locator('.task-item').first();
+    const sourceItem = taskDemo.items.first();
     const sourceBox = await sourceItem.boundingBox();
     if (!sourceBox) throw new Error('Could not get source bounding box');
 
@@ -67,7 +59,7 @@ test.describe('Page Scroll Demo', () => {
     await page.mouse.move(sourceBox.x + 5, sourceBox.y + 5, { steps: 2 });
 
     // Wait for drag to initiate
-    await expect(page.locator('.vdnd-drag-preview')).toBeVisible({ timeout: 2000 });
+    await expect(taskDemo.dragPreview).toBeVisible({ timeout: 2000 });
 
     // Move to second item position (72px item height)
     const targetY = sourceBox.y + 72 + 36; // Move to center of second slot
@@ -80,17 +72,13 @@ test.describe('Page Scroll Demo', () => {
 
     // Verify reorder happened
     await expect(async () => {
-      const newFirstItemText = await page
-        .locator('.task-item')
-        .nth(0)
-        .locator('.task-title')
-        .textContent();
-      expect(newFirstItemText?.trim()).toBe(secondItemText?.trim());
+      const newFirstItemText = await taskDemo.getTaskTitle(0);
+      expect(newFirstItemText).toBe(secondItemText);
     }).toPass({ timeout: 2000 });
   });
 
   test('should show drag preview while dragging', async ({ page }) => {
-    const sourceItem = page.locator('.task-item').first();
+    const sourceItem = taskDemo.items.first();
     const sourceBox = await sourceItem.boundingBox();
     if (!sourceBox) throw new Error('Could not get source bounding box');
 
@@ -100,7 +88,7 @@ test.describe('Page Scroll Demo', () => {
     await page.mouse.move(sourceBox.x + 5, sourceBox.y + 5, { steps: 2 });
 
     // Wait for drag preview to appear
-    const dragPreview = page.locator('.vdnd-drag-preview');
+    const dragPreview = taskDemo.dragPreview;
     await expect(dragPreview).toBeVisible({ timeout: 2000 });
 
     // Move more to ensure drag is fully active
@@ -114,9 +102,9 @@ test.describe('Page Scroll Demo', () => {
 
   test('should handle rapid filter changes without errors', async ({ page }) => {
     // Rapidly change filters
-    const chips = ['Work', 'Personal', 'Urgent', 'All'];
-    for (const chip of chips) {
-      await page.locator('ion-chip').filter({ hasText: chip }).click();
+    const filters = ['work', 'personal', 'urgent', 'all'] as const;
+    for (const filter of filters) {
+      await taskDemo.categoryFilter(filter).click();
       // Wait one rAF between filter changes for rendering to process
       await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     }
@@ -129,18 +117,13 @@ test.describe('Page Scroll Demo', () => {
   test('should scroll and drag without errors', async ({ page }) => {
     // Scroll down — wrap write+read in toPass
     await expect(async () => {
-      await page.evaluate(() => {
-        const scrollContainer = document.querySelector('.scroll-container');
-        if (scrollContainer) scrollContainer.scrollTop = 500;
-      });
-      const scrollTop = await page.evaluate(
-        () => document.querySelector('.scroll-container')?.scrollTop ?? 0,
-      );
+      await taskDemo.scrollTo(500);
+      const scrollTop = await taskDemo.getScrollTop();
       expect(scrollTop).toBeGreaterThan(0);
     }).toPass({ timeout: 2000 });
 
     // Get a visible item
-    const visibleItem = page.locator('.task-item').first();
+    const visibleItem = taskDemo.items.first();
     const box = await visibleItem.boundingBox();
     if (!box) throw new Error('Could not get bounding box');
 
@@ -157,83 +140,52 @@ test.describe('Page Scroll Demo', () => {
     await expect(errorOverlay).not.toBeVisible();
   });
 
-  test('should maintain scroll consistency after scrolling', async ({ page }) => {
+  test('should maintain scroll consistency after scrolling', async () => {
     // Get initial first item text
-    const initialFirstItem = await page
-      .locator('.task-item')
-      .first()
-      .locator('.task-title')
-      .textContent();
+    const initialFirstItem = await taskDemo.getTaskTitle(0);
 
     // Get header height to calculate proper scroll offset
-    const headerHeight = await page.evaluate(() => {
-      const header = document.querySelector('.page-header');
-      return header ? header.getBoundingClientRect().height : 0;
-    });
+    const headerHeight = await taskDemo.getHeaderHeight();
 
     // Scroll down significantly past header — include first-item check in toPass
     const scrollAmount = headerHeight + 500;
     await expect(async () => {
-      await page.evaluate((amount) => {
-        const scrollContainer = document.querySelector('.scroll-container');
-        if (scrollContainer) scrollContainer.scrollTop = amount;
-      }, scrollAmount);
-      const scrollTop = await page.evaluate(
-        () => document.querySelector('.scroll-container')?.scrollTop ?? 0,
-      );
+      await taskDemo.scrollTo(scrollAmount);
+      const scrollTop = await taskDemo.getScrollTop();
       expect(scrollTop).toBeGreaterThan(0);
-      const afterScrollFirstItem = await page
-        .locator('.task-item')
-        .first()
-        .locator('.task-title')
-        .textContent();
-      expect(afterScrollFirstItem?.trim()).not.toBe(initialFirstItem?.trim());
+      const afterScrollFirstItem = await taskDemo.getTaskTitle(0);
+      expect(afterScrollFirstItem).not.toBe(initialFirstItem);
     }).toPass({ timeout: 3000 });
 
     // Scroll back up — include item check in toPass (virtual scroll needs a frame to re-render)
     await expect(async () => {
-      await page.evaluate(() => {
-        const scrollContainer = document.querySelector('.scroll-container');
-        if (scrollContainer) scrollContainer.scrollTop = 0;
-      });
-      const scrollTop = await page.evaluate(
-        () => document.querySelector('.scroll-container')?.scrollTop ?? 0,
-      );
+      await taskDemo.scrollTo(0);
+      const scrollTop = await taskDemo.getScrollTop();
       expect(scrollTop).toBe(0);
-      const restoredFirstItem = await page
-        .locator('.task-item')
-        .first()
-        .locator('.task-title')
-        .textContent();
-      expect(restoredFirstItem?.trim()).toBe(initialFirstItem?.trim());
+      const restoredFirstItem = await taskDemo.getTaskTitle(0);
+      expect(restoredFirstItem).toBe(initialFirstItem);
     }).toPass({ timeout: 3000 });
   });
 
-  test('should not show gray gaps when scrolling up rapidly', async ({ page }) => {
+  test('should not show gray gaps when scrolling up rapidly', async () => {
     // Scroll down significantly
     await expect(async () => {
-      await page.evaluate(() => {
-        const scrollContainer = document.querySelector('.scroll-container');
-        if (scrollContainer) scrollContainer.scrollTop = 2000;
-      });
-      const scrollTop = await page.evaluate(
-        () => document.querySelector('.scroll-container')?.scrollTop ?? 0,
-      );
+      await taskDemo.scrollTo(2000);
+      const scrollTop = await taskDemo.getScrollTop();
       expect(scrollTop).toBeGreaterThan(0);
     }).toPass({ timeout: 2000 });
 
     // Count visible items before rapid scroll
-    const countBefore = await page.locator('.task-item').count();
+    const countBefore = await taskDemo.items.count();
 
     // Rapidly scroll up 500px
-    await page.evaluate(() => {
-      const scrollContainer = document.querySelector('.scroll-container');
-      if (scrollContainer) scrollContainer.scrollTop -= 500;
+    await taskDemo.scrollContainer.evaluate((el) => {
+      el.scrollTop -= 500;
     });
 
     // Wait for virtual scroll to render items at new position
     await expect(async () => {
-      const countAfter = await page.locator('.task-item').count();
+      const countAfter = await taskDemo.items.count();
       expect(countAfter).toBeGreaterThan(countBefore - 3);
     }).toPass({ timeout: 2000 });
   });
@@ -241,51 +193,33 @@ test.describe('Page Scroll Demo', () => {
   test('should position drag placeholder correctly when scrolled', async ({ page }) => {
     // Scroll using retrying assertion (E2E.md: scroll write+read BOTH inside toPass)
     await expect(async () => {
-      await page.evaluate(() => {
-        const scrollContainer = document.querySelector('.scroll-container');
-        if (scrollContainer) scrollContainer.scrollTop = 1500;
-      });
-      const scrollTop = await page.evaluate(
-        () => document.querySelector('.scroll-container')?.scrollTop ?? 0,
-      );
+      await taskDemo.scrollTo(1500);
+      const scrollTop = await taskDemo.getScrollTop();
       expect(scrollTop).toBeGreaterThanOrEqual(1400);
     }).toPass({ timeout: 3000 });
 
     // Wait for virtual scroll to render items at new position
-    await expect(page.locator('.task-item').first()).toBeVisible({ timeout: 2000 });
+    await expect(taskDemo.items.first()).toBeVisible({ timeout: 2000 });
 
     // Virtual scroll renders overscan items above the viewport, and a sticky
     // category-chips header (z-index: 100) occludes items near the top.
     // Pick the source item by viewport position (center of scroll container)
     // to guarantee it's fully visible and not behind the sticky header.
-    const scrollBox = await page.locator('.scroll-container').boundingBox();
+    const scrollBox = await taskDemo.scrollContainer.boundingBox();
     if (!scrollBox) throw new Error('Could not get scroll container bounding box');
 
-    const sourceRect = await page.evaluate(
-      (centerY: number) => {
-        const items = document.querySelectorAll<HTMLElement>('.task-item');
-        for (const item of items) {
-          if (item.offsetParent === null) continue; // skip hidden
-          const rect = item.getBoundingClientRect();
-          if (rect.top < centerY && rect.bottom > centerY) {
-            return { top: rect.top, left: rect.left, width: rect.width, height: rect.height };
-          }
-        }
-        return null;
-      },
-      scrollBox.y + scrollBox.height * 0.4,
-    );
+    const sourceRect = await taskDemo.getItemBoxContainingY(scrollBox.y + scrollBox.height * 0.4);
     if (!sourceRect) throw new Error('Could not find visible task item at center');
 
-    const sourceX = sourceRect.left + sourceRect.width / 2;
-    const sourceY = sourceRect.top + sourceRect.height / 2;
+    const sourceX = sourceRect.x + sourceRect.width / 2;
+    const sourceY = sourceRect.y + sourceRect.height / 2;
 
     // Start drag
     await page.mouse.move(sourceX, sourceY);
     await page.mouse.down();
     await page.mouse.move(sourceX + 5, sourceY + 5, { steps: 2 });
 
-    const dragPreview = page.locator('.vdnd-drag-preview');
+    const dragPreview = taskDemo.dragPreview;
     await expect(dragPreview).toBeVisible({ timeout: 2000 });
 
     // Move 2 items below source — still well within the visible droppable area.
@@ -299,7 +233,7 @@ test.describe('Page Scroll Demo', () => {
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
 
     // Verify placeholder exists and is reasonably aligned with the target slot.
-    const placeholder = page.locator('.vdnd-drag-placeholder-visible');
+    const placeholder = taskDemo.visiblePlaceholder;
     await expect(placeholder).toBeVisible({ timeout: 3000 });
     await expect(async () => {
       const placeholderBox = await placeholder.boundingBox();
@@ -313,12 +247,12 @@ test.describe('Page Scroll Demo', () => {
 
   test('should keep drag preview visible during autoscroll', async ({ page }) => {
     // Get the scroll container and its dimensions
-    const scrollContainer = page.locator('.scroll-container');
+    const scrollContainer = taskDemo.scrollContainer;
     const scrollBox = await scrollContainer.boundingBox();
     if (!scrollBox) throw new Error('Could not get scroll container bounding box');
 
     // Get the first visible item
-    const sourceItem = page.locator('.task-item').first();
+    const sourceItem = taskDemo.items.first();
     const sourceBox = await sourceItem.boundingBox();
     if (!sourceBox) throw new Error('Could not get source bounding box');
 
@@ -328,7 +262,7 @@ test.describe('Page Scroll Demo', () => {
     await page.mouse.move(sourceBox.x + 5, sourceBox.y + 5, { steps: 2 });
 
     // Wait for drag preview to appear
-    const dragPreview = page.locator('.vdnd-drag-preview');
+    const dragPreview = taskDemo.dragPreview;
     await expect(dragPreview).toBeVisible({ timeout: 2000 });
 
     // Move to bottom edge to trigger autoscroll (25px from bottom)
@@ -341,17 +275,11 @@ test.describe('Page Scroll Demo', () => {
 
     // Wait for autoscroll to happen
     await expect(async () => {
-      const scrollTop = await page.evaluate(() => {
-        const container = document.querySelector('.scroll-container');
-        return container?.scrollTop ?? 0;
-      });
+      const scrollTop = await taskDemo.getScrollTop();
       expect(scrollTop, `ScrollTop should increase, current: ${scrollTop}`).toBeGreaterThan(0);
     }).toPass({ timeout: 5000 });
 
-    const scrollTop = await page.evaluate(() => {
-      const container = document.querySelector('.scroll-container');
-      return container?.scrollTop ?? 0;
-    });
+    const scrollTop = await taskDemo.getScrollTop();
 
     // Verify scroll happened (should be > 0 since we started at top)
     expect(scrollTop).toBeGreaterThan(0);
@@ -359,19 +287,19 @@ test.describe('Page Scroll Demo', () => {
     // CRITICAL: Verify drag preview is STILL visible after autoscroll
     await expect(dragPreview).toBeVisible();
 
-    // Continue autoscroll for longer to test extended scrolling — verify preview stays visible
-    // Intentional delay: let autoscroll accumulate more distance while checking preview
+    // Continue autoscroll for longer and verify preview stays visible while scroll advances.
+    let previousScrollTop = scrollTop;
     for (let i = 0; i < 5; i++) {
-      await page.waitForTimeout(300);
-      // Verify drag preview is STILL visible
-      await expect(dragPreview).toBeVisible();
+      await expect(async () => {
+        await expect(dragPreview).toBeVisible();
+        const currentScrollTop = await taskDemo.getScrollTop();
+        expect(currentScrollTop).toBeGreaterThan(previousScrollTop);
+      }).toPass({ timeout: 5000 });
+      previousScrollTop = await taskDemo.getScrollTop();
     }
 
     // Get final scroll position
-    const finalScrollTop = await page.evaluate(() => {
-      const container = document.querySelector('.scroll-container');
-      return container?.scrollTop ?? 0;
-    });
+    const finalScrollTop = await taskDemo.getScrollTop();
 
     // Should have scrolled significantly
     expect(finalScrollTop).toBeGreaterThan(scrollTop);
@@ -385,11 +313,11 @@ test.describe('Page Scroll Demo', () => {
   test('should keep drag preview and placeholder visible during long autoscroll', async ({
     page,
   }, testInfo) => {
-    const scrollContainer = page.locator('.scroll-container');
+    const scrollContainer = taskDemo.scrollContainer;
     const scrollBox = await scrollContainer.boundingBox();
     if (!scrollBox) throw new Error('Could not get scroll container bounding box');
 
-    const sourceItem = page.locator('.task-item').first();
+    const sourceItem = taskDemo.items.first();
     await sourceItem.scrollIntoViewIfNeeded();
     const sourceBox = await sourceItem.boundingBox();
     if (!sourceBox) throw new Error('Could not get source bounding box');
@@ -398,7 +326,7 @@ test.describe('Page Scroll Demo', () => {
     await page.mouse.down();
     await page.mouse.move(sourceBox.x + 5, sourceBox.y + 5, { steps: 2 });
 
-    const dragPreview = page.locator('.vdnd-drag-preview');
+    const dragPreview = taskDemo.dragPreview;
     await expect(dragPreview).toBeVisible({ timeout: 2000 });
 
     const edgeOffset = 25; // Use consistent 25px offset for all browsers (well within 50px threshold)
@@ -411,14 +339,11 @@ test.describe('Page Scroll Demo', () => {
     await page.mouse.move(targetX, bottomEdgeY);
 
     await expect(async () => {
-      const scrollTop = await page.evaluate(() => {
-        const container = document.querySelector('.scroll-container');
-        return container?.scrollTop ?? 0;
-      });
+      const scrollTop = await taskDemo.getScrollTop();
       expect(scrollTop, `Scroll should reach 2000px, current: ${scrollTop}`).toBeGreaterThan(2000);
     }).toPass({ timeout: 15000 });
 
-    const placeholder = page.locator('.vdnd-drag-placeholder');
+    const placeholder = taskDemo.placeholder;
     await expect(dragPreview).toBeVisible();
     await expect(placeholder).toBeVisible();
 
@@ -429,9 +354,9 @@ test.describe('Page Scroll Demo', () => {
     // Measure both elements atomically in a single browser evaluation to avoid
     // timing skew between sequential boundingBox() calls during rapid autoscroll
     const measureAlignment = async () => {
-      const result = await page.evaluate(() => {
-        const preview = document.querySelector('.vdnd-drag-preview');
-        const placeholder = document.querySelector('.vdnd-drag-placeholder');
+      const result = await page.evaluate((selectors) => {
+        const preview = document.querySelector(selectors.dragPreview);
+        const placeholder = document.querySelector(selectors.placeholder);
 
         if (!preview || !placeholder) {
           return null;
@@ -446,7 +371,7 @@ test.describe('Page Scroll Demo', () => {
           placeholderY: placeholderRect.top,
           placeholderHeight: placeholderRect.height,
         };
-      });
+      }, taskDemoSelectors);
 
       if (!result) throw new Error('Elements not rendered');
 
@@ -471,11 +396,15 @@ test.describe('Page Scroll Demo', () => {
     const { drift: initialDrift, itemHeight: initialItemHeight } = await measureAlignment();
     driftSamples.push(initialDrift);
 
+    let previousSampleScrollTop = await taskDemo.getScrollTop();
     for (let i = 0; i < 8; i++) {
-      // Intentional delay: let autoscroll continue between drift samples
-      await page.waitForTimeout(400);
-      await expect(dragPreview).toBeVisible();
-      await expect(placeholder).toBeVisible();
+      await expect(async () => {
+        await expect(dragPreview).toBeVisible();
+        await expect(placeholder).toBeVisible();
+        const currentScrollTop = await taskDemo.getScrollTop();
+        expect(currentScrollTop).toBeGreaterThan(previousSampleScrollTop);
+      }).toPass({ timeout: 5000 });
+      previousSampleScrollTop = await taskDemo.getScrollTop();
       const { drift } = await measureAlignment();
       driftSamples.push(drift);
     }
@@ -485,18 +414,18 @@ test.describe('Page Scroll Demo', () => {
     // contentOffset ResizeObserver rounding (~3px), translateY sub-pixel rendering (~3px),
     // grab offset rounding (~2px). Still catches real regressions (>= 1 item = 72px).
     const alignmentTolerance = initialItemHeight * 0.65 + 4;
-    const debugMetrics = await page.evaluate(() => {
-      const container = document.querySelector('.scroll-container') as HTMLElement | null;
-      const virtualContent = document.querySelector('vdnd-virtual-content') as HTMLElement | null;
-      const wrapper = document.querySelector('.vdnd-content-wrapper') as HTMLElement | null;
+    const debugMetrics = await page.evaluate((selectors) => {
+      const container = document.querySelector(selectors.scrollContainer) as HTMLElement | null;
+      const virtualContent = document.querySelector(selectors.virtualContent) as HTMLElement | null;
+      const wrapper = document.querySelector(selectors.contentWrapper) as HTMLElement | null;
       if (!container || !virtualContent || !wrapper) {
         return null;
       }
       const contentOffset = parseFloat(virtualContent.getAttribute('data-content-offset') || '0');
       const itemHeight = parseFloat(virtualContent.getAttribute('data-item-height') || '0');
       const containerRect = container.getBoundingClientRect();
-      const preview = document.querySelector('.vdnd-drag-preview') as HTMLElement | null;
-      const placeholder = document.querySelector('.vdnd-drag-placeholder') as HTMLElement | null;
+      const preview = document.querySelector(selectors.dragPreview) as HTMLElement | null;
+      const placeholder = document.querySelector(selectors.placeholder) as HTMLElement | null;
       const previewRect = preview?.getBoundingClientRect();
       const placeholderRect = placeholder?.getBoundingClientRect();
       const transform = getComputedStyle(wrapper).transform;
@@ -542,7 +471,7 @@ test.describe('Page Scroll Demo', () => {
         previewCenterY,
         placeholderCenterY,
       };
-    });
+    }, taskDemoSelectors);
     testInfo.attach('alignment-metrics', {
       body: JSON.stringify({ maxDrift, alignmentTolerance, driftSamples, debugMetrics }, null, 2),
       contentType: 'application/json',
@@ -570,14 +499,11 @@ test.describe('Page Scroll Demo', () => {
     });
 
     // Wait for initial render to settle
-    await expect(page.locator('.task-item').first()).toBeVisible();
+    await expect(taskDemo.items.first()).toBeVisible();
 
     // Scroll multiple times to trigger potential ResizeObserver issues
     for (let i = 0; i < 5; i++) {
-      await page.evaluate((scrollAmount) => {
-        const scrollContainer = document.querySelector('.scroll-container');
-        if (scrollContainer) scrollContainer.scrollTop = scrollAmount;
-      }, i * 500);
+      await taskDemo.scrollTo(i * 500);
       // Wait one rAF between scrolls for rendering to process
       await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     }

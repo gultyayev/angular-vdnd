@@ -4,8 +4,8 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  // Retry failed tests - WebKit has some timing-sensitive tests
-  retries: 2,
+  // Keep local runs single-shot so flakes are visible; CI still retries for browser variance.
+  retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: [['html', { open: 'never' }]],
   use: {

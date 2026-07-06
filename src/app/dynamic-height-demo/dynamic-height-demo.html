@@ -10,18 +10,24 @@
 <!-- ion-content with scroll disabled - we use our own scroll container -->
 <ion-content [scrollY]="false">
   <!-- Custom scroll container with Ionic's scroll host class -->
-  <div #scrollContainer class="scroll-container ion-content-scroll-host" vdndScrollable>
+  <div
+    #scrollContainer
+    class="scroll-container ion-content-scroll-host"
+    data-testid="task-scroll-container"
+    vdndScrollable
+  >
     <!-- Virtual list with wrapper-based positioning -->
     <div vdndGroup="tasks">
       <vdnd-virtual-content
         class="virtual-list-wrapper"
+        data-testid="task-virtual-content"
         [itemHeight]="estimatedItemHeight"
         [dynamicItemHeight]="true"
         vdndDroppable="tasks"
         (drop)="onDrop($event)"
       >
         <!-- Header section that scrolls away (auto-measured) -->
-        <div class="page-header" vdndContentHeader>
+        <div class="page-header" data-testid="task-page-header" vdndContentHeader>
           @if (showBanner()) {
             <div class="welcome-banner">
               <ion-button fill="clear" class="close-btn" (click)="dismissBanner()">
@@ -35,9 +41,13 @@
           <h3 class="section-title">My Tasks</h3>
 
           <!-- Sticky category filter -->
-          <div class="category-chips">
+          <div class="category-chips" data-testid="category-filters">
             @for (cat of categories; track cat.value) {
-              <ion-chip [class.active]="category() === cat.value" (click)="setCategory(cat.value)">
+              <ion-chip
+                [class.active]="category() === cat.value"
+                [attr.data-category-filter]="cat.value"
+                (click)="setCategory(cat.value)"
+              >
                 {{ cat.label }}
               </ion-chip>
             }
@@ -49,8 +59,12 @@
             <div class="task-content">
               <div class="task-header">
                 <ion-checkbox [checked]="task.done" (ionChange)="toggleTask(task)"></ion-checkbox>
-                <span class="task-title" [class.done]="task.done">{{ task.title }}</span>
-                <ion-badge [color]="getBadgeColor(task.category)">{{ task.category }}</ion-badge>
+                <span class="task-title" [class.done]="task.done" data-testid="task-title">
+                  {{ task.title }}
+                </span>
+                <ion-badge [color]="getBadgeColor(task.category)" data-testid="task-category">
+                  {{ task.category }}
+                </ion-badge>
               </div>
               @if (task.description) {
                 <p class="task-description">{{ task.description }}</p>
@@ -62,7 +76,7 @@
     </div>
 
     <!-- Footer that appears after list -->
-    <div class="add-task-footer">
+    <div class="add-task-footer" data-testid="add-task-footer">
       <ion-button expand="block" (click)="addTask()">
         <ion-icon name="add" slot="start"></ion-icon>
         Add New Task
@@ -85,8 +99,10 @@
     >
       <ion-icon name="reorder-three" class="drag-handle"></ion-icon>
       <div class="task-content">
-        <span class="task-title">{{ item.title }}</span>
-        <ion-badge [color]="getBadgeColor(item.category)">{{ item.category }}</ion-badge>
+        <span class="task-title" data-testid="task-title">{{ item.title }}</span>
+        <ion-badge [color]="getBadgeColor(item.category)" data-testid="task-category">
+          {{ item.category }}
+        </ion-badge>
       </div>
     </div>
   </ng-template>

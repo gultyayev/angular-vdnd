@@ -19,15 +19,14 @@ export class DemoPage {
     this.page = page;
     this.list1Container = page.locator('[data-droppable-id="list-1"]');
     this.list2Container = page.locator('[data-droppable-id="list-2"]');
-    this.list1VirtualScroll = this.list1Container.locator('vdnd-virtual-scroll');
-    this.list2VirtualScroll = this.list2Container.locator('vdnd-virtual-scroll');
+    this.list1VirtualScroll = this.list1Container.locator('[data-item-height]').first();
+    this.list2VirtualScroll = this.list2Container.locator('[data-item-height]').first();
     this.list1Items = this.list1Container.locator('[data-draggable-id]');
     this.list2Items = this.list2Container.locator('[data-draggable-id]');
     // Use data-testid for library components (stable selectors)
     this.dragPreview = page.getByTestId('vdnd-drag-preview');
-    // List cards contain the headings and badges with actual item counts
-    this.list1Wrapper = page.locator('.list-card').nth(0);
-    this.list2Wrapper = page.locator('.list-card').nth(1);
+    this.list1Wrapper = page.getByTestId('list-1-card');
+    this.list2Wrapper = page.getByTestId('list-2-card');
     this.lockAxisSelect = page.getByTestId('lock-axis-select');
     this.keyboardInstructions = page.locator('#vdnd-keyboard-instructions');
     // Placeholder visible class is a documented public API for styling, making it a stable selector
@@ -68,8 +67,10 @@ export class DemoPage {
   async getItemCount(list: 'list1' | 'list2'): Promise<number> {
     // Get the actual item count from the badge, not from DOM elements
     // This is more reliable with virtual scroll where only visible items are rendered
-    const wrapper = list === 'list1' ? this.list1Wrapper : this.list2Wrapper;
-    const badge = wrapper.locator('.list-badge');
+    const badge =
+      list === 'list1'
+        ? this.page.getByTestId('list-1-count')
+        : this.page.getByTestId('list-2-count');
     const text = await badge.textContent();
     if (text) {
       return parseInt(text.trim(), 10);
@@ -214,9 +215,10 @@ export class DemoPage {
   async countGhostElements(list: 'list1' | 'list2'): Promise<number> {
     const container = list === 'list1' ? this.list1VirtualScroll : this.list2VirtualScroll;
     return container.evaluate((el) => {
-      const items = el.querySelectorAll('.item:not([style*="display: none"])');
+      const items = el.querySelectorAll('[data-draggable-id]:not([style*="display: none"])');
       return Array.from(items).filter((item) => {
-        const text = item.querySelector('.item-text')?.textContent?.trim() ?? '';
+        const text =
+          item.querySelector('[data-testid="demo-item-text"]')?.textContent?.trim() ?? '';
         return text === '';
       }).length;
     });
@@ -232,14 +234,14 @@ export class DemoPage {
     const container = list === 'list1' ? this.list1VirtualScroll : this.list2VirtualScroll;
     return container.evaluate((el) => {
       const elements = el.querySelectorAll(
-        '.item:not([style*="display: none"]), vdnd-drag-placeholder',
+        '[data-draggable-id]:not([style*="display: none"]), vdnd-drag-placeholder',
       );
       return Array.from(elements).map((element) => {
         const tagName = element.tagName.toLowerCase();
         const isPlaceholder = tagName === 'vdnd-drag-placeholder';
         const text = isPlaceholder
           ? ''
-          : (element.querySelector('.item-text')?.textContent?.trim() ?? '');
+          : (element.querySelector('[data-testid="demo-item-text"]')?.textContent?.trim() ?? '');
         return { text, tagName, isPlaceholder };
       });
     });
@@ -250,7 +252,9 @@ export class DemoPage {
    */
   async getVisibleElementCount(list: 'list1' | 'list2'): Promise<number> {
     const container = list === 'list1' ? this.list1VirtualScroll : this.list2VirtualScroll;
-    return container.locator('.item:not([style*="display: none"]), vdnd-drag-placeholder').count();
+    return container
+      .locator('[data-draggable-id]:not([style*="display: none"]), vdnd-drag-placeholder')
+      .count();
   }
 
   /**
