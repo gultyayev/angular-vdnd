@@ -4,6 +4,8 @@ import { DemoPage } from './fixtures/demo.page';
 interface DebugState {
   activeDroppable: string | null;
   placeholder: string | null;
+  placeholderIndex: number | null;
+  sourceIndex: number | null;
 }
 
 test.describe('Constrain to Container', () => {
@@ -23,8 +25,30 @@ test.describe('Constrain to Container', () => {
     return JSON.parse(raw) as DebugState;
   }
 
+  async function expectBottomReorderDestination(
+    page: Parameters<typeof test>[0]['page'],
+  ): Promise<void> {
+    await expect(async () => {
+      const debugState = await getDebugState(page);
+      expect(debugState.activeDroppable).toBe('list-1');
+      expect(debugState.placeholder).not.toBeNull();
+      expect(debugState.placeholderIndex).not.toBeNull();
+      expect(debugState.sourceIndex).not.toBeNull();
+      expect(debugState.placeholderIndex!).toBeGreaterThan(debugState.sourceIndex! + 1);
+    }).toPass({ timeout: 3000 });
+  }
+
+  async function expectActiveDroppable(page: Parameters<typeof test>[0]['page']): Promise<void> {
+    await expect(async () => {
+      const debugState = await getDebugState(page);
+      expect(debugState.activeDroppable).toBe('list-1');
+      expect(debugState.placeholder).not.toBeNull();
+    }).toPass({ timeout: 3000 });
+  }
+
   test('bottom drag stays in droppable and drop succeeds', async ({ page }) => {
     const initialCount = await demoPage.getItemCount('list1');
+    const expectedFirstText = await demoPage.getItemText('list1', 1);
     const sourceItem = demoPage.list1Items.first();
     await sourceItem.scrollIntoViewIfNeeded();
     const sourceBox = await sourceItem.boundingBox();
@@ -49,23 +73,24 @@ test.describe('Constrain to Container', () => {
     await page.mouse.move(targetX, belowContainerY, { steps: 20 });
     await page.mouse.move(targetX, belowContainerY);
 
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
-
-    const debugState = await getDebugState(page);
-    expect(debugState.activeDroppable).not.toBeNull();
-    expect(debugState.placeholder).not.toBeNull();
     await expect(demoPage.placeholder).toBeVisible();
+    await expectActiveDroppable(page);
 
-    await page.mouse.move(
-      containerBox.x + containerBox.width / 2,
-      containerBox.y + containerBox.height / 2,
-    );
+    const bottomEdgeY = containerBox.y + containerBox.height - 25;
+    await page.mouse.move(targetX, bottomEdgeY, { steps: 10 });
+    await page.mouse.move(targetX, bottomEdgeY);
+    await expectBottomReorderDestination(page);
+
     await page.mouse.up();
     await expect(demoPage.dragPreview).not.toBeVisible({ timeout: 2000 });
 
-    const finalCount = await demoPage.getItemCount('list1');
-    expect(finalCount).toBe(initialCount);
-    expect(await demoPage.getItemText('list1', 0)).toBe('Item 2');
+    await expect(async () => {
+      await demoPage.scrollList('list1', 0);
+      expect(await demoPage.getScrollTop('list1')).toBe(0);
+      const finalCount = await demoPage.getItemCount('list1');
+      expect(finalCount).toBe(initialCount);
+      expect(await demoPage.getItemText('list1', 0)).toBe(expectedFirstText);
+    }).toPass({ timeout: 3000 });
   });
 
   test('preview stays inside container at top boundary', async ({ page }) => {
