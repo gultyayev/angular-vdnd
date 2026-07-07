@@ -1,4 +1,5 @@
 import { inject, Injectable, isDevMode, NgZone } from '@angular/core';
+import { queryAllByAttribute, queryByAttribute } from '../utils/attribute-selectors';
 
 /**
  * Snapshot of the candidate droppables for an active drag session.
@@ -170,8 +171,7 @@ export class PositionCalculatorService {
     if (typeof document === 'undefined') {
       return null;
     }
-    const escaped = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(id) : id;
-    return document.querySelector<HTMLElement>(`[${this.#DROPPABLE_ID_ATTR}="${escaped}"]`);
+    return queryByAttribute<HTMLElement>(document, this.#DROPPABLE_ID_ATTR, id);
   }
 
   /**
@@ -181,10 +181,7 @@ export class PositionCalculatorService {
     if (typeof document === 'undefined') {
       return [];
     }
-    const escaped = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(groupName) : groupName;
-    return Array.from(
-      document.querySelectorAll<HTMLElement>(`[${this.#DROPPABLE_GROUP_ATTR}="${escaped}"]`),
-    );
+    return queryAllByAttribute<HTMLElement>(document, this.#DROPPABLE_GROUP_ATTR, groupName);
   }
 
   /**
@@ -375,8 +372,10 @@ export class PositionCalculatorService {
     groupName: string,
   ): { element: HTMLElement; id: string; itemCount: number } | null {
     // Find all droppables in the same group
-    const allDroppables = document.querySelectorAll(
-      `[${this.#DROPPABLE_GROUP_ATTR}="${groupName}"]`,
+    const allDroppables = queryAllByAttribute<HTMLElement>(
+      document,
+      this.#DROPPABLE_GROUP_ATTR,
+      groupName,
     );
 
     if (allDroppables.length <= 1) {

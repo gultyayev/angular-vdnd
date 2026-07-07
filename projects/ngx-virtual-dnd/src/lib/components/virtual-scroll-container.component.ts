@@ -28,6 +28,7 @@ import { createAutoScrollRegistration } from '../utils/auto-scroll-registration'
 import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
 import { FixedHeightStrategy } from '../strategies/fixed-height.strategy';
 import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
+import { queryByAttribute } from '../utils/attribute-selectors';
 
 /**
  * Context provided to the item template.
@@ -710,8 +711,8 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
           if (entry.type !== 'item' || !entry.data) continue;
           const key = idFn(entry.data);
 
-          // Find the DOM element for this item by its data-draggable-id
-          const el = wrapper.querySelector(`[data-draggable-id="${key}"]`) as HTMLElement | null;
+          // Find the DOM element for this item by its data-draggable-id.
+          const el = queryByAttribute<HTMLElement>(wrapper, 'data-draggable-id', key);
           if (el) {
             nextObservedByKey.set(key, el);
           }

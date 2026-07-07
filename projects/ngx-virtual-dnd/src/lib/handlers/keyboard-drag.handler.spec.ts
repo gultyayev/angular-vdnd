@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { afterNextRender } from '@angular/core';
 import {
-  KeyboardDragHandler,
   KeyboardDragCallbacks,
   KeyboardDragDeps,
+  KeyboardDragHandler,
 } from './keyboard-drag.handler';
 
 jest.mock('@angular/core', () => {
@@ -14,6 +15,8 @@ jest.mock('@angular/core', () => {
 });
 
 describe('KeyboardDragHandler', () => {
+  const afterNextRenderMock = jest.mocked(afterNextRender);
+
   let handler: KeyboardDragHandler;
   let mockDragState: any;
   let mockKeyboardDrag: any;
@@ -93,6 +96,8 @@ describe('KeyboardDragHandler', () => {
       groupName: 'test-group',
       data: { name: 'Test' },
     };
+
+    afterNextRenderMock.mockClear();
 
     handler = new KeyboardDragHandler({
       dragState: mockDragState,
@@ -360,6 +365,44 @@ describe('KeyboardDragHandler', () => {
 
       expect(removeSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
       removeSpy.mockRestore();
+    });
+
+    it('restores focus when the draggable ID has selector-sensitive characters', () => {
+      mockContext.draggableId = 'item-"quoted"\\[one]';
+      const element = document.createElement('button');
+      element.setAttribute('data-draggable-id', mockContext.draggableId);
+      const focusSpy = jest.spyOn(element, 'focus');
+      document.body.appendChild(element);
+
+      handler.complete();
+
+      const callback = afterNextRenderMock.mock.calls.at(-1)?.[0] as () => void;
+      expect(() => callback()).not.toThrow();
+      expect(focusSpy).toHaveBeenCalled();
+
+      element.remove();
+    });
+
+    it('focuses the first destination draggable when destination ID has selector-sensitive characters', () => {
+      const destinationId = 'list-"quoted"\\[one]';
+      mockDragState.activeDroppableId.mockReturnValue(destinationId);
+      mockContext.draggableId = 'missing-"quoted"\\[one]';
+
+      const destination = document.createElement('div');
+      destination.setAttribute('data-droppable-id', destinationId);
+      const firstDraggable = document.createElement('button');
+      firstDraggable.setAttribute('data-draggable-id', 'first');
+      const focusSpy = jest.spyOn(firstDraggable, 'focus');
+      destination.appendChild(firstDraggable);
+      document.body.appendChild(destination);
+
+      handler.complete();
+
+      const callback = afterNextRenderMock.mock.calls.at(-1)?.[0] as () => void;
+      expect(() => callback()).not.toThrow();
+      expect(focusSpy).toHaveBeenCalled();
+
+      destination.remove();
     });
   });
 

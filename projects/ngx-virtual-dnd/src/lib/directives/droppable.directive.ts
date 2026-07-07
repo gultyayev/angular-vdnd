@@ -14,6 +14,7 @@ import { DragState, DropEvent, END_OF_LIST } from '../models/drag-drop.models';
 import { VDND_GROUP_TOKEN } from './droppable-group.directive';
 import { createEffectiveGroupSignal } from '../utils/group-resolution';
 import { createAutoScrollRegistration } from '../utils/auto-scroll-registration';
+import { queryByAttribute } from '../utils/attribute-selectors';
 
 /**
  * Marks an element as a valid drop target within the virtual scroll drag-and-drop system.
@@ -243,7 +244,7 @@ export class DroppableDirective implements OnDestroy {
    */
   #getItemIndex(draggableId: string, droppableId: string): number {
     // Find all draggables in the source droppable
-    const droppable = document.querySelector(`[data-droppable-id="${droppableId}"]`);
+    const droppable = queryByAttribute<HTMLElement>(document, 'data-droppable-id', droppableId);
     if (!droppable) {
       return 0;
     }

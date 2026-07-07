@@ -390,8 +390,55 @@ describe('PositionCalculatorService', () => {
       expect(service.getDroppableById('list-1')).toBe(drop);
     });
 
+    it('finds a droppable with selector-sensitive characters in its ID', () => {
+      const unsafeId = 'list-"quoted"\\[one]';
+      const drop = makeDroppableById(unsafeId, 'g');
+
+      expect(() => service.getDroppableById(unsafeId)).not.toThrow();
+      expect(service.getDroppableById(unsafeId)).toBe(drop);
+    });
+
     it('returns null when the element does not exist in the DOM (no session)', () => {
       expect(service.getDroppableById('nonexistent')).toBeNull();
+    });
+  });
+
+  describe('findAdjacentDroppable', () => {
+    const createdAdjacent: HTMLElement[] = [];
+
+    function makeAdjacentDroppable(id: string, group: string, left: number): HTMLElement {
+      const el = document.createElement('div');
+      el.setAttribute('data-droppable-id', id);
+      el.setAttribute('data-droppable-group', group);
+      el.getBoundingClientRect = () =>
+        ({
+          top: 0,
+          left,
+          right: left + 100,
+          bottom: 100,
+          width: 100,
+          height: 100,
+          x: left,
+          y: 0,
+          toJSON: () => ({}),
+        }) as DOMRect;
+      document.body.appendChild(el);
+      createdAdjacent.push(el);
+      return el;
+    }
+
+    afterEach(() => {
+      createdAdjacent.forEach((el) => el.remove());
+      createdAdjacent.length = 0;
+    });
+
+    it('finds adjacent droppables when the group contains selector-sensitive characters', () => {
+      const group = 'group-"quoted"\\[one]';
+      makeAdjacentDroppable('left', group, 0);
+      const right = makeAdjacentDroppable('right', group, 200);
+
+      expect(() => service.findAdjacentDroppable('left', 'right', group)).not.toThrow();
+      expect(service.findAdjacentDroppable('left', 'right', group)?.element).toBe(right);
     });
   });
 });

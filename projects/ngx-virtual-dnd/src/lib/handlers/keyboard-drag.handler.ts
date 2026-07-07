@@ -6,6 +6,7 @@ import { DragIndexCalculatorService } from '../services/drag-index-calculator.se
 import { ElementCloneService } from '../services/element-clone.service';
 import { OverlayContainerService } from '../services/overlay-container.service';
 import { DragEndEvent, DragStartEvent } from '../models/drag-drop.models';
+import { queryByAttribute } from '../utils/attribute-selectors';
 
 /**
  * Context from the directive needed for keyboard drag operations.
@@ -267,17 +268,18 @@ export class KeyboardDragHandler {
 
     afterNextRender(
       () => {
-        const element = document.querySelector(
-          `[data-draggable-id="${draggableId}"]`,
-        ) as HTMLElement | null;
+        const element = queryByAttribute<HTMLElement>(document, 'data-draggable-id', draggableId);
 
         if (element) {
           element.focus();
         } else if (destinationDroppableId) {
           // Fallback: focus the first draggable in the destination container
-          const firstDraggable = document.querySelector(
-            `[data-droppable-id="${destinationDroppableId}"] [data-draggable-id]`,
-          ) as HTMLElement | null;
+          const destination = queryByAttribute<HTMLElement>(
+            document,
+            'data-droppable-id',
+            destinationDroppableId,
+          );
+          const firstDraggable = destination?.querySelector<HTMLElement>('[data-draggable-id]');
           firstDraggable?.focus();
         }
       },

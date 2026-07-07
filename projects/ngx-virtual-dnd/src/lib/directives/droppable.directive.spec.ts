@@ -252,6 +252,33 @@ describe('DroppableDirective', () => {
     });
   });
 
+  describe('drop emission', () => {
+    it('calculates source index when the source droppable ID has selector-sensitive characters', () => {
+      const unsafeDroppableId = 'source-"quoted"\\[one]';
+      component.droppableId.set(unsafeDroppableId);
+      fixture.detectChanges();
+
+      const item = createMockDraggedItem({
+        draggableId: 'item-2',
+        droppableId: unsafeDroppableId,
+      });
+
+      dragStateService.startDrag(item);
+      dragStateService.updateDragPosition({
+        cursorPosition: { x: 100, y: 100 },
+        activeDroppableId: unsafeDroppableId,
+        placeholderId: 'item-3',
+        placeholderIndex: null,
+      });
+      fixture.detectChanges();
+
+      expect(() => dragStateService.endDrag()).not.toThrow();
+      fixture.detectChanges();
+
+      expect(component.dropEvents.at(-1)?.source.index).toBe(1);
+    });
+  });
+
   describe('public methods', () => {
     it('getElement should return native element', () => {
       expect(directive.getElement()).toBe(droppableNative);

@@ -12,9 +12,15 @@ import { DraggedItem } from '../models/drag-drop.models';
 
 // Mock ResizeObserver for JSDOM
 class MockResizeObserver {
+  static instances: MockResizeObserver[] = [];
+
   observe = jest.fn();
   unobserve = jest.fn();
   disconnect = jest.fn();
+
+  constructor() {
+    MockResizeObserver.instances.push(this);
+  }
 }
 
 const nextAnimationFrame = (): Promise<void> =>
@@ -31,6 +37,7 @@ interface TestItem {
       <div
         class="item"
         [attr.data-index]="index"
+        [attr.data-draggable-id]="item.id"
         [attr.data-sticky]="isSticky"
         [style.height.px]="50"
       >
@@ -47,6 +54,7 @@ interface TestItem {
       [itemIdFn]="itemIdFn"
       [trackByFn]="trackByFn"
       [itemTemplate]="itemTpl"
+      [dynamicItemHeight]="dynamicItemHeight()"
       [scrollContainerId]="scrollContainerId()"
       [autoScrollEnabled]="autoScrollEnabled()"
       [autoScrollConfig]="autoScrollConfig()"
@@ -65,6 +73,7 @@ class TestHostComponent {
   scrollContainerId = signal<string | undefined>('test-scroll');
   autoScrollEnabled = signal(true);
   autoScrollConfig = signal<Partial<AutoScrollConfig>>({});
+  dynamicItemHeight = signal(false);
 
   readonly itemIdFn = (item: TestItem): string => item.id;
   readonly trackByFn = (_: number, item: TestItem): string => item.id;
@@ -494,6 +503,29 @@ describe('VirtualScrollContainerComponent', () => {
 
       // Check second item
       expect(items[1].nativeElement.getAttribute('data-index')).toBe('1');
+    });
+  });
+
+  describe('dynamic item measurement', () => {
+    it('observes rendered items with selector-sensitive draggable IDs', () => {
+      MockResizeObserver.instances.length = 0;
+      const unsafeId = 'item-"quoted"\\[one]';
+      const dynamicFixture = TestBed.createComponent(TestHostComponent);
+      dynamicFixture.componentInstance.items.set([{ id: unsafeId, name: 'Unsafe ID item' }]);
+      dynamicFixture.componentInstance.dynamicItemHeight.set(true);
+
+      expect(() => {
+        dynamicFixture.detectChanges();
+        dynamicFixture.detectChanges();
+      }).not.toThrow();
+
+      const itemObserver = MockResizeObserver.instances[0];
+      const itemElement = dynamicFixture.nativeElement.querySelector('.item') as HTMLElement | null;
+
+      expect(itemElement?.getAttribute('data-draggable-id')).toBe(unsafeId);
+      expect(itemObserver.observe).toHaveBeenCalledWith(itemElement);
+
+      dynamicFixture.destroy();
     });
   });
 
