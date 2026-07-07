@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.1.2](https://github.com/gultyayev/angular-vdnd/compare/v3.1.1...v3.1.2) (2026-07-07)
+
+### Bug Fixes
+
+- **lib:** refresh viewport transforms on drag exclusion changes ([2057a38](https://github.com/gultyayev/angular-vdnd/commit/2057a387398dc5b3ff02b4a3c2fff42d39e4acf9))
+- **lib:** safely resolve consumer IDs in attribute lookups ([ab2ea17](https://github.com/gultyayev/angular-vdnd/commit/ab2ea17091ba7ff883c4a55518a60434c5861461))
+- **lib:** sync auto-scroll registration with signal inputs ([c084a32](https://github.com/gultyayev/angular-vdnd/commit/c084a32aa458326a8a684e17270c3ab4c5bf50f9))
+
 ## [3.1.1](https://github.com/gultyayev/angular-vdnd/compare/v3.1.0...v3.1.1) (2026-06-24)
 
 ### Performance
