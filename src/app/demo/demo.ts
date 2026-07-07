@@ -88,10 +88,14 @@ export class DemoComponent {
   readonly debugState = computed(() => ({
     isDragging: this.#dragState.isDragging(),
     draggedItemId: this.#dragState.draggedItemId(),
+    draggedItemHeight: this.#dragState.draggedItem()?.height ?? null,
     sourceDroppable: this.#dragState.sourceDroppableId(),
+    sourceIndex: this.#dragState.sourceIndex(),
     activeDroppable: this.#dragState.activeDroppableId(),
     placeholder: this.#dragState.placeholderId(),
     placeholderIndex: this.#dragState.placeholderIndex(),
+    cursorPosition: this.#dragState.cursorPosition(),
+    grabOffset: this.#dragState.grabOffset(),
   }));
 
   constructor() {

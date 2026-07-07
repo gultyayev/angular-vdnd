@@ -27,6 +27,12 @@ export interface VisibleTask {
   height: number;
 }
 
+export interface VisibleListCoverage {
+  maxGap: number;
+  renderedItemCount: number;
+  visibleHeight: number;
+}
+
 export class TaskDemoPage {
   readonly scrollContainer: Locator;
   readonly virtualContent: Locator;
@@ -119,6 +125,67 @@ export class TaskDemoPage {
 
       visible.sort((a, b) => a.top - b.top);
       return visible;
+    }, taskDemoSelectors);
+  }
+
+  async getVisibleListCoverage(): Promise<VisibleListCoverage> {
+    return this.page.evaluate((selectors) => {
+      const scrollContainer = document.querySelector<HTMLElement>(selectors.scrollContainer);
+      const virtualContent = document.querySelector<HTMLElement>(selectors.virtualContent);
+
+      if (!scrollContainer || !virtualContent) {
+        return { maxGap: 0, renderedItemCount: 0, visibleHeight: 0 };
+      }
+
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const contentRect = virtualContent.getBoundingClientRect();
+      const projectedHeader = virtualContent.querySelector<HTMLElement>(selectors.header);
+      const listTop = projectedHeader
+        ? projectedHeader.getBoundingClientRect().bottom
+        : contentRect.top;
+      const visibleTop = Math.max(containerRect.top, listTop);
+      const visibleBottom = Math.min(containerRect.bottom, contentRect.bottom);
+      const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+
+      if (visibleHeight === 0) {
+        return { maxGap: 0, renderedItemCount: 0, visibleHeight };
+      }
+
+      const intervals = Array.from(virtualContent.querySelectorAll<HTMLElement>(selectors.item))
+        .map((item) => item.getBoundingClientRect())
+        .filter(
+          (rect) =>
+            rect.width > 0 &&
+            rect.height > 0 &&
+            rect.bottom > visibleTop &&
+            rect.top < visibleBottom,
+        )
+        .map((rect) => ({
+          top: Math.max(rect.top, visibleTop),
+          bottom: Math.min(rect.bottom, visibleBottom),
+        }))
+        .sort((a, b) => a.top - b.top);
+
+      let cursor = visibleTop;
+      let maxGap = 0;
+
+      for (const interval of intervals) {
+        if (interval.bottom <= cursor) {
+          continue;
+        }
+
+        if (interval.top > cursor) {
+          maxGap = Math.max(maxGap, interval.top - cursor);
+        }
+
+        cursor = Math.max(cursor, interval.bottom);
+      }
+
+      if (cursor < visibleBottom) {
+        maxGap = Math.max(maxGap, visibleBottom - cursor);
+      }
+
+      return { maxGap, renderedItemCount: intervals.length, visibleHeight };
     }, taskDemoSelectors);
   }
 

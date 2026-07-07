@@ -166,17 +166,17 @@ test.describe('Dynamic Height Demo', () => {
       expect(scrollTop).toBeGreaterThan(0);
     }).toPass({ timeout: 2000 });
 
-    const countBefore = await taskDemo.items.count();
-
     // Rapidly scroll up
     await taskDemo.scrollContainer.evaluate((el) => {
       el.scrollTop -= 500;
     });
 
-    // Wait for virtual scroll to render items at new position
+    // Wait for virtual scroll to cover the visible list area at the new position.
     await expect(async () => {
-      const countAfter = await taskDemo.items.count();
-      expect(countAfter).toBeGreaterThan(countBefore - 3);
+      const coverage = await taskDemo.getVisibleListCoverage();
+      expect(coverage.visibleHeight).toBeGreaterThan(100);
+      expect(coverage.renderedItemCount).toBeGreaterThan(0);
+      expect(coverage.maxGap, JSON.stringify(coverage)).toBeLessThanOrEqual(4);
     }).toPass({ timeout: 2000 });
   });
 

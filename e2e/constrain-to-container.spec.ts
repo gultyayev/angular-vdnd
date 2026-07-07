@@ -139,22 +139,16 @@ test.describe('Constrain to Container', () => {
       expect(scrollTop).toBeGreaterThan(100);
     }).toPass({ timeout: 10000 });
 
+    const scrollTopBeforeTopEdge = await demoPage.getScrollTop('list1');
+
     // Now move to the container's top edge — autoscroll should reverse upward
     const topEdgeY = containerBox.y + 25;
     await page.mouse.move(grabX, topEdgeY, { steps: 15 });
     await page.mouse.move(grabX, topEdgeY);
 
-    // Capture scrollTop after reaching top edge, then assert it decreases
-    // (use toPass to wait for the RAF loop to detect the new cursor position)
-    await expect(async () => {
-      const scrollTop = await demoPage.getScrollTop('list1');
-      expect(scrollTop).toBeGreaterThan(0);
-    }).toPass({ timeout: 2000 });
-
-    const scrollTopAtTopEdge = await demoPage.getScrollTop('list1');
     await expect(async () => {
       const scrollTopNow = await demoPage.getScrollTop('list1');
-      expect(scrollTopNow).toBeLessThan(scrollTopAtTopEdge);
+      expect(scrollTopNow).toBeLessThan(scrollTopBeforeTopEdge);
     }).toPass({
       timeout: 5000,
       message: 'Autoscroll up should trigger at top edge with non-trivial grabOffset',
