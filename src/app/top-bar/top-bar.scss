@@ -1,0 +1,178 @@
+/* stylelint-disable */
+/*
+ * Non-sticky by design: on the window-scrolling main demo a position:sticky topbar
+ * triggers a Firefox bug where a constrained drag whose pointer-up lands below the
+ * viewport never finalizes. On the Ionic task pages the topbar is pinned by the
+ * ion-header flex layout regardless, so it stays visible there.
+ */
+:host {
+  position: relative;
+  z-index: 20;
+  display: block;
+  background: var(--topbar-bg);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar-in {
+  width: min(1160px, 100% - 48px);
+  margin-inline: auto;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.wordmark {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.nav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.nav-tab {
+  padding: 7px 13px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--ink-2);
+  text-decoration: none;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.nav-tab:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.nav-tab.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.icon-btn:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+  border-color: var(--border-2);
+}
+
+/* Mobile nav toggle + dropdown sheet (hidden on desktop) */
+.nav-toggle.icon-btn {
+  display: none;
+  margin-left: 6px;
+}
+
+/*
+ * The overlay (.nav-menu) is teleported to <body>, so backdrop and sheet position
+ * against the viewport. It only ever renders while the mobile toggle is visible.
+ */
+.nav-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  top: 60px;
+  z-index: 19;
+  background: color-mix(in srgb, var(--ink) 22%, transparent);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+.nav-sheet {
+  position: fixed;
+  top: 72px;
+  right: max(16px, (100% - 1160px) / 2 + 24px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 220px;
+  padding: 8px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+}
+
+.nav-sheet-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.nav-sheet-item:hover {
+  background: var(--surface-2);
+}
+
+.nav-sheet-item.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.nav-sheet-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+@media (max-width: 620px) {
+  .nav {
+    display: none;
+  }
+
+  .nav-toggle.icon-btn {
+    display: grid;
+  }
+}

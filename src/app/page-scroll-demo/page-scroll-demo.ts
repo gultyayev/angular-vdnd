@@ -8,20 +8,9 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import {
-  IonBadge,
-  IonButton,
-  IonCheckbox,
-  IonChip,
-  IonContent,
-  IonHeader,
-  IonIcon,
-  IonTitle,
-  IonToolbar,
-} from '@ionic/angular/standalone';
+import { IonCheckbox, IonContent, IonHeader, IonIcon, IonToolbar } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { add, arrowBack, checkmarkCircle, close, reorderThree } from 'ionicons/icons';
+import { reorderThree } from 'ionicons/icons';
 import {
   DraggableDirective,
   DragPreviewComponent,
@@ -36,6 +25,7 @@ import {
   VirtualContentComponent,
   VirtualForDirective,
 } from 'ngx-virtual-dnd';
+import { TopBarComponent } from '../top-bar/top-bar';
 
 interface Task {
   id: string;
@@ -59,15 +49,11 @@ type CategoryFilter = 'all' | 'work' | 'personal' | 'urgent';
   selector: 'app-page-scroll-demo',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink,
+    TopBarComponent,
     IonContent,
     IonHeader,
     IonToolbar,
-    IonTitle,
-    IonButton,
-    IonChip,
     IonCheckbox,
-    IonBadge,
     IonIcon,
     ScrollableDirective,
     VirtualForDirective,
@@ -109,10 +95,23 @@ export class PageScrollDemoComponent implements OnDestroy {
     return allTasks.filter((t) => t.category === cat);
   });
 
+  /** Count of open (not done) tasks, shown in the header summary. */
+  readonly openCount = computed(() => this.tasks().filter((t) => !t.done).length);
+
+  /** Per-category counts shown as chip badges. */
+  readonly counts = computed(() => {
+    const c: Record<CategoryFilter, number> = { all: 0, work: 0, personal: 0, urgent: 0 };
+    for (const t of this.tasks()) {
+      c.all++;
+      c[t.category]++;
+    }
+    return c;
+  });
+
   #resizeObserver: ResizeObserver | null = null;
 
   constructor() {
-    addIcons({ add, arrowBack, checkmarkCircle, close, reorderThree });
+    addIcons({ reorderThree });
 
     // Set up header height tracking after render
     afterNextRender(() => {
@@ -159,17 +158,6 @@ export class PageScrollDemoComponent implements OnDestroy {
       done: false,
     };
     this.tasks.update((tasks) => [...tasks, newTask]);
-  }
-
-  getBadgeColor(category: Task['category']): string {
-    switch (category) {
-      case 'work':
-        return 'primary';
-      case 'personal':
-        return 'secondary';
-      case 'urgent':
-        return 'danger';
-    }
   }
 
   onDrop(event: DropEvent): void {

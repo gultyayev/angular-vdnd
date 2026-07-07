@@ -1,6 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { JsonPipe } from '@angular/common';
-import { RouterLink } from '@angular/router';
 import {
   applyMove,
   DraggableDirective,
@@ -14,6 +13,7 @@ import {
   VirtualScrollContainerComponent,
   VirtualSortableListComponent,
 } from 'ngx-virtual-dnd';
+import { TopBarComponent } from '../top-bar/top-bar';
 
 interface Item {
   id: string;
@@ -28,7 +28,7 @@ interface Item {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     JsonPipe,
-    RouterLink,
+    TopBarComponent,
     DragPreviewComponent,
     DraggableDirective,
     DroppableDirective,
@@ -41,6 +41,9 @@ interface Item {
 })
 export class DemoComponent {
   readonly #dragState = inject(DragStateService);
+
+  /** Whether a drag is currently active (drives the debug live indicator). */
+  readonly isDragging = this.#dragState.isDragging;
 
   /** Number of items to generate */
   readonly itemCount = signal(100);
@@ -67,7 +70,7 @@ export class DemoComponent {
   readonly settingsExpanded = signal(true);
 
   /** Whether debug panel is expanded */
-  readonly debugExpanded = signal(true);
+  readonly debugExpanded = signal(false);
 
   /** List 1 items */
   readonly list1 = signal<Item[]>([]);

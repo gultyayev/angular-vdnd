@@ -75,15 +75,11 @@ export class TaskDemoPage {
   }
 
   async getTaskCategoryTexts(): Promise<string[]> {
-    const categories = this.page.locator(taskDemoSelectors.category);
-    const count = await categories.count();
-    const texts: string[] = [];
-
-    for (let i = 0; i < count; i++) {
-      texts.push((await categories.nth(i).textContent())?.trim() ?? '');
-    }
-
-    return texts;
+    return this.page
+      .locator(taskDemoSelectors.category)
+      .evaluateAll((categories) =>
+        categories.map((category) => category.textContent?.trim() ?? ''),
+      );
   }
 
   async scrollTo(scrollTop: number): Promise<void> {

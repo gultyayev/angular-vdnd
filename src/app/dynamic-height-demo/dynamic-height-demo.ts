@@ -1,18 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import {
-  IonBadge,
-  IonButton,
-  IonCheckbox,
-  IonChip,
-  IonContent,
-  IonHeader,
-  IonIcon,
-  IonTitle,
-  IonToolbar,
-} from '@ionic/angular/standalone';
+import { IonCheckbox, IonContent, IonHeader, IonIcon, IonToolbar } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { add, arrowBack, checkmarkCircle, close, reorderThree } from 'ionicons/icons';
+import { reorderThree } from 'ionicons/icons';
 import {
   ContentHeaderDirective,
   DraggableDirective,
@@ -28,6 +17,7 @@ import {
   VirtualContentComponent,
   VirtualForDirective,
 } from 'ngx-virtual-dnd';
+import { TopBarComponent } from '../top-bar/top-bar';
 
 interface DynamicTask {
   id: string;
@@ -43,15 +33,11 @@ type CategoryFilter = 'all' | 'work' | 'personal' | 'urgent';
   selector: 'app-dynamic-height-demo',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink,
+    TopBarComponent,
     IonContent,
     IonHeader,
     IonToolbar,
-    IonTitle,
-    IonButton,
-    IonChip,
     IonCheckbox,
-    IonBadge,
     IonIcon,
     ScrollableDirective,
     VirtualForDirective,
@@ -66,7 +52,10 @@ type CategoryFilter = 'all' | 'work' | 'personal' | 'urgent';
   templateUrl: './dynamic-height-demo.html',
 })
 export class DynamicHeightDemoComponent {
-  readonly estimatedItemHeight = 80;
+  // A conservative estimate at/below the shortest row (a title-only row is ~57px).
+  // Keeping it a lower bound means freshly-rendered items only ever grow when measured,
+  // never shrink — which avoids a transient height overshoot right after scrolling.
+  readonly estimatedItemHeight = 56;
 
   readonly categories: { value: CategoryFilter; label: string }[] = [
     { value: 'all', label: 'All' },
@@ -88,8 +77,21 @@ export class DynamicHeightDemoComponent {
     return allTasks.filter((t) => t.category === cat);
   });
 
+  /** Count of open (not done) tasks, shown in the header summary. */
+  readonly openCount = computed(() => this.tasks().filter((t) => !t.done).length);
+
+  /** Per-category counts shown as chip badges. */
+  readonly counts = computed(() => {
+    const c: Record<CategoryFilter, number> = { all: 0, work: 0, personal: 0, urgent: 0 };
+    for (const t of this.tasks()) {
+      c.all++;
+      c[t.category]++;
+    }
+    return c;
+  });
+
   constructor() {
-    addIcons({ add, arrowBack, checkmarkCircle, close, reorderThree });
+    addIcons({ reorderThree });
   }
 
   trackById = (_index: number, task: DynamicTask): string => task.id;
@@ -117,17 +119,6 @@ export class DynamicHeightDemoComponent {
       done: false,
     };
     this.tasks.update((tasks) => [...tasks, newTask]);
-  }
-
-  getBadgeColor(category: DynamicTask['category']): string {
-    switch (category) {
-      case 'work':
-        return 'primary';
-      case 'personal':
-        return 'secondary';
-      case 'urgent':
-        return 'danger';
-    }
   }
 
   onDrop(event: DropEvent): void {

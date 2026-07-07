@@ -1,108 +1,182 @@
-<div class="demo-page">
-  <!-- Header -->
-  <header class="header">
-    <div class="header-content">
-      <div class="logo">
-        <svg
-          class="logo-icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <rect x="3" y="3" width="7" height="7" rx="1" />
-          <rect x="14" y="3" width="7" height="7" rx="1" />
-          <rect x="3" y="14" width="7" height="7" rx="1" />
-          <rect x="14" y="14" width="7" height="7" rx="1" />
-          <path d="M10 7h4M7 10v4M17 10v4M10 17h4" stroke-dasharray="2 2" />
-        </svg>
-        <span class="logo-text">ngx-virtual-dnd</span>
+<div class="app">
+  <app-top-bar />
+
+  <!-- Hero -->
+  <section class="hero hero--flat">
+    <div class="hero-in">
+      <h1 class="hero-title">Sortable lists, virtualized.</h1>
+      <p class="hero-sub">
+        High-performance drag &amp; drop for Angular — element-under-point detection keeps
+        reordering smooth across thousands of rows.
+      </p>
+      <div class="hero-tags">
+        <span class="htag">
+          <svg
+            viewBox="0 0 24 24"
+            width="15"
+            height="15"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" />
+          </svg>
+          Zero-jank drag
+        </span>
+        <span class="htag">
+          <svg
+            viewBox="0 0 24 24"
+            width="15"
+            height="15"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+          </svg>
+          Virtual scroll
+        </span>
+        <span class="htag">
+          <svg
+            viewBox="0 0 24 24"
+            width="15"
+            height="15"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect x="3" y="3" width="7" height="7" rx="1.4" />
+            <rect x="14" y="3" width="7" height="7" rx="1.4" />
+            <rect x="3" y="14" width="7" height="7" rx="1.4" />
+            <rect x="14" y="14" width="7" height="7" rx="1.4" />
+          </svg>
+          Cross-list moves
+        </span>
       </div>
-      <p class="tagline">High-performance drag & drop with virtual scrolling</p>
-      <a routerLink="/page-scroll" class="demo-link"> View Page-Level Scroll Demo → </a>
-      <a routerLink="/dynamic-height" class="demo-link"> View Dynamic Height Demo → </a>
     </div>
-  </header>
+  </section>
 
   <!-- Main Content -->
-  <main class="main">
+  <main class="stage">
     <!-- Settings Panel -->
-    <section class="settings-panel">
+    <section class="panel">
       <button
         type="button"
-        class="settings-header"
+        class="panel-hd"
         (click)="toggleSettings()"
         [attr.aria-expanded]="settingsExpanded()"
-        aria-controls="settings-content"
       >
-        <h2 class="settings-title">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3" />
-            <path
-              d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"
-            />
-          </svg>
+        <span class="panel-hd-l">
+          <span class="panel-ico">
+            <svg
+              viewBox="0 0 24 24"
+              width="17"
+              height="17"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1l2.1-2.1M17 7l2.1-2.1"
+              />
+            </svg>
+          </span>
           Settings
-        </h2>
-        <span class="settings-toggle" [class.collapsed]="!settingsExpanded()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+        </span>
+        <span class="panel-hd-r">
+          <span class="panel-hint">Configure the demo</span>
+          <span class="chev" [class.up]="settingsExpanded()">
+            <svg
+              viewBox="0 0 24 24"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </span>
         </span>
       </button>
 
-      @if (settingsExpanded()) {
-        <div class="settings-content">
+      <div class="collapse" [class.is-open]="settingsExpanded()">
+        <div>
           <div class="settings-grid">
-            <!-- Data Settings -->
-            <div class="setting-group">
-              <h3 class="setting-group-title">Data</h3>
-              <div class="setting-item">
-                <label class="setting-label" for="itemCount">Item count</label>
+            <!-- Data -->
+            <div class="setgroup">
+              <div class="set-label">Data</div>
+              <label class="field">
+                <span class="field-lbl">Item count</span>
                 <input
-                  id="itemCount"
                   type="number"
                   class="input"
                   [value]="itemCount()"
                   (input)="updateItemCount($event)"
                 />
-              </div>
-              <button class="btn btn-secondary" (click)="regenerateItems()">
+              </label>
+              <button type="button" class="btn btn-secondary" (click)="regenerateItems()">
                 <svg
-                  class="icon"
                   viewBox="0 0 24 24"
+                  width="15"
+                  height="15"
                   fill="none"
                   stroke="currentColor"
                   stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
                 >
                   <path d="M23 4v6h-6M1 20v-6h6" />
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                  <path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15" />
                 </svg>
                 Regenerate
               </button>
             </div>
 
-            <!-- Drag Behavior -->
-            <div class="setting-group">
-              <h3 class="setting-group-title">Drag Behavior</h3>
-              <div class="setting-item">
-                <label class="setting-label" for="lockAxis">Lock axis</label>
-                <select
-                  id="lockAxis"
-                  class="select"
-                  [value]="lockAxis() ?? ''"
-                  (change)="updateLockAxis($event)"
-                  data-testid="lock-axis-select"
-                >
-                  <option value="">Free movement</option>
-                  <option value="x">Horizontal only</option>
-                  <option value="y">Vertical only</option>
-                </select>
-              </div>
-              <div class="setting-item">
-                <label class="setting-label" for="dragDelay">Delay (ms)</label>
+            <!-- Drag behavior -->
+            <div class="setgroup">
+              <div class="set-label">Drag behavior</div>
+              <label class="field">
+                <span class="field-lbl">Lock axis</span>
+                <span class="select-wrap">
+                  <select
+                    class="input"
+                    [value]="lockAxis() ?? ''"
+                    (change)="updateLockAxis($event)"
+                    data-testid="lock-axis-select"
+                  >
+                    <option value="">Free movement</option>
+                    <option value="x">Horizontal only</option>
+                    <option value="y">Vertical only</option>
+                  </select>
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="15"
+                    height="15"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </span>
+              </label>
+              <label class="field">
+                <span class="field-lbl">Delay (ms)</span>
                 <input
-                  id="dragDelay"
                   type="number"
                   class="input"
                   min="0"
@@ -111,82 +185,119 @@
                   (input)="updateDragDelay($event)"
                   data-testid="drag-delay-input"
                 />
-              </div>
-              <label class="checkbox-label">
-                <input
-                  type="checkbox"
-                  class="checkbox"
-                  [checked]="useDragHandle()"
-                  (change)="toggleDragHandle($event)"
-                  data-testid="drag-handle-checkbox"
-                />
-                <span class="checkbox-text">Use drag handle</span>
-              </label>
-              <label class="checkbox-label">
-                <input
-                  type="checkbox"
-                  class="checkbox"
-                  [checked]="constrainToContainer()"
-                  (change)="toggleConstrainToContainer($event)"
-                  data-testid="constrain-to-container-checkbox"
-                />
-                <span class="checkbox-text">Constrain to container</span>
               </label>
             </div>
 
-            <!-- Display Options -->
-            <div class="setting-group">
-              <h3 class="setting-group-title">Display</h3>
-              <label class="checkbox-label">
+            <!-- Display -->
+            <div class="setgroup">
+              <div class="set-label">Display</div>
+              <label class="check">
                 <input
                   type="checkbox"
-                  class="checkbox"
                   [checked]="dragEnabled()"
                   (change)="toggleDragEnabled($event)"
                   data-testid="drag-enabled-checkbox"
                 />
-                <span class="checkbox-text">Enable dragging</span>
+                <span class="check-box" aria-hidden="true">
+                  <svg viewBox="0 0 14 14">
+                    <path
+                      d="M3 7.2 5.8 10 11 4.2"
+                      fill="none"
+                      stroke-width="2.2"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </span>
+                <span class="check-lbl">Enable dragging</span>
+              </label>
+              <label class="check">
+                <input
+                  type="checkbox"
+                  [checked]="useDragHandle()"
+                  (change)="toggleDragHandle($event)"
+                  data-testid="drag-handle-checkbox"
+                />
+                <span class="check-box" aria-hidden="true">
+                  <svg viewBox="0 0 14 14">
+                    <path
+                      d="M3 7.2 5.8 10 11 4.2"
+                      fill="none"
+                      stroke-width="2.2"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </span>
+                <span class="check-lbl">Use drag handle</span>
+              </label>
+              <label class="check">
+                <input
+                  type="checkbox"
+                  [checked]="constrainToContainer()"
+                  (change)="toggleConstrainToContainer($event)"
+                  data-testid="constrain-to-container-checkbox"
+                />
+                <span class="check-box" aria-hidden="true">
+                  <svg viewBox="0 0 14 14">
+                    <path
+                      d="M3 7.2 5.8 10 11 4.2"
+                      fill="none"
+                      stroke-width="2.2"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </span>
+                <span class="check-lbl">Constrain to container</span>
               </label>
             </div>
 
-            <!-- API Mode -->
-            <div class="setting-group">
-              <h3 class="setting-group-title">API Mode</h3>
-              <div class="toggle-group">
+            <!-- API mode -->
+            <div class="setgroup">
+              <div class="set-label">API mode</div>
+              <div class="segmented">
+                <span class="seg-thumb" [style.left]="useSimplifiedApi() ? '50%' : '3px'"></span>
                 <button
-                  class="toggle-btn"
-                  [class.active]="!useSimplifiedApi()"
+                  type="button"
+                  class="seg-btn"
+                  [class.is-active]="!useSimplifiedApi()"
                   (click)="useSimplifiedApi.set(false)"
                 >
                   Verbose
                 </button>
                 <button
-                  class="toggle-btn"
-                  [class.active]="useSimplifiedApi()"
+                  type="button"
+                  class="seg-btn"
+                  [class.is-active]="useSimplifiedApi()"
                   (click)="useSimplifiedApi.set(true)"
                   data-testid="simplified-api-checkbox"
                 >
                   Simplified
                 </button>
               </div>
-              <p class="setting-hint">
+              <p class="hint">
                 @if (useSimplifiedApi()) {
                   Using <code>VirtualSortableList</code> + <code>moveItem()</code>
                 } @else {
-                  Using individual directives with manual placeholder
+                  Individual directives with a manual placeholder
                 }
               </p>
             </div>
           </div>
         </div>
-      }
+      </div>
     </section>
 
     <!-- Lists Section -->
     <section class="lists-section">
       @if (useSimplifiedApi()) {
         <!-- SIMPLIFIED API -->
-        <div class="lists-container" vdndGroup="demo">
+        <div class="lists" vdndGroup="demo">
+          <!-- Declared inside vdndGroup so the rendered draggables inherit the group. -->
           <ng-template #simplifiedItemTpl let-item>
             <div
               class="item"
@@ -198,91 +309,106 @@
               [dragDelay]="dragDelay()"
               [dragHandle]="useDragHandle() ? '.item-handle' : undefined"
             >
-              <span class="item-handle" data-testid="demo-item-handle">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <circle cx="9" cy="6" r="1.5" />
-                  <circle cx="15" cy="6" r="1.5" />
-                  <circle cx="9" cy="12" r="1.5" />
-                  <circle cx="15" cy="12" r="1.5" />
-                  <circle cx="9" cy="18" r="1.5" />
-                  <circle cx="15" cy="18" r="1.5" />
-                </svg>
-              </span>
-              <span class="item-text" data-testid="demo-item-text">{{ item.name }}</span>
+              <div class="item-inner">
+                <span class="item-handle" data-testid="demo-item-handle">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="9" cy="5" r="1.6" />
+                    <circle cx="15" cy="5" r="1.6" />
+                    <circle cx="9" cy="12" r="1.6" />
+                    <circle cx="15" cy="12" r="1.6" />
+                    <circle cx="9" cy="19" r="1.6" />
+                    <circle cx="15" cy="19" r="1.6" />
+                  </svg>
+                </span>
+                <span class="item-text" data-testid="demo-item-text">{{ item.name }}</span>
+              </div>
             </div>
           </ng-template>
 
-          <div class="list-card" data-testid="list-1-card">
-            <div class="list-header">
-              <h3 class="list-title">List 1</h3>
-              <span class="list-badge" data-testid="list-1-count">{{ list1().length }}</span>
+          <div class="listcard" data-testid="list-1-card">
+            <div class="list-hd">
+              <span class="list-title">List 1</span>
+              <span class="list-meta">
+                <span class="virt">virtualized</span>
+                <span class="count-badge" data-testid="list-1-count">{{ list1().length }}</span>
+              </span>
             </div>
-            <vdnd-sortable-list
-              class="list"
-              droppableId="list-1"
-              group="demo"
-              [items]="list1()"
-              [itemHeight]="50"
-              [containerHeight]="400"
-              [itemIdFn]="getItemId"
-              [itemTemplate]="simplifiedItemTpl"
-              [constrainToContainer]="constrainToContainer()"
-              (drop)="onDropSimplified($event)"
-            />
+            <div class="list">
+              <vdnd-sortable-list
+                droppableId="list-1"
+                group="demo"
+                [items]="list1()"
+                [itemHeight]="50"
+                [containerHeight]="400"
+                [itemIdFn]="getItemId"
+                [itemTemplate]="simplifiedItemTpl"
+                [constrainToContainer]="constrainToContainer()"
+                (drop)="onDropSimplified($event)"
+              />
+            </div>
           </div>
 
-          <div class="list-card" data-testid="list-2-card">
-            <div class="list-header">
-              <h3 class="list-title">List 2</h3>
-              <span class="list-badge" data-testid="list-2-count">{{ list2().length }}</span>
+          <div class="listcard" data-testid="list-2-card">
+            <div class="list-hd">
+              <span class="list-title">List 2</span>
+              <span class="list-meta">
+                <span class="virt">virtualized</span>
+                <span class="count-badge" data-testid="list-2-count">{{ list2().length }}</span>
+              </span>
             </div>
-            <vdnd-sortable-list
-              class="list"
-              droppableId="list-2"
-              group="demo"
-              [items]="list2()"
-              [itemHeight]="50"
-              [containerHeight]="400"
-              [itemIdFn]="getItemId"
-              [itemTemplate]="simplifiedItemTpl"
-              [constrainToContainer]="constrainToContainer()"
-              (drop)="onDropSimplified($event)"
-            />
+            <div class="list">
+              <vdnd-sortable-list
+                droppableId="list-2"
+                group="demo"
+                [items]="list2()"
+                [itemHeight]="50"
+                [containerHeight]="400"
+                [itemIdFn]="getItemId"
+                [itemTemplate]="simplifiedItemTpl"
+                [constrainToContainer]="constrainToContainer()"
+                (drop)="onDropSimplified($event)"
+              />
+            </div>
           </div>
         </div>
       } @else {
         <!-- VERBOSE API -->
-        <div class="lists-container">
-          <ng-template #itemTpl let-item let-index="index">
-            <div
-              class="item"
-              [class.use-handle]="useDragHandle()"
-              vdndDraggable="{{ item.id }}"
-              vdndDraggableGroup="demo"
-              [vdndDraggableData]="item"
-              [lockAxis]="lockAxis()"
-              [disabled]="!dragEnabled()"
-              [dragDelay]="dragDelay()"
-              [dragHandle]="useDragHandle() ? '.item-handle' : undefined"
-            >
+        <ng-template #itemTpl let-item>
+          <div
+            class="item"
+            [class.use-handle]="useDragHandle()"
+            vdndDraggable="{{ item.id }}"
+            vdndDraggableGroup="demo"
+            [vdndDraggableData]="item"
+            [lockAxis]="lockAxis()"
+            [disabled]="!dragEnabled()"
+            [dragDelay]="dragDelay()"
+            [dragHandle]="useDragHandle() ? '.item-handle' : undefined"
+          >
+            <div class="item-inner">
               <span class="item-handle" data-testid="demo-item-handle">
                 <svg viewBox="0 0 24 24" fill="currentColor">
-                  <circle cx="9" cy="6" r="1.5" />
-                  <circle cx="15" cy="6" r="1.5" />
-                  <circle cx="9" cy="12" r="1.5" />
-                  <circle cx="15" cy="12" r="1.5" />
-                  <circle cx="9" cy="18" r="1.5" />
-                  <circle cx="15" cy="18" r="1.5" />
+                  <circle cx="9" cy="5" r="1.6" />
+                  <circle cx="15" cy="5" r="1.6" />
+                  <circle cx="9" cy="12" r="1.6" />
+                  <circle cx="15" cy="12" r="1.6" />
+                  <circle cx="9" cy="19" r="1.6" />
+                  <circle cx="15" cy="19" r="1.6" />
                 </svg>
               </span>
               <span class="item-text" data-testid="demo-item-text">{{ item.name }}</span>
             </div>
-          </ng-template>
+          </div>
+        </ng-template>
 
-          <div class="list-card" data-testid="list-1-card">
-            <div class="list-header">
-              <h3 class="list-title">List 1</h3>
-              <span class="list-badge" data-testid="list-1-count">{{ list1().length }}</span>
+        <div class="lists">
+          <div class="listcard" data-testid="list-1-card">
+            <div class="list-hd">
+              <span class="list-title">List 1</span>
+              <span class="list-meta">
+                <span class="virt">virtualized</span>
+                <span class="count-badge" data-testid="list-1-count">{{ list1().length }}</span>
+              </span>
             </div>
             <div
               class="list"
@@ -304,10 +430,13 @@
             </div>
           </div>
 
-          <div class="list-card" data-testid="list-2-card">
-            <div class="list-header">
-              <h3 class="list-title">List 2</h3>
-              <span class="list-badge" data-testid="list-2-count">{{ list2().length }}</span>
+          <div class="listcard" data-testid="list-2-card">
+            <div class="list-hd">
+              <span class="list-title">List 2</span>
+              <span class="list-meta">
+                <span class="virt">virtualized</span>
+                <span class="count-badge" data-testid="list-2-count">{{ list2().length }}</span>
+              </span>
             </div>
             <div
               class="list"
@@ -333,31 +462,59 @@
     </section>
 
     <!-- Debug Panel -->
-    <section class="debug-panel" [class.expanded]="debugExpanded()">
+    <section class="panel">
       <button
         type="button"
-        class="debug-header"
+        class="panel-hd"
         (click)="toggleDebug()"
         [attr.aria-expanded]="debugExpanded()"
-        aria-controls="debug-content"
       >
-        <h3 class="debug-title">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 19V5M5 12l7-7 7 7" />
-          </svg>
-          Debug State
-        </h3>
-        <span class="debug-toggle" [class.collapsed]="!debugExpanded()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+        <span class="panel-hd-l">
+          <span class="panel-ico panel-ico--muted">
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M8 2l1.9 1.9M14.1 3.9 16 2M9 7.1v-1a3 3 0 0 1 6 0v1" />
+              <path
+                d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6z"
+              />
+              <path
+                d="M12 20v-9M6.5 9C4.6 8.8 3 7.1 3 5M16.5 9c1.9-.2 3.5-1.9 3.5-4M3 19a9.4 9.4 0 0 0 3.5-1.1M21 19a9.4 9.4 0 0 1-3.5-1.1"
+              />
+            </svg>
+          </span>
+          Debug state
+        </span>
+        <span class="panel-hd-r">
+          <span class="live-dot" [class.is-live]="isDragging()"></span>
+          <span class="chev" [class.up]="debugExpanded()">
+            <svg
+              viewBox="0 0 24 24"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </span>
         </span>
       </button>
-      @if (debugExpanded()) {
-        <pre class="debug-content drag-state" data-testid="drag-state-debug">
-          {{ debugState() | json }}
-        </pre>
-      }
+      <div class="collapse" [class.is-open]="debugExpanded()">
+        <div>
+          <pre class="debug-json" data-testid="drag-state-debug">{{ debugState() | json }}</pre>
+        </div>
+      </div>
     </section>
   </main>
 

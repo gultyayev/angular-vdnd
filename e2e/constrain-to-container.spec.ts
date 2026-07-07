@@ -16,7 +16,7 @@ test.describe('Constrain to Container', () => {
   });
 
   async function getDebugState(page: Parameters<typeof test>[0]['page']): Promise<DebugState> {
-    const raw = await page.locator('.debug-content.drag-state').textContent();
+    const raw = await page.getByTestId('drag-state-debug').textContent();
     if (!raw) {
       throw new Error('Debug panel state is missing');
     }

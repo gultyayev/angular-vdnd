@@ -1,9 +1,6 @@
 <ion-header>
-  <ion-toolbar color="primary">
-    <ion-button slot="start" fill="clear" class="back-button" routerLink="/">
-      <ion-icon name="arrow-back" slot="icon-only"></ion-icon>
-    </ion-button>
-    <ion-title>Dynamic Height Tasks</ion-title>
+  <ion-toolbar>
+    <app-top-bar />
   </ion-toolbar>
 </ion-header>
 
@@ -16,71 +13,127 @@
     data-testid="task-scroll-container"
     vdndScrollable
   >
-    <!-- Virtual list with wrapper-based positioning -->
-    <div vdndGroup="tasks">
-      <vdnd-virtual-content
-        class="virtual-list-wrapper"
-        data-testid="task-virtual-content"
-        [itemHeight]="estimatedItemHeight"
-        [dynamicItemHeight]="true"
-        vdndDroppable="tasks"
-        (drop)="onDrop($event)"
-      >
-        <!-- Header section that scrolls away (auto-measured) -->
-        <div class="page-header" data-testid="task-page-header" vdndContentHeader>
-          @if (showBanner()) {
-            <div class="welcome-banner">
-              <ion-button fill="clear" class="close-btn" (click)="dismissBanner()">
-                <ion-icon name="close" slot="icon-only"></ion-icon>
-              </ion-button>
-              <h2>Variable Heights</h2>
-              <p>Items have different heights based on their description length</p>
-            </div>
-          }
-
-          <h3 class="section-title">My Tasks</h3>
-
-          <!-- Sticky category filter -->
-          <div class="category-chips" data-testid="category-filters">
-            @for (cat of categories; track cat.value) {
-              <ion-chip
-                [class.active]="category() === cat.value"
-                [attr.data-category-filter]="cat.value"
-                (click)="setCategory(cat.value)"
+    <div class="tm-stage">
+      <!-- Virtual list with wrapper-based positioning -->
+      <div vdndGroup="tasks">
+        <vdnd-virtual-content
+          class="tasklist"
+          data-testid="task-virtual-content"
+          [itemHeight]="estimatedItemHeight"
+          [dynamicItemHeight]="true"
+          vdndDroppable="tasks"
+          (drop)="onDrop($event)"
+        >
+          <!-- Static header section that scrolls away (auto-measured via vdndContentHeader) -->
+          <div class="page-header" data-testid="task-page-header" vdndContentHeader>
+            <div class="tm-head">
+              <h1 class="tm-title">Dynamic Height Tasks</h1>
+              <span class="tm-count"
+                ><b>{{ openCount() }}</b> open · {{ tasks().length }} total</span
               >
-                {{ cat.label }}
-              </ion-chip>
-            }
-          </div>
-        </div>
-        <ng-container *vdndVirtualFor="let task of filteredTasks(); trackBy: trackById">
-          <div class="task-item" [vdndDraggable]="task.id">
-            <ion-icon name="reorder-three" class="drag-handle"></ion-icon>
-            <div class="task-content">
-              <div class="task-header">
-                <ion-checkbox [checked]="task.done" (ionChange)="toggleTask(task)"></ion-checkbox>
-                <span class="task-title" [class.done]="task.done" data-testid="task-title">
-                  {{ task.title }}
+            </div>
+
+            @if (showBanner()) {
+              <div class="tm-note">
+                <span class="tm-note-ico">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M12 3v18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3" />
+                    <path d="M4 8h3M4 16h3M17 8h3M17 16h3" opacity="0.55" />
+                  </svg>
                 </span>
-                <ion-badge [color]="getBadgeColor(task.category)" data-testid="task-category">
-                  {{ task.category }}
-                </ion-badge>
+                <div>
+                  <h2>Variable-height rows</h2>
+                  <p>
+                    Each row sizes to its own content — descriptions run from one line to several.
+                    Heights are measured automatically with a ResizeObserver and survive reordering,
+                    so drag stays accurate.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="tm-note-x"
+                  aria-label="Dismiss"
+                  (click)="dismissBanner()"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  >
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                </button>
               </div>
-              @if (task.description) {
-                <p class="task-description">{{ task.description }}</p>
+            }
+
+            <!-- Category filters -->
+            <div class="tm-tools" data-testid="category-filters">
+              @for (cat of categories; track cat.value) {
+                <button
+                  type="button"
+                  class="chip"
+                  [class.is-active]="category() === cat.value"
+                  [attr.data-category-filter]="cat.value"
+                  (click)="setCategory(cat.value)"
+                >
+                  {{ cat.label }}<span class="chip-count">{{ counts()[cat.value] }}</span>
+                </button>
               }
             </div>
           </div>
-        </ng-container>
-      </vdnd-virtual-content>
-    </div>
 
-    <!-- Footer that appears after list -->
-    <div class="add-task-footer" data-testid="add-task-footer">
-      <ion-button expand="block" (click)="addTask()">
-        <ion-icon name="add" slot="start"></ion-icon>
-        Add New Task
-      </ion-button>
+          <ng-container *vdndVirtualFor="let task of filteredTasks(); trackBy: trackById">
+            <div class="task" [class.is-done]="task.done" [vdndDraggable]="task.id">
+              <ion-icon name="reorder-three" class="task-handle"></ion-icon>
+              <ion-checkbox
+                class="task-check"
+                [checked]="task.done"
+                (ionChange)="toggleTask(task)"
+              ></ion-checkbox>
+              <div class="task-main">
+                <div class="task-row1">
+                  <span class="task-title" data-testid="task-title">{{ task.title }}</span>
+                  <span class="tag tag--{{ task.category }}" data-testid="task-category">
+                    {{ task.category }}
+                  </span>
+                </div>
+                @if (task.description) {
+                  <p class="task-desc">{{ task.description }}</p>
+                }
+              </div>
+            </div>
+          </ng-container>
+        </vdnd-virtual-content>
+      </div>
+
+      <!-- Footer that appears after list -->
+      <button type="button" class="tm-add" data-testid="add-task-footer" (click)="addTask()">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        >
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        Add task
+      </button>
     </div>
   </div>
 </ion-content>
@@ -88,21 +141,15 @@
 <!-- Drag preview portal -->
 <vdnd-drag-preview>
   <ng-template let-item>
-    <div
-      class="task-item"
-      style="
-        width: 300px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-        border-radius: 8px;
-        transform: rotate(2deg);
-      "
-    >
-      <ion-icon name="reorder-three" class="drag-handle"></ion-icon>
-      <div class="task-content">
-        <span class="task-title" data-testid="task-title">{{ item.title }}</span>
-        <ion-badge [color]="getBadgeColor(item.category)" data-testid="task-category">
-          {{ item.category }}
-        </ion-badge>
+    <div class="task" style="width: 340px">
+      <ion-icon name="reorder-three" class="task-handle"></ion-icon>
+      <div class="task-main">
+        <div class="task-row1">
+          <span class="task-title" data-testid="task-title">{{ item.title }}</span>
+          <span class="tag tag--{{ item.category }}" data-testid="task-category">
+            {{ item.category }}
+          </span>
+        </div>
       </div>
     </div>
   </ng-template>
