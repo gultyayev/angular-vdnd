@@ -14,9 +14,10 @@
 /* ── Ionic shell reset: the shared app-top-bar provides the bar visuals ── */
 ion-header {
   flex-shrink: 0;
+  box-shadow: none; /* remove Ionic's md elevation shadow — app-top-bar uses a flat 1px border */
 }
 ion-header::after {
-  display: none; /* remove Ionic's md header shadow line */
+  display: none; /* remove Ionic's ios header shadow line */
 }
 ion-toolbar {
   --background: transparent;
