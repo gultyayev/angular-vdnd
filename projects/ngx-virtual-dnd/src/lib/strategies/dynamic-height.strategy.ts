@@ -13,6 +13,9 @@ import { HeightCache } from '../utils/height-cache';
  * computeds to re-evaluate.
  */
 export class DynamicHeightStrategy implements VirtualScrollStrategy {
+  /** Dynamic height measures and remeasures items via ResizeObserver. */
+  readonly measuresHeight = true;
+
   readonly #cache: HeightCache;
   readonly #version: WritableSignal<number> = signal(0);
 

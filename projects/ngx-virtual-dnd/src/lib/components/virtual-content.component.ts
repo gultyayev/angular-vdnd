@@ -13,8 +13,7 @@ import {
 import { VDND_VIRTUAL_VIEWPORT, VdndVirtualViewport } from '../tokens/virtual-viewport.token';
 import { VDND_SCROLL_CONTAINER, VdndScrollContainer } from '../tokens/scroll-container.token';
 import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
-import { FixedHeightStrategy } from '../strategies/fixed-height.strategy';
-import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
+import { createHeightStrategy } from '../utils/height-strategy-loader';
 import { ContentHeaderDirective } from '../directives/content-header.directive';
 
 /**
@@ -162,9 +161,7 @@ export class VirtualContentComponent implements VdndVirtualViewport, VdndScrollC
   /** The virtual scroll strategy, created based on dynamicItemHeight input */
   readonly #strategy = computed<VirtualScrollStrategy>(() => {
     const height = this.itemHeight();
-    return this.dynamicItemHeight()
-      ? new DynamicHeightStrategy(height)
-      : new FixedHeightStrategy(height);
+    return createHeightStrategy(height, this.dynamicItemHeight());
   });
 
   get strategy(): VirtualScrollStrategy {

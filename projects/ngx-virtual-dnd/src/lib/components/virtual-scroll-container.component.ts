@@ -26,8 +26,7 @@ import {
 } from '../utils/dom-signal-bindings';
 import { createAutoScrollRegistration } from '../utils/auto-scroll-registration';
 import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
-import { FixedHeightStrategy } from '../strategies/fixed-height.strategy';
-import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
+import { createHeightStrategy } from '../utils/height-strategy-loader';
 import { queryByAttribute } from '../utils/attribute-selectors';
 
 /**
@@ -240,9 +239,7 @@ export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit
   /** The virtual scroll strategy, created based on dynamicItemHeight input */
   readonly #strategy = computed<VirtualScrollStrategy>(() => {
     const height = this.itemHeight();
-    return this.dynamicItemHeight()
-      ? new DynamicHeightStrategy(height)
-      : new FixedHeightStrategy(height);
+    return createHeightStrategy(height, this.dynamicItemHeight());
   });
 
   /**

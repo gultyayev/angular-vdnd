@@ -196,7 +196,11 @@ Everything in Phase 0 is done and validated (494 unit, 472 E2E all-browser, lint
    hit-testing to consume it. _(shared — perf + DX, keystone)_ **LANDED** — see below.
 6. Lazy boundaries: dynamic strategy `import()` at config time; keyboard chunk
    prefetched on `focusin`/`pointerdown`; `provideVdndAutoScroll()` registering into the
-   scheduler. _(size)_ **← NEXT STAGE**
+   scheduler. _(size)_ Split as landed:
+   - ✅ 6a **Dynamic-height strategy lazy `import()` + strategy discriminant.** — LANDED
+     (branch `claude/v4-migration-next-stage-nj0q4r`). See below.
+   - ⏳ 6b Keyboard handler/service lazy chunk, prefetched on `focusin`/`pointerdown`. **← NEXT STAGE**
+   - ⏳ 6c `provideVdndAutoScroll()` registering the autoscroll participant into the scheduler.
 
 #### Phase 1 status & where to continue (zero-context handoff)
 
@@ -262,6 +266,49 @@ chunk prefetched on `focusin`/`pointerdown` (NEVER gated on the activating keyst
 a11y); `provideVdndAutoScroll()` that registers the autoscroll participant into the
 scheduler instead of the always-injected `AutoScrollService`. This overlaps the Phase 2
 entry-point split (item 7) and carries real bundling risk, so it is its own stage.
+
+#### Item 6a status & where to continue (zero-context handoff)
+
+The dynamic-height strategy sub-part is **done and validated** on branch
+`claude/v4-migration-next-stage-nj0q4r`.
+
+**What landed (non-breaking, additive; runtime seamless):**
+
+- **Strategy discriminant.** `VirtualScrollStrategy` gained `readonly measuresHeight: boolean`
+  (`false` fixed / `true` dynamic). This replaces the `instanceof DynamicHeightStrategy` check
+  in `virtual-for.directive.ts` so the concrete dynamic class no longer has to be statically
+  imported just for a type test.
+- **Lazy loader** (`lib/utils/height-strategy-loader.ts`). `createHeightStrategy(height, dynamic)`
+  resolves fixed height synchronously; for dynamic height it `import()`s the
+  dynamic-height chunk (module-level, fetched at most once across all lists) and stands in with a
+  `FixedHeightStrategy` seeded with the same estimate until the chunk resolves — behaviourally
+  identical to a freshly-constructed dynamic strategy with no measurements yet, so the swap is
+  invisible. A module-level `dynamicReady` signal, read inside each caller's `computed`, drives
+  the upgrade re-run.
+- **All four construction sites** (`virtual-for.directive.ts`,
+  `virtual-viewport.component.ts`, `virtual-content.component.ts`,
+  `virtual-scroll-container.component.ts`) now call `createHeightStrategy(...)` and no longer
+  statically import `DynamicHeightStrategy`.
+- **ResizeObserver setup** in `virtual-for.directive.ts` moved from a one-time `ngOnInit`
+  `instanceof` check to a reactive effect keyed on `dynamicItemHeight() || strategy.measuresHeight`,
+  registered before the view-update effect, so it wires up correctly once a dynamic strategy is
+  inherited/loaded.
+
+**Measured bundling reality (important for item 7):** ng-packagr flattens the single public
+entry point into one FESM, and because `DynamicHeightStrategy` is still a **public export**
+(`lib/index.ts`), rollup inlines the `import()` (`Promise.resolve().then(() => dynamicHeight_strategy)`)
+back into the main chunk — so **no bundle split is realized yet**. The realized size win lands
+when Phase 2 item 7 relocates `DynamicHeightStrategy` to a secondary entry point / drops it from
+the core public surface; at that point the `import()` is the only reference and the split
+materializes with no further code change. 6a is the non-breaking runtime + discriminant foundation
+that makes item 7 mechanical.
+
+**Validation:** 522 unit tests pass (incl. 4 new `height-strategy-loader.spec.ts`). Chromium E2E:
+dynamic-height (13/14), placeholder-behavior (3/3), drag-drop / drop-accuracy /
+placeholder-integrity / container-resize / constrain-to-container / empty-list (42/42). The single
+dynamic-height failure (`:215`, drag-preview visibility) fails **identically on clean `v4`** — it is
+the environmental Playwright/Chromium version mismatch (env ships Chromium 1194; the pinned
+Playwright expects 1228), not a regression. webkit/firefox unavailable for the same reason.
 
 ### Phase 2 — 4.0 breaking surface
 

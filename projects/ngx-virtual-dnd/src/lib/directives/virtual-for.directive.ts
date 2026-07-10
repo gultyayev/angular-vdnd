@@ -21,7 +21,7 @@ import { DragIndexCalculatorService } from '../services/drag-index-calculator.se
 import { DroppableDirective } from './droppable.directive';
 import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
 import { FixedHeightStrategy } from '../strategies/fixed-height.strategy';
-import { DynamicHeightStrategy } from '../strategies/dynamic-height.strategy';
+import { createHeightStrategy } from '../utils/height-strategy-loader';
 
 /**
  * Context provided to the template for each virtual item.
@@ -192,9 +192,7 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
       }
       return new FixedHeightStrategy(50);
     }
-    return this.vdndVirtualForDynamicItemHeight()
-      ? new DynamicHeightStrategy(height)
-      : new FixedHeightStrategy(height);
+    return createHeightStrategy(height, this.vdndVirtualForDynamicItemHeight());
   });
 
   // ========== Placeholder Computed Values ==========
@@ -313,6 +311,19 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
       }
     });
 
+    // Set up the ResizeObserver for dynamic-height measurement lazily. The
+    // strategy only reports `measuresHeight` once its chunk has loaded (own
+    // dynamic mode) or when a dynamic strategy is inherited from a viewport, so
+    // this reacts rather than checking a single time in ngOnInit. Registered
+    // before the view-update effect so the observer exists when views are first
+    // rendered/observed within the same change-detection flush.
+    effect(() => {
+      const measures = this.vdndVirtualForDynamicItemHeight() || this.#strategy().measuresHeight;
+      if (measures && !this.#resizeObserver) {
+        this.#setupResizeObserver();
+      }
+    });
+
     // React to changes and update views
     effect(() => {
       this.#updateViews();
@@ -328,15 +339,6 @@ export class VirtualForDirective<T> implements OnInit, OnDestroy {
 
     // Create placeholder element for drag operations
     this.#createPlaceholder();
-
-    // Set up ResizeObserver for dynamic height mode.
-    // Check both the directive's own input and the viewport's strategy (when inherited).
-    if (
-      this.vdndVirtualForDynamicItemHeight() ||
-      this.#strategy() instanceof DynamicHeightStrategy
-    ) {
-      this.#setupResizeObserver();
-    }
   }
 
   ngOnDestroy(): void {

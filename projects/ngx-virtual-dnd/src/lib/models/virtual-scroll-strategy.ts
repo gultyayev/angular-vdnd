@@ -15,6 +15,15 @@ export interface VirtualScrollStrategy {
   /** Reactivity hook — bumps when internal state changes */
   readonly version: Signal<number>;
 
+  /**
+   * Whether this strategy measures item heights at runtime.
+   *
+   * `true` for dynamic height (items are observed and remeasured), `false` for
+   * fixed height. Used instead of an `instanceof` check so the concrete
+   * `DynamicHeightStrategy` class can be code-split out of the eager graph.
+   */
+  readonly measuresHeight: boolean;
+
   /** Total content height for spacer */
   getTotalHeight(itemCount: number): number;
 

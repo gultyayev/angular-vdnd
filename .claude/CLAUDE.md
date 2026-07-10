@@ -69,6 +69,7 @@ _Plain classes (non-injectable), instantiated by DraggableDirective._
 
 _Plain classes implementing `VirtualScrollStrategy` interface (`lib/models/virtual-scroll-strategy.ts`)._
 _`HeightCache` utility: `lib/utils/height-cache.ts`_
+_Strategies are created via `createHeightStrategy()` (`lib/utils/height-strategy-loader.ts`), which lazy-`import()`s `DynamicHeightStrategy` and stands in with a fixed-height estimate until its chunk resolves. Use the `measuresHeight` discriminant (not `instanceof`) to detect a dynamic strategy._
 
 ### Directives
 

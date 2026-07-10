@@ -6,6 +6,7 @@ import { DragIndexCalculatorService } from './drag-index-calculator.service';
 import { PositionCalculatorService } from './position-calculator.service';
 
 class MockStrategy implements VirtualScrollStrategy {
+  readonly measuresHeight = false;
   readonly #version = signal(0);
   readonly version = this.#version.asReadonly();
   readonly #itemCount: number;

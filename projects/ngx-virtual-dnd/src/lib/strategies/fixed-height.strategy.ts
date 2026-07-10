@@ -9,6 +9,9 @@ import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
  * is not enabled.
  */
 export class FixedHeightStrategy implements VirtualScrollStrategy {
+  /** Fixed height never remeasures items. */
+  readonly measuresHeight = false;
+
   readonly #itemHeight: number;
 
   /** Excluded index during same-list drag (-1 = none) */
