@@ -192,11 +192,60 @@ Everything in Phase 0 is done and validated (494 unit, 472 E2E all-browser, lint
 
 ### Phase 1 — Foundation for 4.0 (mostly internal)
 
-5. `VdndGroupRegistry` (directive-scoped, stores `{id, element, dataSignal}`); rewire
-   hit-testing to consume it. _(shared — perf + DX, keystone)_
+5. ✅ `VdndGroupRegistry` (directive-scoped, stores `{id, element, data}`); rewire
+   hit-testing to consume it. _(shared — perf + DX, keystone)_ **LANDED** — see below.
 6. Lazy boundaries: dynamic strategy `import()` at config time; keyboard chunk
    prefetched on `focusin`/`pointerdown`; `provideVdndAutoScroll()` registering into the
-   scheduler. _(size)_
+   scheduler. _(size)_ **← NEXT STAGE**
+
+#### Phase 1 status & where to continue (zero-context handoff)
+
+Item 5 (the keystone) is **done and validated** on branch
+`claude/major-refactoring-next-k0jigw`. Item 6 is the remaining Phase 1 work.
+
+**What landed for item 5 (non-breaking, additive):**
+
+- **`VdndGroupRegistry`** (`lib/services/vdnd-group-registry.ts`) — a plain
+  `@Injectable()` (NOT `providedIn:'root'`) storing `{id, element, data: Signal}` per
+  member, exposing `register`/`unregister`/`getMember`/`getMembersInDocumentOrder()`.
+  Document-order sort (`compareDocumentPosition`) reproduces the painter's-order
+  tie-break `querySelectorAll` gave for free, so nested/overlapping droppables resolve
+  identically to the DOM-query fallback.
+- **`DroppableGroupDirective`** provides it in its element injector — one instance per
+  `vdndGroup` subtree, shared by every droppable/draggable underneath.
+- **`DroppableDirective`** injects it `{optional:true}` and keeps its membership in sync
+  via an effect keyed on the ID input; unregisters in `ngOnDestroy`.
+- **`DraggableDirective`** injects the same instance `{optional:true}` and passes it to
+  `beginDragSession(group, registry?)`.
+- **`PositionCalculatorService.beginDragSession`** takes an optional registry: when
+  present, candidates come from `getMembersInDocumentOrder()` instead of a
+  `data-droppable-group` DOM scan. **Fallback preserved** — no `vdndGroup` wrapper (explicit
+  `vdndDroppableGroup`) ⇒ registry is null ⇒ original DOM-query path, so the change is
+  fully backward-compatible.
+
+**Deliberately left for later (do NOT treat as missed):**
+
+- Registry stays **internal** (not exported from `public-api`/`index.ts`) — demotion of
+  internals and the public surface is Phase 2 item 7.
+- `transferItem()` and generic `data` typing (the DX consumers of the registry's `data`
+  signal) are Phase 2 items 8–9. The `data` signal is stored now as foundation.
+- `findAdjacentDroppable`/`getDroppableParent` (keyboard, non-hot-path) still use DOM
+  queries — intentionally not migrated; they can move to the registry opportunistically.
+
+**Validation:** 515 unit tests pass (5 new registry specs). E2E: 97 chromium tests across
+every registry-touched path pass (drag-drop, drop-accuracy, placeholder-behavior/integrity,
+constrain-to-container, keyboard-navigation, keyboard-drag, empty-list, disabled-elements).
+NOTE: the pinned Playwright (1.61.1) expects Chromium build 1228 but this environment ships
+1194; a version-mismatch flake in `dynamic-height.spec.ts` (drag-preview visibility) fails
+identically on **clean master**, so it is environmental, not a regression. Full all-browser
+(webkit/firefox) run was not possible for the same reason.
+
+**Where item 6 goes next:** dynamic-height strategy `import()`ed at config time (replace the
+static import + `instanceof` with a discriminant); keyboard handler/service split into a
+chunk prefetched on `focusin`/`pointerdown` (NEVER gated on the activating keystroke —
+a11y); `provideVdndAutoScroll()` that registers the autoscroll participant into the
+scheduler instead of the always-injected `AutoScrollService`. This overlaps the Phase 2
+entry-point split (item 7) and carries real bundling risk, so it is its own stage.
 
 ### Phase 2 — 4.0 breaking surface
 

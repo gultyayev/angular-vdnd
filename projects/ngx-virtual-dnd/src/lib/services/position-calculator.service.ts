@@ -1,5 +1,6 @@
 import { inject, Injectable, isDevMode, NgZone } from '@angular/core';
 import { queryAllByAttribute, queryByAttribute } from '../utils/attribute-selectors';
+import type { VdndGroupRegistry } from './vdnd-group-registry';
 
 /**
  * Snapshot of the candidate droppables for an active drag session.
@@ -53,12 +54,19 @@ export class PositionCalculatorService {
    * invalidate those rects. While a session is active, `findDroppableAtPoint`
    * runs as pure geometry against the cached rects instead of `elementFromPoint`.
    *
+   * When a {@link VdndGroupRegistry} is supplied (the draggable lives under a
+   * `vdndGroup`), candidates come from the registry's membership instead of a DOM
+   * query — same document-order tie-break, no `querySelectorAll` scan. Without a
+   * registry it falls back to the `data-droppable-group` query.
+   *
    * Safe to call repeatedly — a new call replaces any previous session.
    */
-  beginDragSession(groupName: string): void {
+  beginDragSession(groupName: string, registry?: VdndGroupRegistry | null): void {
     this.endDragSession();
 
-    const candidates = this.#queryDroppables(groupName);
+    const candidates = registry
+      ? registry.getMembersInDocumentOrder().map((member) => member.element)
+      : this.#queryDroppables(groupName);
     const onViewportChange = () => {
       if (this.#session) {
         this.#session.dirty = true;

@@ -26,6 +26,7 @@ import {
   GrabOffset,
 } from '../models/drag-drop.models';
 import { VDND_GROUP_TOKEN } from './droppable-group.directive';
+import { VdndGroupRegistry } from '../services/vdnd-group-registry';
 import { createEffectiveGroupSignal } from '../utils/group-resolution';
 import { KeyboardDragHandler } from '../handlers/keyboard-drag.handler';
 import { PointerDragHandler } from '../handlers/pointer-drag.handler';
@@ -86,6 +87,8 @@ export class DraggableDirective implements OnInit, OnDestroy {
   readonly #ngZone = inject(NgZone);
   readonly #envInjector = inject(EnvironmentInjector);
   readonly #parentGroup = inject(VDND_GROUP_TOKEN, { optional: true });
+  /** Shared group membership registry (present only under a `vdndGroup`). */
+  readonly #groupRegistry = inject(VdndGroupRegistry, { optional: true });
 
   /** Unique identifier for this draggable */
   vdndDraggable = input.required<string>();
@@ -344,7 +347,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
 
     // Snapshot droppable rects for this drag session so subsequent hit-testing is
     // pure geometry (no elementFromPoint layout flush per pointermove).
-    this.#positionCalculator.beginDragSession(groupName);
+    this.#positionCalculator.beginDragSession(groupName, this.#groupRegistry);
 
     const droppableElement = this.#positionCalculator.findDroppableAtPoint(
       position.x,
