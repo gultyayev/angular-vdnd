@@ -12,6 +12,7 @@ import { DragStateService } from '../services/drag-state.service';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
 import { DragState, DropEvent, END_OF_LIST } from '../models/drag-drop.models';
 import { VDND_GROUP_TOKEN } from './droppable-group.directive';
+import { VdndGroupRegistry } from '../services/vdnd-group-registry';
 import { createEffectiveGroupSignal } from '../utils/group-resolution';
 import { createAutoScrollRegistration } from '../utils/auto-scroll-registration';
 import { queryByAttribute } from '../utils/attribute-selectors';
@@ -54,6 +55,8 @@ export class DroppableDirective implements OnDestroy {
   readonly #dragState = inject(DragStateService);
   readonly #autoScroll = inject(AutoScrollService);
   readonly #parentGroup = inject(VDND_GROUP_TOKEN, { optional: true });
+  /** App-level group membership registry (keyed by resolved group name). */
+  readonly #groupRegistry = inject(VdndGroupRegistry);
 
   /** Unique identifier for this droppable */
   vdndDroppable = input.required<string>();
@@ -114,6 +117,9 @@ export class DroppableDirective implements OnDestroy {
   /** Cached state for handling drop (since state is cleared before effect fires) */
   #cachedDragState: DragState | null = null;
 
+  /** Group name this droppable is currently registered under (null = unregistered). */
+  #registeredGroup: string | null = null;
+
   /**
    * Check if this element is actually scrollable.
    */
@@ -139,6 +145,31 @@ export class DroppableDirective implements OnDestroy {
   }
 
   constructor() {
+    // Keep this droppable's membership in the app-level registry in sync with its
+    // resolved group and ID. The group name is the connection identity, so the
+    // member is keyed under `effectiveGroup()`; membership is keyed by element, so
+    // an unregister only ever removes this droppable's own entry. When the group
+    // changes we drop the stale bucket entry before registering under the new one.
+    effect(() => {
+      const group = this.effectiveGroup();
+      const element = this.#elementRef.nativeElement;
+
+      if (this.#registeredGroup !== null && this.#registeredGroup !== group) {
+        this.#groupRegistry.unregister(this.#registeredGroup, element);
+        this.#registeredGroup = null;
+      }
+
+      if (group) {
+        this.#groupRegistry.register({
+          id: this.vdndDroppable(),
+          element,
+          data: this.vdndDroppableData,
+          group,
+        });
+        this.#registeredGroup = group;
+      }
+    });
+
     createAutoScrollRegistration({
       autoScrollService: this.#autoScroll,
       getElement: () => this.#elementRef.nativeElement,
@@ -186,6 +217,12 @@ export class DroppableDirective implements OnDestroy {
 
     // Unregister from auto-scroll
     this.#autoScroll.unregisterContainer(this.vdndDroppable());
+
+    // Unregister from the group registry (by element — ownership-safe)
+    if (this.#registeredGroup !== null) {
+      this.#groupRegistry.unregister(this.#registeredGroup, this.#elementRef.nativeElement);
+      this.#registeredGroup = null;
+    }
   }
 
   /**
