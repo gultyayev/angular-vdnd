@@ -14,61 +14,96 @@ export interface VdndGroupMember {
   readonly element: HTMLElement;
   /** Reactive view of the droppable's associated data. */
   readonly data: Signal<unknown>;
+  /** The resolved group name this droppable belongs to. */
+  readonly group: string;
 }
 
 /**
- * Membership registry for a single `vdndGroup` subtree.
+ * App-level membership registry keyed by **group name**.
  *
- * Provided by {@link DroppableGroupDirective} on its element injector — **never**
- * `providedIn: 'root'` — so every droppable/draggable under a given `vdndGroup`
- * resolves the same instance and shares one authoritative candidate set. This is
- * the keystone the 4.0 refactor's perf (cached-rect hit-testing) and DX
- * (`transferItem()`) both consume.
+ * The group name — not any DOM wrapper instance — is the identity of a connection
+ * set: every droppable that resolves to the same name belongs to the same group,
+ * regardless of where it sits in the tree. This matches the pre-registry
+ * `data-droppable-group` DOM-query semantics (a global, layout-independent key) and
+ * keeps separate `vdndGroup` wrappers that share a name connected.
  *
- * Absent a `vdndGroup` wrapper the registry does not exist; callers must fall back
- * to a DOM query (`data-droppable-group`) so explicit-group usage keeps working.
+ * Members are stored **by element** within each group bucket so a directive only
+ * ever removes its own entry — an ID that has since been reassigned to a different
+ * droppable can never delete the wrong member.
+ *
+ * `providedIn: 'root'`: a passive lookup table (no eager feature wiring), consumed
+ * by {@link PositionCalculatorService} for cached-rect hit-testing and, later, by
+ * cross-list `transferItem()`. Absent any registration the hit-testing path falls
+ * back to a DOM query, so the registry is purely additive.
  */
-@Injectable()
+@Injectable({ providedIn: 'root' })
 export class VdndGroupRegistry {
-  readonly #members = new Map<string, VdndGroupMember>();
+  /** group name → (element → member). Element keys keep unregister ownership-safe. */
+  readonly #groups = new Map<string, Map<HTMLElement, VdndGroupMember>>();
 
   /**
-   * Register (or replace) a droppable member by ID. Called by
-   * {@link DroppableDirective} once its ID input is available and whenever the ID
-   * changes.
+   * Register (or update) a droppable member. Called by {@link DroppableDirective}
+   * once its resolved group is available and whenever its ID/group changes. When
+   * the group changes the caller must unregister the old group first.
    */
   register(member: VdndGroupMember): void {
-    this.#members.set(member.id, member);
+    let bucket = this.#groups.get(member.group);
+    if (!bucket) {
+      bucket = new Map<HTMLElement, VdndGroupMember>();
+      this.#groups.set(member.group, bucket);
+    }
+    bucket.set(member.element, member);
   }
 
   /**
-   * Remove a droppable member by ID. Called on directive teardown or ID change.
-   * Safe to call with an unknown ID.
+   * Remove a droppable member from a group by its element. Safe to call with an
+   * unknown group/element. Keying on the element (not the ID) guarantees a
+   * directive removes only the entry it owns.
    */
-  unregister(id: string): void {
-    this.#members.delete(id);
+  unregister(group: string, element: HTMLElement): void {
+    const bucket = this.#groups.get(group);
+    if (!bucket) {
+      return;
+    }
+    bucket.delete(element);
+    if (bucket.size === 0) {
+      this.#groups.delete(group);
+    }
   }
 
-  /** Look up a single member by its droppable ID. */
-  getMember(id: string): VdndGroupMember | undefined {
-    return this.#members.get(id);
+  /** Look up a single member of a group by its droppable ID. */
+  getMember(group: string, id: string): VdndGroupMember | undefined {
+    const bucket = this.#groups.get(group);
+    if (!bucket) {
+      return undefined;
+    }
+    for (const member of bucket.values()) {
+      if (member.id === id) {
+        return member;
+      }
+    }
+    return undefined;
   }
 
-  /** Number of registered members (primarily for tests/diagnostics). */
-  get size(): number {
-    return this.#members.size;
+  /** Number of registered members in a group (primarily for tests/diagnostics). */
+  size(group: string): number {
+    return this.#groups.get(group)?.size ?? 0;
   }
 
   /**
-   * Members sorted in document order, which equals default paint order.
+   * Members of `group` sorted in document order, which equals default paint order.
    *
-   * Hit-testing relies on this ordering to reproduce the painter's-order
-   * tie-break `elementFromPoint` gave for free: when droppables overlap, the last
-   * one in document order is painted on top and wins. `querySelectorAll` (the
-   * fallback path) already yields document order, so both paths agree.
+   * Hit-testing relies on this ordering to reproduce the painter's-order tie-break
+   * `elementFromPoint` gave for free: when droppables overlap, the last one in
+   * document order is painted on top and wins. `querySelectorAll` (the fallback
+   * path) already yields document order, so both paths agree.
    */
-  getMembersInDocumentOrder(): VdndGroupMember[] {
-    return [...this.#members.values()].sort((a, b) => {
+  getMembersInDocumentOrder(group: string): VdndGroupMember[] {
+    const bucket = this.#groups.get(group);
+    if (!bucket) {
+      return [];
+    }
+    return [...bucket.values()].sort((a, b) => {
       if (a.element === b.element) return 0;
       const relation = a.element.compareDocumentPosition(b.element);
       if (relation & Node.DOCUMENT_POSITION_FOLLOWING) return -1;

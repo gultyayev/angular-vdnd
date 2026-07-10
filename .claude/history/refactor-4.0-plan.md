@@ -205,23 +205,38 @@ Item 5 (the keystone) is **done and validated** on branch
 
 **What landed for item 5 (non-breaking, additive):**
 
-- **`VdndGroupRegistry`** (`lib/services/vdnd-group-registry.ts`) — a plain
-  `@Injectable()` (NOT `providedIn:'root'`) storing `{id, element, data: Signal}` per
-  member, exposing `register`/`unregister`/`getMember`/`getMembersInDocumentOrder()`.
-  Document-order sort (`compareDocumentPosition`) reproduces the painter's-order
-  tie-break `querySelectorAll` gave for free, so nested/overlapping droppables resolve
-  identically to the DOM-query fallback.
-- **`DroppableGroupDirective`** provides it in its element injector — one instance per
-  `vdndGroup` subtree, shared by every droppable/draggable underneath.
-- **`DroppableDirective`** injects it `{optional:true}` and keeps its membership in sync
-  via an effect keyed on the ID input; unregisters in `ngOnDestroy`.
-- **`DraggableDirective`** injects the same instance `{optional:true}` and passes it to
-  `beginDragSession(group, registry?)`.
-- **`PositionCalculatorService.beginDragSession`** takes an optional registry: when
-  present, candidates come from `getMembersInDocumentOrder()` instead of a
-  `data-droppable-group` DOM scan. **Fallback preserved** — no `vdndGroup` wrapper (explicit
-  `vdndDroppableGroup`) ⇒ registry is null ⇒ original DOM-query path, so the change is
-  fully backward-compatible.
+> ⚠️ **Design correction from PR review** (supersedes the plan's "directive-scoped,
+> element-injector, never `providedIn:'root'`" cross-challenge resolution). Making the
+> `vdndGroup` **element instance** the registry identity was wrong: it (a) let a droppable
+> with an explicit `vdndDroppableGroup` different from its wrapper leak into the wrapper's
+> candidate set, and (b) silently split two same-named `vdndGroup` wrappers that the old
+> `data-droppable-group` DOM query connected. **The identity of a connection set is the
+> resolved group _name_, independent of DOM layout** — matching the pre-registry semantics
+> and CDK's connected-lists model. The registry is therefore keyed by name at the root.
+> The "no root god-object" concern does not apply: this is a passive name→members lookup
+> (like CDK's `DragDropRegistry`), with no eager feature wiring.
+
+- **`VdndGroupRegistry`** (`lib/services/vdnd-group-registry.ts`) — `providedIn:'root'`,
+  storing `{id, element, data: Signal, group}` in a `Map<groupName, Map<element, member>>`.
+  Keyed by **group name** (connection identity) then by **element** (so an unregister only
+  ever removes the caller's own entry — an ID reassigned to another droppable can't delete
+  the wrong member). Exposes `register`/`unregister(group, element)`/`getMember(group,id)`/
+  `size(group)`/`getMembersInDocumentOrder(group)`. Document-order sort
+  (`compareDocumentPosition`) reproduces the painter's-order tie-break `querySelectorAll`
+  gave for free.
+- **`DroppableDirective`** injects the root registry and keeps its membership in sync via an
+  effect keyed on `effectiveGroup()` (+ id/data); re-keys on group change; unregisters in
+  `ngOnDestroy` by group+element. Both wrapped (`vdndGroup`) and explicit
+  (`vdndDroppableGroup`) droppables register uniformly.
+- **`PositionCalculatorService`** injects the registry and, in `beginDragSession(group)`,
+  snapshots candidates from `getMembersInDocumentOrder(group)` — filtered by name.
+  **Fallback preserved**: if nothing is registered under the name (droppables not yet
+  initialised / SSR), it uses the original `data-droppable-group` DOM query.
+- **`DroppableGroupDirective`** is unchanged except it no longer provides the registry — it
+  remains pure name-inheritance sugar via `VDND_GROUP_TOKEN`.
+
+Three PR-review findings drove this and are all now covered by unit tests: explicit-group
+isolation, same-name-wrapper merging, and ownership-safe unregister under a one-pass ID swap.
 
 **Deliberately left for later (do NOT treat as missed):**
 
@@ -232,9 +247,10 @@ Item 5 (the keystone) is **done and validated** on branch
 - `findAdjacentDroppable`/`getDroppableParent` (keyboard, non-hot-path) still use DOM
   queries — intentionally not migrated; they can move to the registry opportunistically.
 
-**Validation:** 515 unit tests pass (5 new registry specs). E2E: 97 chromium tests across
-every registry-touched path pass (drag-drop, drop-accuracy, placeholder-behavior/integrity,
-constrain-to-container, keyboard-navigation, keyboard-drag, empty-list, disabled-elements).
+**Validation:** 518 unit tests pass (8 registry specs incl. the three review scenarios).
+E2E: 97 chromium tests across every registry-touched path pass (drag-drop, drop-accuracy,
+placeholder-behavior/integrity, constrain-to-container, keyboard-navigation, keyboard-drag,
+empty-list, disabled-elements).
 NOTE: the pinned Playwright (1.61.1) expects Chromium build 1228 but this environment ships
 1194; a version-mismatch flake in `dynamic-height.spec.ts` (drag-preview visibility) fails
 identically on **clean master**, so it is environmental, not a regression. Full all-browser

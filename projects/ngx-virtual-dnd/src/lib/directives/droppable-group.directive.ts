@@ -1,5 +1,4 @@
 import { Directive, InjectionToken, input, Signal } from '@angular/core';
-import { VdndGroupRegistry } from '../services/vdnd-group-registry';
 
 /**
  * Token for injecting the group context from a parent directive.
@@ -44,9 +43,6 @@ export interface VdndGroupContext {
       provide: VDND_GROUP_TOKEN,
       useExisting: DroppableGroupDirective,
     },
-    // Element-injector scoped: every droppable/draggable under this group shares
-    // one membership registry. Keystone of the 4.0 hit-testing + transfer work.
-    VdndGroupRegistry,
   ],
 })
 export class DroppableGroupDirective implements VdndGroupContext {

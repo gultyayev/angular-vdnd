@@ -37,17 +37,17 @@ These rules prevent common mistakes that cause hard-to-debug issues:
 
 ### Services
 
-| Service                    | Path                                            | Purpose                                                                                                                                 |
-| -------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| DragStateService           | `lib/services/drag-state.service.ts`            | Central signals-based drag state                                                                                                        |
-| PositionCalculatorService  | `lib/services/position-calculator.service.ts`   | DOM hit-testing, drop index calculation                                                                                                 |
-| DragSchedulerService       | `lib/services/drag-scheduler.service.ts`        | Single RAF loop with read→compute→write phases; coordinates pointer-move coalescing and autoscroll participant                          |
-| AutoScrollService          | `lib/services/auto-scroll.service.ts`           | Edge-scroll logic registered as a DragSchedulerService participant                                                                      |
-| ElementCloneService        | `lib/services/element-clone.service.ts`         | Clone elements for drag preview                                                                                                         |
-| KeyboardDragService        | `lib/services/keyboard-drag.service.ts`         | Keyboard drag state management                                                                                                          |
-| DragIndexCalculatorService | `lib/services/drag-index-calculator.service.ts` | Placeholder index with virtual scroll math                                                                                              |
-| OverlayContainerService    | `lib/services/overlay-container.service.ts`     | Body-level container for overlay elements                                                                                               |
-| VdndGroupRegistry          | `lib/services/vdnd-group-registry.ts`           | Per-`vdndGroup` droppable membership (`{id, element, data}`); feeds cached-rect hit-testing. Directive-scoped (NOT `providedIn:'root'`) |
+| Service                    | Path                                            | Purpose                                                                                                                                                         |
+| -------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DragStateService           | `lib/services/drag-state.service.ts`            | Central signals-based drag state                                                                                                                                |
+| PositionCalculatorService  | `lib/services/position-calculator.service.ts`   | DOM hit-testing, drop index calculation                                                                                                                         |
+| DragSchedulerService       | `lib/services/drag-scheduler.service.ts`        | Single RAF loop with read→compute→write phases; coordinates pointer-move coalescing and autoscroll participant                                                  |
+| AutoScrollService          | `lib/services/auto-scroll.service.ts`           | Edge-scroll logic registered as a DragSchedulerService participant                                                                                              |
+| ElementCloneService        | `lib/services/element-clone.service.ts`         | Clone elements for drag preview                                                                                                                                 |
+| KeyboardDragService        | `lib/services/keyboard-drag.service.ts`         | Keyboard drag state management                                                                                                                                  |
+| DragIndexCalculatorService | `lib/services/drag-index-calculator.service.ts` | Placeholder index with virtual scroll math                                                                                                                      |
+| OverlayContainerService    | `lib/services/overlay-container.service.ts`     | Body-level container for overlay elements                                                                                                                       |
+| VdndGroupRegistry          | `lib/services/vdnd-group-registry.ts`           | App-level droppable membership keyed by group name (`{id, element, data, group}`); feeds cached-rect hit-testing. `providedIn:'root'`, members keyed by element |
 
 _All paths relative to `/projects/ngx-virtual-dnd/src/`_
 
@@ -108,13 +108,11 @@ DraggableDirective
 ├── PositionCalculatorService
 ├── AutoScrollService
 ├── ElementCloneService
-├── DragIndexCalculatorService
-└── VdndGroupRegistry (optional — present only under a vdndGroup)
+└── DragIndexCalculatorService
 
-DroppableGroupDirective → provides VdndGroupRegistry (element-injector scoped)
-DroppableDirective → VdndGroupRegistry (optional; registers/unregisters itself)
-DraggableDirective → VdndGroupRegistry (optional; passed to beginDragSession)
-PositionCalculatorService.beginDragSession(group, registry?) → registry members when present, else DOM query
+VdndGroupRegistry (providedIn:'root'; keyed by resolved group name)
+DroppableDirective → VdndGroupRegistry (registers/unregisters itself by group+element)
+PositionCalculatorService → VdndGroupRegistry (candidates filtered by group name; DOM query when none registered)
 DragPreviewComponent → DragStateService, OverlayContainerService
 DragIndexCalculatorService → PositionCalculatorService
 AutoScrollService → DragStateService, PositionCalculatorService
