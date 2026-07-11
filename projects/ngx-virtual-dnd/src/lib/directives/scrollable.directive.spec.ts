@@ -48,7 +48,7 @@ describe('ScrollableDirective', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [TestHostComponent],
-      providers: [provideZonelessChangeDetection()],
+      providers: [provideZonelessChangeDetection(), AutoScrollService],
     });
 
     fixture = TestBed.createComponent(TestHostComponent);

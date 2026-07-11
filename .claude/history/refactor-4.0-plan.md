@@ -197,10 +197,11 @@ Everything in Phase 0 is done and validated (494 unit, 472 E2E all-browser, lint
 6. Lazy boundaries: dynamic strategy `import()` at config time; keyboard chunk
    prefetched on `focusin`/`pointerdown`; `provideVdndAutoScroll()` registering into the
    scheduler. _(size)_ Split as landed:
-   - ✅ 6a **Dynamic-height strategy lazy `import()` + strategy discriminant.** — LANDED
-     (branch `claude/v4-migration-next-stage-nj0q4r`). See below.
-   - ⏳ 6b Keyboard handler/service lazy chunk, prefetched on `focusin`/`pointerdown`. **← NEXT STAGE**
-   - ⏳ 6c `provideVdndAutoScroll()` registering the autoscroll participant into the scheduler.
+   - ✅ 6a **Dynamic-height strategy lazy `import()` + strategy discriminant.** — LANDED.
+   - ✅ 6b **Keyboard handler lazy chunk, prefetched on `focusin`/`pointerdown`.** — LANDED
+     (with a known intermittent test flake to revisit — see below).
+   - ✅ 6c **`provideVdndAutoScroll()` — autoscroll opt-in provider.** — LANDED (BREAKING).
+     All three on branch `claude/v4-migration-next-stage-nj0q4r`. See handoffs below.
 
 #### Phase 1 status & where to continue (zero-context handoff)
 
@@ -309,6 +310,48 @@ placeholder-integrity / container-resize / constrain-to-container / empty-list (
 dynamic-height failure (`:215`, drag-preview visibility) fails **identically on clean `v4`** — it is
 the environmental Playwright/Chromium version mismatch (env ships Chromium 1194; the pinned
 Playwright expects 1228), not a regression. webkit/firefox unavailable for the same reason.
+
+#### Item 6c status — autoscroll opt-in provider (BREAKING)
+
+- **`AutoScrollService`** dropped `providedIn: 'root'` → plain `@Injectable()`. New
+  **`provideVdndAutoScroll()`** (`lib/providers/auto-scroll.provider.ts`, exported from
+  `public-api`) provides it via `makeEnvironmentProviders`. All five injection sites
+  (`DraggableDirective`, `DroppableDirective`, `ScrollableDirective`, `VirtualViewportComponent`,
+  `VirtualScrollContainerComponent`) now `inject(AutoScrollService, { optional: true })` and guard
+  on `null`. `createAutoScrollRegistration` takes a nullable service and no-ops when absent, with a
+  one-time dev-mode "you forgot `provideVdndAutoScroll()`" warning when a container has autoscroll
+  enabled but no provider.
+- **BREAKING for consumers:** autoscroll is now off unless `provideVdndAutoScroll()` is added. The
+  demo app-config adds it; README + SKILL + api-reference updated. Because `AutoScrollService`
+  remains a public export, no bundle removal is realized until item 7 demotes internals — but the
+  service now genuinely drops out of the injector graph when the provider is absent.
+
+#### Item 6b status — lazy keyboard handler (with a KNOWN ISSUE to revisit)
+
+- **`DraggableDirective`** no longer statically imports `KeyboardDragHandler` or constructs it in
+  `ngOnInit`. `#loadKeyboardHandler()` lazy-`import()`s and builds it once; prefetched (fire-and-
+  forget) on `focusin` (new host binding) and inside `onPointerDown` — **never gated on the
+  activating keystroke** (a11y). `KeyboardDragService` stays eagerly injected (small; public export).
+- **Cold-load robustness:** if a key beats the prefetch, `onKeyboardActivate` marks
+  `#keyboardActivationPending` and buffers subsequent keyboard-drag keys
+  (`#bufferedKeyboardKeys`), replaying them via `handler.handleKey()` once the chunk activates. This
+  was required — without it, a fast/first-ever Space→Arrow→Escape sequence stranded the drag and
+  broke focus restoration (caught by `keyboard-drag-a11y.spec.ts:100`). `onEscape` now takes
+  `$event` so a pending-window cancel is buffered too.
+- **⚠️ KNOWN ISSUE (revisit):** `keyboard-drag-virtual.spec.ts:82` ("complete drag after navigating
+  through virtual scroll boundary") is **intermittently flaky** on this branch (~3 failures across
+  ~24 single-worker runs; **stable on baseline**). The async-activation microtask delay appears to
+  occasionally desync the rapid 15-arrow virtual-scroll navigation so the item nets no move. CI
+  (`retries: 2`) masks it. The focus-restoration races are fully fixed; this completion flake is
+  not. **6b delivers no bundle win yet** (handler chunk inlined in the single-entry FESM until item
+  7), so the cleanest resolution is to revalidate/harden 6b when item 7 lands the entry-point split
+  — or revert to eager keyboard if the flake proves load-bearing. Shipped now per explicit request,
+  documented here to revisit.
+
+**Validation (6b + 6c):** 524 unit tests pass (incl. `auto-scroll.provider.spec.ts`). Chromium
+E2E: auto-scroll (4/4), autoscroll-drift (12/12), keyboard-navigation (11/11), full keyboard-drag
+suite (44/44 across runs; the `:82` virtual-scroll flake is intermittent, see above). Core pointer
+drag re-verified. Environmental `:215` drag-preview mismatch unchanged.
 
 ### Phase 2 — 4.0 breaking surface
 

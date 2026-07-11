@@ -1,8 +1,8 @@
-import { DestroyRef, effect, inject } from '@angular/core';
+import { DestroyRef, effect, inject, isDevMode } from '@angular/core';
 import { type AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
 
 interface AutoScrollRegistrationOptions {
-  autoScrollService: AutoScrollService;
+  autoScrollService: AutoScrollService | null;
   getElement: () => HTMLElement;
   getId: () => string;
   enabled: () => boolean;
@@ -10,8 +10,31 @@ interface AutoScrollRegistrationOptions {
   canRegister?: () => boolean;
 }
 
+/** Dev-mode "you forgot the provider" warning, emitted at most once. */
+let warnedMissingProvider = false;
+
 export function createAutoScrollRegistration(options: AutoScrollRegistrationOptions): void {
   const destroyRef = inject(DestroyRef);
+  const service = options.autoScrollService;
+
+  // No provider → autoscroll opted out. Warn once (dev only) if a container
+  // actually asks for it, so the missing `provideVdndAutoScroll()` isn't silent.
+  if (!service) {
+    if (isDevMode()) {
+      effect(() => {
+        if (!warnedMissingProvider && options.enabled() && (options.canRegister?.() ?? true)) {
+          warnedMissingProvider = true;
+          console.warn(
+            '[ngx-virtual-dnd] Auto-scroll is enabled on a container but ' +
+              '`provideVdndAutoScroll()` was not added to your providers. ' +
+              'Drag will work without edge auto-scrolling.',
+          );
+        }
+      });
+    }
+    return;
+  }
+
   let registeredId: string | null = null;
 
   const unregisterCurrent = (): void => {
@@ -19,7 +42,7 @@ export function createAutoScrollRegistration(options: AutoScrollRegistrationOpti
       return;
     }
 
-    options.autoScrollService.unregisterContainer(registeredId);
+    service.unregisterContainer(registeredId);
     registeredId = null;
   };
 
@@ -38,7 +61,7 @@ export function createAutoScrollRegistration(options: AutoScrollRegistrationOpti
       unregisterCurrent();
     }
 
-    options.autoScrollService.registerContainer(id, options.getElement(), config);
+    service.registerContainer(id, options.getElement(), config);
     registeredId = id;
   });
 

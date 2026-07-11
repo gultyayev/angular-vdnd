@@ -37,17 +37,17 @@ These rules prevent common mistakes that cause hard-to-debug issues:
 
 ### Services
 
-| Service                    | Path                                            | Purpose                                                                                                                                                         |
-| -------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| DragStateService           | `lib/services/drag-state.service.ts`            | Central signals-based drag state                                                                                                                                |
-| PositionCalculatorService  | `lib/services/position-calculator.service.ts`   | DOM hit-testing, drop index calculation                                                                                                                         |
-| DragSchedulerService       | `lib/services/drag-scheduler.service.ts`        | Single RAF loop with read→compute→write phases; coordinates pointer-move coalescing and autoscroll participant                                                  |
-| AutoScrollService          | `lib/services/auto-scroll.service.ts`           | Edge-scroll logic registered as a DragSchedulerService participant                                                                                              |
-| ElementCloneService        | `lib/services/element-clone.service.ts`         | Clone elements for drag preview                                                                                                                                 |
-| KeyboardDragService        | `lib/services/keyboard-drag.service.ts`         | Keyboard drag state management                                                                                                                                  |
-| DragIndexCalculatorService | `lib/services/drag-index-calculator.service.ts` | Placeholder index with virtual scroll math                                                                                                                      |
-| OverlayContainerService    | `lib/services/overlay-container.service.ts`     | Body-level container for overlay elements                                                                                                                       |
-| VdndGroupRegistry          | `lib/services/vdnd-group-registry.ts`           | App-level droppable membership keyed by group name (`{id, element, data, group}`); feeds cached-rect hit-testing. `providedIn:'root'`, members keyed by element |
+| Service                    | Path                                            | Purpose                                                                                                                                                                                                            |
+| -------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| DragStateService           | `lib/services/drag-state.service.ts`            | Central signals-based drag state                                                                                                                                                                                   |
+| PositionCalculatorService  | `lib/services/position-calculator.service.ts`   | DOM hit-testing, drop index calculation                                                                                                                                                                            |
+| DragSchedulerService       | `lib/services/drag-scheduler.service.ts`        | Single RAF loop with read→compute→write phases; coordinates pointer-move coalescing and autoscroll participant                                                                                                     |
+| AutoScrollService          | `lib/services/auto-scroll.service.ts`           | Edge-scroll logic registered as a DragSchedulerService participant. **Opt-in** via `provideVdndAutoScroll()` (plain `@Injectable()`, not root); injected `{ optional: true }` and null when the provider is absent |
+| ElementCloneService        | `lib/services/element-clone.service.ts`         | Clone elements for drag preview                                                                                                                                                                                    |
+| KeyboardDragService        | `lib/services/keyboard-drag.service.ts`         | Keyboard drag state management                                                                                                                                                                                     |
+| DragIndexCalculatorService | `lib/services/drag-index-calculator.service.ts` | Placeholder index with virtual scroll math                                                                                                                                                                         |
+| OverlayContainerService    | `lib/services/overlay-container.service.ts`     | Body-level container for overlay elements                                                                                                                                                                          |
+| VdndGroupRegistry          | `lib/services/vdnd-group-registry.ts`           | App-level droppable membership keyed by group name (`{id, element, data, group}`); feeds cached-rect hit-testing. `providedIn:'root'`, members keyed by element                                                    |
 
 _All paths relative to `/projects/ngx-virtual-dnd/src/`_
 
@@ -59,6 +59,7 @@ _All paths relative to `/projects/ngx-virtual-dnd/src/`_
 | PointerDragHandler  | `lib/handlers/pointer-drag.handler.ts`  | Pointer (mouse/touch) drag lifecycle + RAF |
 
 _Plain classes (non-injectable), instantiated by DraggableDirective._
+_`KeyboardDragHandler` is lazy-`import()`ed and constructed on first `focusin`/`pointerdown` (prefetch, never gated on the activating keystroke); keys pressed before the chunk resolves are buffered and replayed on activation. `PointerDragHandler` is eager (core)._
 
 ### Strategies
 
@@ -164,6 +165,8 @@ Unit test filenames mirror source filenames (`foo.service.ts` → `foo.service.s
 **Events:** `DragStartEvent`, `DropEvent`, `DragEndEvent`
 
 **Utilities:** `moveItem()`, `reorderItems()`, `applyMove()`, `isNoOpDrop()`, `insertAt()`, `removeAt()`
+
+**Providers:** `provideVdndAutoScroll()` (opt-in edge auto-scroll)
 
 **Tokens:** `VDND_SCROLL_CONTAINER`, `VDND_VIRTUAL_VIEWPORT`, `VDND_GROUP_TOKEN`
 

@@ -65,7 +65,7 @@ import { createAutoScrollRegistration } from '../utils/auto-scroll-registration'
 export class ScrollableDirective implements VdndScrollContainer, OnInit, OnDestroy {
   readonly #elementRef = inject(ElementRef<HTMLElement>);
   readonly #ngZone = inject(NgZone);
-  readonly #autoScrollService = inject(AutoScrollService);
+  readonly #autoScrollService = inject(AutoScrollService, { optional: true });
 
   /** Current scroll position (reactive) */
   readonly #scrollTop = signal(0);

@@ -111,7 +111,7 @@ export class VirtualViewportComponent
 {
   readonly #elementRef = inject(ElementRef<HTMLElement>);
   readonly #ngZone = inject(NgZone);
-  readonly #autoScrollService = inject(AutoScrollService);
+  readonly #autoScrollService = inject(AutoScrollService, { optional: true });
 
   /** Current scroll position (reactive) */
   readonly #scrollTop = signal(0);

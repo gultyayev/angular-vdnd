@@ -383,6 +383,16 @@ function removeAt<T>(list: T[], index: number): T[];
 
 ---
 
+## Providers
+
+```typescript
+function provideVdndAutoScroll(): EnvironmentProviders;
+```
+
+Opt into edge auto-scrolling during drag. Add to application (or route) providers. Without it, drag works but containers don't edge-scroll (dev-mode warning logged if a container has auto-scroll enabled but the provider is missing).
+
+---
+
 ## Services
 
 ### DragStateService
@@ -411,7 +421,7 @@ function removeAt<T>(list: T[], index: number): T[];
 
 ### AutoScrollService
 
-**Injectable:** `providedIn: 'root'` (singleton)
+**Injectable:** opt-in via `provideVdndAutoScroll()` (not `providedIn: 'root'`). Absent unless the provider is added.
 
 Controls edge auto-scrolling during drag operations. Usually configured via component inputs rather than used directly.
 

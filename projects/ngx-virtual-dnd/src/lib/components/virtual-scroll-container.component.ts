@@ -147,7 +147,7 @@ export interface VirtualScrollItemContext<T> {
 export class VirtualScrollContainerComponent<T> implements OnInit, AfterViewInit, OnDestroy {
   readonly #dragState = inject(DragStateService);
   readonly #elementRef = inject(ElementRef<HTMLElement>);
-  readonly #autoScrollService = inject(AutoScrollService);
+  readonly #autoScrollService = inject(AutoScrollService, { optional: true });
   readonly #dragIndexCalculator = inject(DragIndexCalculatorService);
   readonly #ngZone = inject(NgZone);
   readonly #injector = inject(Injector);

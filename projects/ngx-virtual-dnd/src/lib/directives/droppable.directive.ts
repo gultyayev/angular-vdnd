@@ -53,7 +53,7 @@ import { queryByAttribute } from '../utils/attribute-selectors';
 export class DroppableDirective implements OnDestroy {
   readonly #elementRef = inject(ElementRef<HTMLElement>);
   readonly #dragState = inject(DragStateService);
-  readonly #autoScroll = inject(AutoScrollService);
+  readonly #autoScroll = inject(AutoScrollService, { optional: true });
   readonly #parentGroup = inject(VDND_GROUP_TOKEN, { optional: true });
   /** App-level group membership registry (keyed by resolved group name). */
   readonly #groupRegistry = inject(VdndGroupRegistry);
@@ -216,7 +216,7 @@ export class DroppableDirective implements OnDestroy {
     }
 
     // Unregister from auto-scroll
-    this.#autoScroll.unregisterContainer(this.vdndDroppable());
+    this.#autoScroll?.unregisterContainer(this.vdndDroppable());
 
     // Unregister from the group registry (by element — ownership-safe)
     if (this.#registeredGroup !== null) {

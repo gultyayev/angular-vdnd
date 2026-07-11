@@ -27,7 +27,7 @@ import {
 } from '../models/drag-drop.models';
 import { VDND_GROUP_TOKEN } from './droppable-group.directive';
 import { createEffectiveGroupSignal } from '../utils/group-resolution';
-import { KeyboardDragHandler } from '../handlers/keyboard-drag.handler';
+import type { KeyboardDragHandler } from '../handlers/keyboard-drag.handler';
 import { PointerDragHandler } from '../handlers/pointer-drag.handler';
 
 /**
@@ -62,6 +62,7 @@ import { PointerDragHandler } from '../handlers/pointer-drag.handler';
     '[style.display]': 'isDragging() ? "none" : null',
     '[attr.aria-grabbed]': 'isDragging() ? "true" : "false"',
     '[tabindex]': 'disabled() ? -1 : 0',
+    '(focusin)': 'onKeyboardPrefetch()',
     '(mousedown)': 'onPointerDown($event, false)',
     '(touchstart)': 'onPointerDown($event, true)',
     '(keydown.space)': 'onKeyboardActivate($event)',
@@ -70,14 +71,14 @@ import { PointerDragHandler } from '../handlers/pointer-drag.handler';
     '(keydown.arrowdown)': 'onArrowKey($event)',
     '(keydown.arrowleft)': 'onArrowKey($event)',
     '(keydown.arrowright)': 'onArrowKey($event)',
-    '(keydown.escape)': 'onEscape()',
+    '(keydown.escape)': 'onEscape($event)',
   },
 })
 export class DraggableDirective implements OnInit, OnDestroy {
   readonly #elementRef = inject(ElementRef<HTMLElement>);
   readonly #dragState = inject(DragStateService);
   readonly #positionCalculator = inject(PositionCalculatorService);
-  readonly #autoScroll = inject(AutoScrollService);
+  readonly #autoScroll = inject(AutoScrollService, { optional: true });
   readonly #elementClone = inject(ElementCloneService);
   readonly #keyboardDrag = inject(KeyboardDragService);
   readonly #dragIndexCalculator = inject(DragIndexCalculatorService);
@@ -145,7 +146,22 @@ export class DraggableDirective implements OnInit, OnDestroy {
     return draggedItem?.draggableId === this.vdndDraggable();
   });
 
-  #keyboardHandler!: KeyboardDragHandler;
+  /**
+   * Keyboard drag handler — lazily loaded on first focus/pointer interaction
+   * (its chunk is kept out of the eager drag graph). `null` until the chunk
+   * resolves; keyboard activation awaits the load if a key beats the prefetch.
+   */
+  #keyboardHandler: KeyboardDragHandler | null = null;
+  #keyboardHandlerLoad: Promise<KeyboardDragHandler> | null = null;
+
+  /**
+   * True between a keyboard activation (Space) and the handler chunk resolving,
+   * when the handler isn't loaded yet. Keyboard-drag keys pressed in this window
+   * are buffered in {@link #bufferedKeyboardKeys} and replayed once the handler
+   * activates, so a fast (or first-ever, pre-prefetch) key sequence is never lost.
+   */
+  #keyboardActivationPending = false;
+  #bufferedKeyboardKeys: KeyboardEvent[] = [];
   #pointerHandler!: PointerDragHandler;
 
   /** Cached constraint flag from source droppable */
@@ -179,29 +195,6 @@ export class DraggableDirective implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.#keyboardHandler = new KeyboardDragHandler({
-      dragState: this.#dragState,
-      keyboardDrag: this.#keyboardDrag,
-      positionCalculator: this.#positionCalculator,
-      dragIndexCalculator: this.#dragIndexCalculator,
-      elementClone: this.#elementClone,
-      overlayContainer: this.#overlayContainer,
-      ngZone: this.#ngZone,
-      envInjector: this.#envInjector,
-      callbacks: {
-        onDragStart: (event) => this.dragStart.emit(event),
-        onDragEnd: (event) => this.dragEnd.emit(event),
-        getParentDroppableId: () => this.#getParentDroppableId(),
-        calculateSourceIndex: (el, droppable) => this.#calculateSourceIndex(el, droppable),
-      },
-      getContext: () => ({
-        element: this.#elementRef.nativeElement,
-        draggableId: this.vdndDraggable(),
-        groupName: this.#effectiveGroup(),
-        data: this.vdndDraggableData(),
-      }),
-    });
-
     this.#pointerHandler = new PointerDragHandler({
       ngZone: this.#ngZone,
       callbacks: {
@@ -233,13 +226,67 @@ export class DraggableDirective implements OnInit, OnDestroy {
       this.#endDrag(true);
     }
     this.#pointerHandler.destroy();
-    this.#keyboardHandler.destroy();
+    this.#keyboardHandler?.destroy();
+  }
+
+  /**
+   * Lazily import and construct the keyboard drag handler (once). Its chunk is
+   * kept out of the eager drag graph and prefetched on `focusin`/`pointerdown`
+   * — NEVER gated on the activating keystroke, so keyboard drag never silently
+   * fails for a11y even if a key beats the prefetch (activation awaits this).
+   */
+  #loadKeyboardHandler(): Promise<KeyboardDragHandler> {
+    if (this.#keyboardHandler) {
+      return Promise.resolve(this.#keyboardHandler);
+    }
+    this.#keyboardHandlerLoad ??= import('../handlers/keyboard-drag.handler').then(
+      ({ KeyboardDragHandler }) => {
+        const handler = new KeyboardDragHandler({
+          dragState: this.#dragState,
+          keyboardDrag: this.#keyboardDrag,
+          positionCalculator: this.#positionCalculator,
+          dragIndexCalculator: this.#dragIndexCalculator,
+          elementClone: this.#elementClone,
+          overlayContainer: this.#overlayContainer,
+          ngZone: this.#ngZone,
+          envInjector: this.#envInjector,
+          callbacks: {
+            onDragStart: (event) => this.dragStart.emit(event),
+            onDragEnd: (event) => this.dragEnd.emit(event),
+            getParentDroppableId: () => this.#getParentDroppableId(),
+            calculateSourceIndex: (el, droppable) => this.#calculateSourceIndex(el, droppable),
+          },
+          getContext: () => ({
+            element: this.#elementRef.nativeElement,
+            draggableId: this.vdndDraggable(),
+            groupName: this.#effectiveGroup(),
+            data: this.vdndDraggableData(),
+          }),
+        });
+        this.#keyboardHandler = handler;
+        return handler;
+      },
+    );
+    return this.#keyboardHandlerLoad;
+  }
+
+  /**
+   * Prefetch the keyboard handler chunk on focus / pointer interaction so it is
+   * ready before any keystroke. Fire-and-forget.
+   */
+  protected onKeyboardPrefetch(): void {
+    if (this.disabled()) {
+      return;
+    }
+    void this.#loadKeyboardHandler();
   }
 
   /**
    * Handle pointer down (mouse or touch).
    */
   protected onPointerDown(event: MouseEvent | TouchEvent, isTouch: boolean): void {
+    // Prefetch keyboard support alongside pointer interaction (never blocks the drag).
+    this.onKeyboardPrefetch();
     this.#pointerHandler.onPointerDown(event, isTouch);
   }
 
@@ -255,46 +302,95 @@ export class DraggableDirective implements OnInit, OnDestroy {
     event.preventDefault();
     event.stopPropagation(); // Prevent document listener from receiving this event
 
-    // If we're in a keyboard drag, Space drops the item
-    if (this.#keyboardHandler.isActive()) {
-      this.#keyboardHandler.complete();
+    const handler = this.#keyboardHandler;
+    if (handler) {
+      // If we're in a keyboard drag, Space drops the item
+      if (handler.isActive()) {
+        handler.complete();
+        return;
+      }
+      // If we're in a pointer drag, ignore
+      if (this.isDragging()) {
+        return;
+      }
+      handler.activate();
       return;
     }
 
-    // If we're in a pointer drag, ignore
+    // Chunk not resolved yet (key beat the prefetch) — load then activate so
+    // keyboard drag is never silently dropped. preventDefault already fired.
     if (this.isDragging()) {
       return;
     }
+    // A repeat Space during the load window is the drop — buffer it to replay
+    // as complete() after activation.
+    if (this.#keyboardActivationPending) {
+      this.#bufferedKeyboardKeys.push(event as KeyboardEvent);
+      return;
+    }
+    this.#keyboardActivationPending = true;
+    void this.#loadKeyboardHandler().then((h) => {
+      this.#keyboardActivationPending = false;
+      const buffered = this.#bufferedKeyboardKeys;
+      this.#bufferedKeyboardKeys = [];
+      if (this.isDragging() || h.isActive()) {
+        return;
+      }
+      h.activate();
+      // Replay navigation/drop/cancel keys pressed while the chunk was loading.
+      for (const bufferedKey of buffered) {
+        h.handleKey(bufferedKey);
+      }
+    });
+  }
 
-    // Start keyboard drag
-    this.#keyboardHandler.activate();
+  /**
+   * Buffer a keyboard-drag key that arrived while activation is pending (handler
+   * chunk still loading). Returns true if buffered.
+   */
+  #bufferKeyIfActivationPending(event: KeyboardEvent): boolean {
+    if (this.#keyboardActivationPending) {
+      event.preventDefault();
+      this.#bufferedKeyboardKeys.push(event);
+      return true;
+    }
+    return false;
   }
 
   /**
    * Handle Enter key (alternative to Space for dropping during keyboard drag).
    */
   protected onEnterKey(event: Event): void {
-    if (this.#keyboardHandler.isActive()) {
+    if (this.#keyboardHandler?.isActive()) {
       event.preventDefault();
       this.#keyboardHandler.complete();
+      return;
     }
+    this.#bufferKeyIfActivationPending(event as KeyboardEvent);
   }
 
   /**
    * Handle arrow keys during keyboard drag.
    */
   protected onArrowKey(event: Event): void {
-    if (this.#keyboardHandler.isActive()) {
+    if (this.#keyboardHandler?.isActive()) {
       this.#keyboardHandler.handleKey(event as KeyboardEvent);
+      return;
     }
+    this.#bufferKeyIfActivationPending(event as KeyboardEvent);
   }
 
   /**
    * Handle escape key to cancel drag (host binding, fires before element is hidden).
    */
-  protected onEscape(): boolean {
-    if (this.#keyboardHandler.isActive()) {
+  protected onEscape(event: Event): boolean {
+    if (this.#keyboardHandler?.isActive()) {
       this.#keyboardHandler.cancel();
+      return false;
+    }
+    // Cancel pressed while the keyboard chunk is still loading — buffer it so
+    // the pending activation is cancelled on replay (never a stranded drag).
+    if (this.#bufferKeyIfActivationPending(event as KeyboardEvent)) {
       return false;
     }
     if (this.isDragging()) {
@@ -420,7 +516,8 @@ export class DraggableDirective implements OnInit, OnDestroy {
     });
 
     // Start auto-scroll monitoring — registers as a scheduler participant.
-    this.#autoScroll.startMonitoring(() => this.#recalculatePlaceholder());
+    // Null when `provideVdndAutoScroll()` was not added (autoscroll opted out).
+    this.#autoScroll?.startMonitoring(() => this.#recalculatePlaceholder());
 
     // Emit drag start event
     this.dragStart.emit({
@@ -605,7 +702,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
           y: axisLock === 'y' ? startPos.y : scrollCursor.y,
         };
       }
-      this.#autoScroll.setCursorOverride({
+      this.#autoScroll?.setCursorOverride({
         x: Math.max(rect.left, Math.min(scrollCursor.x, rect.right)),
         y: Math.max(rect.top, Math.min(scrollCursor.y, rect.bottom)),
       });
@@ -660,7 +757,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
   #endDrag(cancelled: boolean): void {
     // Stop the scheduler RAF loop first, then remove the autoscroll participant.
     this.#scheduler.stop();
-    this.#autoScroll.stopMonitoring();
+    this.#autoScroll?.stopMonitoring();
 
     // Tear down the geometric hit-testing snapshot + its viewport listeners
     this.#positionCalculator.endDragSession();

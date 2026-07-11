@@ -409,7 +409,17 @@ Or on the directive:
 
 ### Auto-Scroll
 
-Configure auto-scroll when dragging near container edges:
+Auto-scroll is **opt-in**. Add `provideVdndAutoScroll()` to your app (or route) providers:
+
+```ts
+import { provideVdndAutoScroll } from 'ngx-virtual-dnd';
+
+bootstrapApplication(AppComponent, {
+  providers: [provideVdndAutoScroll()],
+});
+```
+
+Without it, drag still works but containers don't edge-scroll (a dev-mode warning is logged if a container has auto-scroll enabled but the provider is missing). Once enabled, configure behavior when dragging near container edges:
 
 ```html
 <vdnd-sortable-list

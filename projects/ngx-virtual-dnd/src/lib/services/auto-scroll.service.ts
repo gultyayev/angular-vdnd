@@ -27,10 +27,13 @@ const DEFAULT_CONFIG: AutoScrollConfig = {
 
 /**
  * Service that handles auto-scrolling when dragging near container edges.
+ *
+ * Not `providedIn: 'root'` — opt-in via `provideVdndAutoScroll()`. When the
+ * provider is absent, every injection site resolves `null` and drag proceeds
+ * without edge-scrolling (graceful degradation). This keeps the autoscroll
+ * tick participant out of the base graph for consumers that don't need it.
  */
-@Injectable({
-  providedIn: 'root',
-})
+@Injectable()
 export class AutoScrollService {
   readonly #dragState = inject(DragStateService);
   readonly #positionCalculator = inject(PositionCalculatorService);

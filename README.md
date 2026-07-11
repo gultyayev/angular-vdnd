@@ -140,6 +140,10 @@ The library exports these main pieces (use IDE completion for full details):
 - `FixedHeightStrategy` - Fixed `index * itemHeight` math (zero overhead)
 - `DynamicHeightStrategy` - Variable heights with auto-measurement and binary search
 
+**Providers:**
+
+- `provideVdndAutoScroll()` - Opt into edge auto-scrolling during drag (see [Auto-Scroll Configuration](#auto-scroll-configuration))
+
 ## Advanced Usage
 
 ### Dynamic Item Heights
@@ -274,7 +278,17 @@ Without a custom template, the library clones the dragged element as the preview
 
 ### Auto-Scroll Configuration
 
-Configure auto-scroll behavior when dragging near container edges:
+Auto-scroll is **opt-in**. Add `provideVdndAutoScroll()` to your application (or route) providers to enable edge auto-scrolling during drag:
+
+```ts
+import { provideVdndAutoScroll } from 'ngx-virtual-dnd';
+
+bootstrapApplication(AppComponent, {
+  providers: [provideVdndAutoScroll()],
+});
+```
+
+Without the provider, containers still work — they just don't edge-scroll while dragging (a dev-mode warning is logged if a container has auto-scroll enabled but the provider is missing). Once enabled, configure behavior when dragging near container edges:
 
 ```html
 <vdnd-sortable-list
