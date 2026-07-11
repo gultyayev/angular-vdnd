@@ -61,11 +61,17 @@ export class DragStateService {
   /** Index where the placeholder should be inserted — updated on each placeholder move */
   readonly #placeholderIndex = signal<number | null>(null);
 
+  /** Snapshot captured synchronously immediately before the last drag state reset. */
+  readonly #endedDragState = signal<DragState | null>(null);
+
   /** Flag indicating if the last drag was cancelled (not dropped) */
   readonly #wasCancelled = signal<boolean>(false);
 
   /** Whether the last drag was cancelled (for droppable to check before emitting drop) */
   readonly wasCancelled = this.#wasCancelled.asReadonly();
+
+  /** Snapshot captured synchronously before the last drag reset. */
+  readonly endedDragState = this.#endedDragState.asReadonly();
 
   /** Whether a drag operation is in progress */
   readonly isDragging = computed(() => this.#state().isDragging);
@@ -149,7 +155,8 @@ export class DragStateService {
     isKeyboardDrag?: boolean,
     axisLockPosition?: CursorPosition,
   ): void {
-    // Reset cancellation flag at start of new drag
+    // Reset terminal drag metadata at start of new drag
+    this.#endedDragState.set(null);
     this.#wasCancelled.set(false);
     this.#cursorPosition.set(cursorPosition ?? null);
     this.#keyboardTargetIndex.set(isKeyboardDrag ? (sourceIndex ?? 0) : null);
@@ -234,6 +241,7 @@ export class DragStateService {
    * End the drag operation and reset state (normal drop).
    */
   endDrag(): void {
+    this.#endedDragState.set(this.getStateSnapshot());
     this.#wasCancelled.set(false);
     this.#resetHighFrequencySignals();
     this.#state.set(INITIAL_CORE_STATE);
@@ -243,6 +251,7 @@ export class DragStateService {
    * Cancel the drag operation (escape key, disabled, etc.).
    */
   cancelDrag(): void {
+    this.#endedDragState.set(this.getStateSnapshot());
     this.#wasCancelled.set(true);
     this.#resetHighFrequencySignals();
     this.#state.set(INITIAL_CORE_STATE);
