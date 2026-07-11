@@ -7,6 +7,7 @@ import { ElementCloneService } from '../services/element-clone.service';
 import { OverlayContainerService } from '../services/overlay-container.service';
 import { DragEndEvent, DragStartEvent } from '../models/drag-drop.models';
 import { queryByAttribute } from '../utils/attribute-selectors';
+import { normalizeDropDestinationIndex } from '../utils/drop-index-normalization';
 
 /**
  * Context from the directive needed for keyboard drag operations.
@@ -193,7 +194,12 @@ export class KeyboardDragHandler {
   complete(): void {
     const ctx = this.#deps.getContext();
     const sourceIndex = this.#deps.dragState.sourceIndex() ?? 0;
-    const destinationIndex = this.#deps.dragState.placeholderIndex();
+    const destinationIndex = normalizeDropDestinationIndex({
+      sourceIndex,
+      placeholderIndex: this.#deps.dragState.placeholderIndex(),
+      sourceDroppableId: this.#deps.dragState.sourceDroppableId(),
+      activeDroppableId: this.#deps.dragState.activeDroppableId(),
+    });
 
     // Remove document listener
     this.#cleanupDocumentListener();

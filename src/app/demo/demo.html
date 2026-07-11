@@ -308,6 +308,7 @@
               [disabled]="!dragEnabled()"
               [dragDelay]="dragDelay()"
               [dragHandle]="useDragHandle() ? '.item-handle' : undefined"
+              (dragEnd)="onDragEnd($event)"
             >
               <div class="item-inner">
                 <span class="item-handle" data-testid="demo-item-handle">
@@ -384,6 +385,7 @@
             [disabled]="!dragEnabled()"
             [dragDelay]="dragDelay()"
             [dragHandle]="useDragHandle() ? '.item-handle' : undefined"
+            (dragEnd)="onDragEnd($event)"
           >
             <div class="item-inner">
               <span class="item-handle" data-testid="demo-item-handle">

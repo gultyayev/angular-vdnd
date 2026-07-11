@@ -120,3 +120,59 @@ test.describe('Keyboard Drag - Basic Operations', () => {
     await expect(demoPage.placeholder).toBeVisible();
   });
 });
+
+test.describe('Keyboard Drag - Event Consistency', () => {
+  let demoPage: DemoPage;
+
+  test.beforeEach(async ({ page }) => {
+    demoPage = new DemoPage(page);
+    await demoPage.goto();
+  });
+
+  test('should emit matching dragEnd and drop destination indexes for same-list no-op drops', async ({
+    page,
+  }) => {
+    const sourceItem = demoPage.list1Items.nth(3);
+
+    await sourceItem.focus();
+    await page.keyboard.press('Space');
+    await expect(demoPage.dragPreview).toBeVisible();
+    await page.keyboard.press('Space');
+
+    await expect(page.locator('[data-last-drag-end-destination-index]')).toHaveAttribute(
+      'data-last-drag-end-destination-index',
+      '3',
+    );
+    await expect(page.locator('[data-last-drop-destination-index]')).toHaveAttribute(
+      'data-last-drop-destination-index',
+      '3',
+    );
+  });
+
+  test('should emit matching dragEnd and drop destination indexes for same-list move-down drops', async ({
+    page,
+  }) => {
+    const sourceItemText = await demoPage.getItemText('list1', 1);
+    const targetItemText = await demoPage.getItemText('list1', 2);
+    const sourceItem = demoPage.list1Items.nth(1);
+
+    await sourceItem.focus();
+    await page.keyboard.press('Space');
+    await expect(demoPage.dragPreview).toBeVisible();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Space');
+
+    await expect(page.locator('[data-last-drag-end-destination-index]')).toHaveAttribute(
+      'data-last-drag-end-destination-index',
+      '2',
+    );
+    await expect(page.locator('[data-last-drop-destination-index]')).toHaveAttribute(
+      'data-last-drop-destination-index',
+      '2',
+    );
+    await expect(async () => {
+      await expect.poll(() => demoPage.getItemText('list1', 1)).toBe(targetItemText);
+      await expect.poll(() => demoPage.getItemText('list1', 2)).toBe(sourceItemText);
+    }).toPass({ timeout: 2000 });
+  });
+});
