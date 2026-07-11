@@ -440,5 +440,15 @@ describe('PositionCalculatorService', () => {
       expect(() => service.findAdjacentDroppable('left', 'right', group)).not.toThrow();
       expect(service.findAdjacentDroppable('left', 'right', group)?.element).toBe(right);
     });
+
+    it('skips disabled droppables for adjacent keyboard navigation', () => {
+      const group = 'group-disabled';
+      makeAdjacentDroppable('left', group, 0);
+      const disabledMiddle = makeAdjacentDroppable('disabled-middle', group, 200);
+      disabledMiddle.classList.add('vdnd-droppable-disabled');
+      const right = makeAdjacentDroppable('right', group, 400);
+
+      expect(service.findAdjacentDroppable('left', 'right', group)?.element).toBe(right);
+    });
   });
 });

@@ -310,11 +310,17 @@ export class KeyboardDragHandler {
       return;
     }
 
+    const itemCount = this.#deps.dragIndexCalculator.getTotalItemCount({
+      droppableElement: adjacent.element,
+      isSameList: false,
+      draggedItemHeight: 0,
+    });
+
     // Maintain the current target index (clamped to the new list's size)
     const currentTargetIndex = this.#deps.keyboardDrag.targetIndex() ?? 0;
-    const targetIndex = Math.min(currentTargetIndex, adjacent.itemCount);
+    const targetIndex = Math.min(currentTargetIndex, itemCount);
 
-    this.#deps.keyboardDrag.moveToDroppable(adjacent.id, targetIndex, adjacent.itemCount);
+    this.#deps.keyboardDrag.moveToDroppable(adjacent.id, targetIndex, itemCount);
   }
 
   /**

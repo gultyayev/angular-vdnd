@@ -291,7 +291,7 @@ describe('KeyboardDragHandler', () => {
     });
 
     it('should handle ArrowLeft key (cross-list)', () => {
-      const adjacent = { element: createElement(), id: 'list-2', itemCount: 3 };
+      const adjacent = { element: createElement(), id: 'list-2' };
       mockPositionCalculator.findAdjacentDroppable.mockReturnValue(adjacent);
 
       const event = createKeyEvent('ArrowLeft');
@@ -303,11 +303,16 @@ describe('KeyboardDragHandler', () => {
         'left',
         'test-group',
       );
-      expect(mockKeyboardDrag.moveToDroppable).toHaveBeenCalledWith('list-2', 0, 3);
+      expect(mockDragIndexCalculator.getTotalItemCount).toHaveBeenCalledWith({
+        droppableElement: adjacent.element,
+        isSameList: false,
+        draggedItemHeight: 0,
+      });
+      expect(mockKeyboardDrag.moveToDroppable).toHaveBeenCalledWith('list-2', 0, 5);
     });
 
     it('should handle ArrowRight key (cross-list)', () => {
-      const adjacent = { element: createElement(), id: 'list-2', itemCount: 3 };
+      const adjacent = { element: createElement(), id: 'list-2' };
       mockPositionCalculator.findAdjacentDroppable.mockReturnValue(adjacent);
 
       const event = createKeyEvent('ArrowRight');
@@ -331,12 +336,28 @@ describe('KeyboardDragHandler', () => {
 
     it('should clamp target index to new list size on cross-list move', () => {
       mockKeyboardDrag.targetIndex.mockReturnValue(10);
-      const adjacent = { element: createElement(), id: 'list-2', itemCount: 3 };
+      const adjacent = { element: createElement(), id: 'list-2' };
       mockPositionCalculator.findAdjacentDroppable.mockReturnValue(adjacent);
 
       handler.handleKey(createKeyEvent('ArrowRight'));
 
-      expect(mockKeyboardDrag.moveToDroppable).toHaveBeenCalledWith('list-2', 3, 3);
+      expect(mockKeyboardDrag.moveToDroppable).toHaveBeenCalledWith('list-2', 5, 5);
+    });
+
+    it('uses DragIndexCalculator count when clamping cross-list movement', () => {
+      mockKeyboardDrag.targetIndex.mockReturnValue(12);
+      mockDragIndexCalculator.getTotalItemCount.mockReturnValue(8);
+      const adjacent = { element: createElement(), id: 'dynamic-list' };
+      mockPositionCalculator.findAdjacentDroppable.mockReturnValue(adjacent);
+
+      handler.handleKey(createKeyEvent('ArrowRight'));
+
+      expect(mockDragIndexCalculator.getTotalItemCount).toHaveBeenCalledWith({
+        droppableElement: adjacent.element,
+        isSameList: false,
+        draggedItemHeight: 0,
+      });
+      expect(mockKeyboardDrag.moveToDroppable).toHaveBeenCalledWith('dynamic-list', 8, 8);
     });
   });
 
