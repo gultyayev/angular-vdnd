@@ -15,8 +15,10 @@ import { DragStartEvent, DragEndEvent } from '../models/drag-drop.models';
     <div
       vdndDroppable="test-list"
       vdndDroppableGroup="test-group"
-      style="height: 400px; overflow: auto;"
+      style="height: 400px; overflow: auto; padding-top: 20px; row-gap: 10px;"
     >
+      <div data-draggable-id="preceding-item-1"></div>
+      <div data-draggable-id="preceding-item-2"></div>
       <div
         vdndDraggable="test-item"
         vdndDraggableGroup="test-group"
@@ -36,6 +38,11 @@ import { DragStartEvent, DragEndEvent } from '../models/drag-drop.models';
         <input type="text" />
       </div>
     </div>
+    <div
+      vdndDroppable="foreign-list"
+      vdndDroppableGroup="test-group"
+      style="height: 400px; overflow: auto;"
+    ></div>
   `,
   imports: [DraggableDirective, DroppableDirective],
 })
@@ -378,6 +385,73 @@ describe('DraggableDirective', () => {
 
       expect(dragStateService.isDragging()).toBe(true);
       expect(dragStateService.lockAxis()).toBe('y');
+    });
+  });
+
+  describe('source index calculation', () => {
+    function mockRect(element: HTMLElement, top: number, height: number): void {
+      jest.spyOn(element, 'getBoundingClientRect').mockReturnValue({
+        x: 0,
+        y: top,
+        top,
+        right: 200,
+        bottom: top + height,
+        left: 0,
+        width: 200,
+        height,
+        toJSON: () => ({}),
+      } as DOMRect);
+    }
+
+    function startPointerDrag(position: { x: number; y: number }): void {
+      draggableNative.dispatchEvent(
+        new MouseEvent('mousedown', {
+          clientX: 100,
+          clientY: 145,
+          button: 0,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      document.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: position.x,
+          clientY: position.y,
+          bubbles: true,
+        }),
+      );
+    }
+
+    it('should calculate the source index from the parent when activation is over another list', () => {
+      const positionCalculator = TestBed.inject(PositionCalculatorService);
+      const source = fixture.nativeElement.querySelector(
+        '[data-droppable-id="test-list"]',
+      ) as HTMLElement;
+      const foreign = fixture.nativeElement.querySelector(
+        '[data-droppable-id="foreign-list"]',
+      ) as HTMLElement;
+      mockRect(draggableNative, 140, 50);
+      mockRect(source, 0, 400);
+      mockRect(foreign, 500, 400);
+      jest.spyOn(positionCalculator, 'findDroppableAtPoint').mockReturnValue(foreign);
+
+      startPointerDrag({ x: 500, y: 550 });
+
+      expect(component.dragStartEvents[0].sourceIndex).toBe(2);
+    });
+
+    it('should count preceding items for a non-virtual list with padding and gaps', () => {
+      const positionCalculator = TestBed.inject(PositionCalculatorService);
+      const source = fixture.nativeElement.querySelector(
+        '[data-droppable-id="test-list"]',
+      ) as HTMLElement;
+      mockRect(draggableNative, 140, 50);
+      mockRect(source, 0, 400);
+      jest.spyOn(positionCalculator, 'findDroppableAtPoint').mockReturnValue(source);
+
+      startPointerDrag({ x: 100, y: 155 });
+
+      expect(component.dragStartEvents[0].sourceIndex).toBe(2);
     });
   });
 
