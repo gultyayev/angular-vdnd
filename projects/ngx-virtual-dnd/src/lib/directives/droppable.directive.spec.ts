@@ -129,6 +129,18 @@ describe('DroppableDirective', () => {
       expect(droppableNative.classList.contains('vdnd-droppable-disabled')).toBe(true);
     });
 
+    it('should reflect disabled state into a data attribute', () => {
+      component.disabled.set(true);
+      fixture.detectChanges();
+
+      expect(droppableNative.getAttribute('data-droppable-disabled')).toBe('true');
+
+      component.disabled.set(false);
+      fixture.detectChanges();
+
+      expect(droppableNative.hasAttribute('data-droppable-disabled')).toBe(false);
+    });
+
     it('should not be active when disabled', () => {
       component.disabled.set(true);
       fixture.detectChanges();

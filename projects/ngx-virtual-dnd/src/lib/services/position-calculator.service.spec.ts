@@ -349,6 +349,17 @@ describe('PositionCalculatorService', () => {
       // No beginDragSession() — lazy path queries the DOM directly.
       expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBe(drop);
     });
+
+    it('excludes disabled droppables from hit-test candidates', () => {
+      const dragged = document.createElement('div');
+      const enabled = makeDroppable('enabled', 'g', { top: 0, left: 0, right: 200, bottom: 200 });
+      const disabled = makeDroppable('disabled', 'g', { top: 0, left: 0, right: 200, bottom: 200 });
+      disabled.setAttribute('data-droppable-disabled', 'true');
+
+      service.beginDragSession('g');
+
+      expect(service.findDroppableAtPoint(100, 100, dragged, 'g')).toBe(enabled);
+    });
   });
 
   describe('getDroppableById', () => {
@@ -439,6 +450,15 @@ describe('PositionCalculatorService', () => {
 
       expect(() => service.findAdjacentDroppable('left', 'right', group)).not.toThrow();
       expect(service.findAdjacentDroppable('left', 'right', group)?.element).toBe(right);
+    });
+
+    it('skips disabled droppables during keyboard adjacent navigation', () => {
+      makeAdjacentDroppable('left', 'g', 0);
+      const disabledMiddle = makeAdjacentDroppable('middle', 'g', 200);
+      disabledMiddle.setAttribute('data-droppable-disabled', 'true');
+      const right = makeAdjacentDroppable('right', 'g', 400);
+
+      expect(service.findAdjacentDroppable('left', 'right', 'g')?.element).toBe(right);
     });
   });
 });

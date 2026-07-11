@@ -42,6 +42,7 @@ import { queryByAttribute } from '../utils/attribute-selectors';
   host: {
     '[attr.data-droppable-id]': 'vdndDroppable()',
     '[attr.data-droppable-group]': 'effectiveGroup()',
+    '[attr.data-droppable-disabled]': 'disabled() ? "true" : null',
     '[attr.data-constrain-to-container]': 'constrainToContainer() || null',
     '[attr.aria-dropeffect]': '"move"',
     '[class.vdnd-droppable]': 'true',

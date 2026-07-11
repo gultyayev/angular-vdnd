@@ -318,7 +318,7 @@ Use the `disabled` input to conditionally disable draggables, droppables, or ent
 />
 ```
 
-Disabled draggables get the `vdnd-draggable-disabled` CSS class. Disabled droppables get `vdnd-droppable-disabled`.
+Disabled draggables get the `vdnd-draggable-disabled` CSS class. Disabled droppables get `vdnd-droppable-disabled` and are excluded from pointer hit-testing and keyboard cross-list navigation, so dropping over a disabled destination behaves like dropping over no valid destination.
 
 ### Low-Level API
 
@@ -489,7 +489,7 @@ All event types are importable from `ngx-virtual-dnd`.
 | `(dragEnd)`   | `DragEndEvent`   | `DraggableDirective`                                 |
 | `(drop)`      | `DropEvent`      | `DroppableDirective`, `VirtualSortableListComponent` |
 
-`DragEndEvent` includes a `cancelled` boolean to distinguish drops from cancellations.
+`DragEndEvent` includes a `cancelled` boolean to distinguish explicit cancellations from releases. Its `destinationIndex` is `null` when the release has no valid destination, such as over a disabled droppable.
 
 ## How It Works
 

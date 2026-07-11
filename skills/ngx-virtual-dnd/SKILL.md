@@ -449,7 +449,7 @@ Set `[autoScrollEnabled]="false"` to disable auto-scroll entirely. Available on 
 />
 ```
 
-Disabled draggables get `vdnd-draggable-disabled`. Disabled droppables get `vdnd-droppable-disabled`.
+Disabled draggables get `vdnd-draggable-disabled`. Disabled droppables get `vdnd-droppable-disabled` and are excluded from pointer hit-testing and keyboard cross-list navigation, so dropping over a disabled destination behaves like dropping over no valid destination.
 
 ### Overscan
 
@@ -644,7 +644,7 @@ export class MyComponent {
 | `(dragEnd)` | `DragEndEvent` | `DraggableDirective` |
 | `(drop)` | `DropEvent` | `DroppableDirective`, `VirtualSortableListComponent` |
 
-`DragEndEvent.cancelled` distinguishes drops from cancellations. `DragEndEvent.sourceIndex` and `DragEndEvent.destinationIndex` provide 0-indexed positions for announcements.
+`DragEndEvent.cancelled` distinguishes explicit cancellations from drag releases. `DragEndEvent.sourceIndex` and `DragEndEvent.destinationIndex` provide 0-indexed positions for announcements; `destinationIndex` is `null` when the release has no valid destination, such as over a disabled droppable.
 
 ## Critical Rules
 

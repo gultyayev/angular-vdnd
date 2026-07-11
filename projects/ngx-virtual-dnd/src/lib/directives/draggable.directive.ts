@@ -693,14 +693,14 @@ export class DraggableDirective implements OnInit, OnDestroy {
 
     const sourceIndex = this.#dragState.sourceIndex() ?? 0;
     const placeholderIndex = this.#dragState.placeholderIndex();
-    let destinationIndex = cancelled ? null : placeholderIndex;
+    const activeDroppableId = this.#dragState.activeDroppableId();
+    let destinationIndex = cancelled || activeDroppableId === null ? null : placeholderIndex;
 
     // Keep DragEndEvent semantics consistent with DropEvent.destination.index.
     // During same-list drag, placeholderIndex includes the hidden-item adjustment,
     // but the final insertion index must account for removal of the source item.
     if (!cancelled && placeholderIndex !== null) {
       const sourceDroppableId = this.#dragState.sourceDroppableId();
-      const activeDroppableId = this.#dragState.activeDroppableId();
       if (sourceDroppableId !== null && sourceDroppableId === activeDroppableId) {
         if (sourceIndex < placeholderIndex) {
           destinationIndex = placeholderIndex - 1;

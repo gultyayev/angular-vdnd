@@ -38,6 +38,9 @@ export class PositionCalculatorService {
   /** Data attribute used to identify draggable elements */
   readonly #DRAGGABLE_ID_ATTR = 'data-draggable-id';
 
+  /** Data attribute used to exclude disabled droppable elements from drag targets */
+  readonly #DROPPABLE_DISABLED_ATTR = 'data-droppable-disabled';
+
   /** Maximum DOM levels to traverse when looking for parent elements */
   readonly #MAX_PARENT_TRAVERSAL = 15;
 
@@ -181,7 +184,9 @@ export class PositionCalculatorService {
     if (typeof document === 'undefined') {
       return [];
     }
-    return queryAllByAttribute<HTMLElement>(document, this.#DROPPABLE_GROUP_ATTR, groupName);
+    return queryAllByAttribute<HTMLElement>(document, this.#DROPPABLE_GROUP_ATTR, groupName).filter(
+      (el) => !el.hasAttribute(this.#DROPPABLE_DISABLED_ATTR),
+    );
   }
 
   /**
@@ -372,11 +377,7 @@ export class PositionCalculatorService {
     groupName: string,
   ): { element: HTMLElement; id: string; itemCount: number } | null {
     // Find all droppables in the same group
-    const allDroppables = queryAllByAttribute<HTMLElement>(
-      document,
-      this.#DROPPABLE_GROUP_ATTR,
-      groupName,
-    );
+    const allDroppables = this.#queryDroppables(groupName);
 
     if (allDroppables.length <= 1) {
       return null;
