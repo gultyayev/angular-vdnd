@@ -4,7 +4,20 @@
     "pr": "",
     "sessionUrl": false
   },
-  "hooks": {},
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/install-deps.sh",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
+  },
   "enabledPlugins": {
     "chrome-devtools-mcp@chrome-devtools-plugins": true
   }
