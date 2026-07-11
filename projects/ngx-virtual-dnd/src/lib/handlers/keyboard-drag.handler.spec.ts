@@ -48,6 +48,7 @@ describe('KeyboardDragHandler', () => {
     mockDragState = {
       sourceIndex: jest.fn().mockReturnValue(0),
       placeholderIndex: jest.fn().mockReturnValue(2),
+      sourceDroppableId: jest.fn().mockReturnValue('list-1'),
       activeDroppableId: jest.fn().mockReturnValue('list-1'),
     };
 
@@ -344,6 +345,7 @@ describe('KeyboardDragHandler', () => {
     it('should emit drag end event with correct data', () => {
       mockDragState.sourceIndex.mockReturnValue(1);
       mockDragState.placeholderIndex.mockReturnValue(3);
+      mockDragState.activeDroppableId.mockReturnValue('list-2');
 
       handler.complete();
 
@@ -357,6 +359,66 @@ describe('KeyboardDragHandler', () => {
         }),
       );
       expect(mockKeyboardDrag.completeKeyboardDrag).toHaveBeenCalled();
+    });
+
+    it('normalizes destination index for a same-list no-op drop', () => {
+      mockDragState.sourceIndex.mockReturnValue(3);
+      mockDragState.placeholderIndex.mockReturnValue(4);
+      mockDragState.activeDroppableId.mockReturnValue('list-1');
+
+      handler.complete();
+
+      expect(mockCallbacks.onDragEnd).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceIndex: 3,
+          destinationIndex: 3,
+        }),
+      );
+    });
+
+    it('normalizes destination index for a same-list move down', () => {
+      mockDragState.sourceIndex.mockReturnValue(1);
+      mockDragState.placeholderIndex.mockReturnValue(4);
+      mockDragState.activeDroppableId.mockReturnValue('list-1');
+
+      handler.complete();
+
+      expect(mockCallbacks.onDragEnd).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceIndex: 1,
+          destinationIndex: 3,
+        }),
+      );
+    });
+
+    it('keeps destination index for a same-list move up', () => {
+      mockDragState.sourceIndex.mockReturnValue(3);
+      mockDragState.placeholderIndex.mockReturnValue(1);
+      mockDragState.activeDroppableId.mockReturnValue('list-1');
+
+      handler.complete();
+
+      expect(mockCallbacks.onDragEnd).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceIndex: 3,
+          destinationIndex: 1,
+        }),
+      );
+    });
+
+    it('keeps destination index for cross-list drops', () => {
+      mockDragState.sourceIndex.mockReturnValue(1);
+      mockDragState.placeholderIndex.mockReturnValue(4);
+      mockDragState.activeDroppableId.mockReturnValue('list-2');
+
+      handler.complete();
+
+      expect(mockCallbacks.onDragEnd).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceIndex: 1,
+          destinationIndex: 4,
+        }),
+      );
     });
 
     it('should remove document listener', () => {

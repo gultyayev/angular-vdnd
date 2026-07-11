@@ -120,3 +120,32 @@ test.describe('Keyboard Drag - Basic Operations', () => {
     await expect(demoPage.placeholder).toBeVisible();
   });
 });
+
+test.describe('Keyboard Drag - Event Consistency', () => {
+  let demoPage: DemoPage;
+
+  test.beforeEach(async ({ page }) => {
+    demoPage = new DemoPage(page);
+    await demoPage.goto();
+  });
+
+  test('should emit matching dragEnd and drop destination indexes for same-list no-op drops', async ({
+    page,
+  }) => {
+    const sourceItem = demoPage.list1Items.nth(3);
+
+    await sourceItem.focus();
+    await page.keyboard.press('Space');
+    await expect(demoPage.dragPreview).toBeVisible();
+    await page.keyboard.press('Space');
+
+    await expect(page.locator('[data-last-drag-end-destination-index]')).toHaveAttribute(
+      'data-last-drag-end-destination-index',
+      '3',
+    );
+    await expect(page.locator('[data-last-drop-destination-index]')).toHaveAttribute(
+      'data-last-drop-destination-index',
+      '3',
+    );
+  });
+});
