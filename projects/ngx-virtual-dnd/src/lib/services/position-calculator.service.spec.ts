@@ -342,6 +342,42 @@ describe('PositionCalculatorService', () => {
       expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBe(drop);
     });
 
+    it('refreshes session candidates so droppables added mid-drag can be hit-tested', () => {
+      const dragged = document.createElement('div');
+      makeDroppable('initial', 'g', { top: 0, left: 0, right: 100, bottom: 100 });
+
+      service.beginDragSession('g');
+      const late = makeDroppable('late', 'g', { top: 200, left: 200, right: 300, bottom: 300 });
+
+      expect(service.findDroppableAtPoint(250, 250, dragged, 'g')).toBeNull();
+
+      service.refreshCandidates();
+
+      expect(service.findDroppableAtPoint(250, 250, dragged, 'g')).toBe(late);
+    });
+
+    it('clips droppable hit rects to a scrollable ancestor', () => {
+      const dragged = document.createElement('div');
+      const scroller = document.createElement('div');
+      scroller.classList.add('vdnd-scrollable');
+      stubRect(scroller, { top: 100, left: 100, right: 300, bottom: 300 });
+      document.body.appendChild(scroller);
+      created.push(scroller);
+
+      const drop = document.createElement('div');
+      drop.setAttribute('data-droppable-id', 'clipped');
+      drop.setAttribute('data-droppable-group', 'g');
+      stubRect(drop, { top: 50, left: 50, right: 350, bottom: 350 });
+      scroller.appendChild(drop);
+      created.push(drop);
+
+      service.beginDragSession('g');
+
+      expect(service.findDroppableAtPoint(150, 150, dragged, 'g')).toBe(drop);
+      expect(service.findDroppableAtPoint(75, 150, dragged, 'g')).toBeNull();
+      expect(service.findDroppableAtPoint(150, 325, dragged, 'g')).toBeNull();
+    });
+
     it('falls back to a one-shot geometric query when no session is active', () => {
       const dragged = document.createElement('div');
       const drop = makeDroppable('list', 'g', { top: 100, left: 100, right: 300, bottom: 400 });

@@ -124,7 +124,7 @@ The library exports these main pieces (use IDE completion for full details):
 
 - `DragStateService` - Access drag state (isDragging, draggedItem, placeholderIndex, etc.)
 - `AutoScrollService` - Controls edge auto-scrolling
-- `PositionCalculatorService` - Calculates placeholder positions
+- `PositionCalculatorService` - Calculates placeholder positions and maintains drag-session hit-test candidates
 
 **Utilities:**
 

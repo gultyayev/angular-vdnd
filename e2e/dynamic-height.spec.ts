@@ -221,12 +221,18 @@ test.describe('Dynamic Height Demo', () => {
       expect(scrollTop).toBeGreaterThan(0);
     }).toPass({ timeout: 2000 });
 
-    // Get items actually visible in the viewport (not overscan items)
+    // Get items fully visible in the scroll container (not overscan or clipped items).
     const visibleItems = await taskDemo.getVisibleTasks();
+    const scrollBox = await taskDemo.scrollContainer.boundingBox();
+    if (!scrollBox) throw new Error('Could not get scroll container bounding box');
+    const actionableItems = visibleItems.filter(
+      (item) =>
+        item.top >= scrollBox.y + 8 && item.top + item.height <= scrollBox.y + scrollBox.height - 8,
+    );
 
-    expect(visibleItems.length).toBeGreaterThanOrEqual(3);
-    const sourceId = visibleItems[0].id;
-    const targetId = visibleItems[2].id;
+    expect(actionableItems.length).toBeGreaterThanOrEqual(3);
+    const sourceId = actionableItems[0].id;
+    const targetId = actionableItems[2].id;
     expect(sourceId).not.toBe(targetId);
 
     // Drag first visible item to third visible item

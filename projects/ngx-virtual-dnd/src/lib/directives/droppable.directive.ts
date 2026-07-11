@@ -15,6 +15,7 @@ import { VDND_GROUP_TOKEN } from './droppable-group.directive';
 import { createEffectiveGroupSignal } from '../utils/group-resolution';
 import { createAutoScrollRegistration } from '../utils/auto-scroll-registration';
 import { queryByAttribute } from '../utils/attribute-selectors';
+import { PositionCalculatorService } from '../services/position-calculator.service';
 
 /**
  * Marks an element as a valid drop target within the virtual scroll drag-and-drop system.
@@ -53,6 +54,7 @@ export class DroppableDirective implements OnDestroy {
   readonly #elementRef = inject(ElementRef<HTMLElement>);
   readonly #dragState = inject(DragStateService);
   readonly #autoScroll = inject(AutoScrollService);
+  readonly #positionCalculator = inject(PositionCalculatorService);
   readonly #parentGroup = inject(VDND_GROUP_TOKEN, { optional: true });
 
   /** Unique identifier for this droppable */
@@ -148,6 +150,12 @@ export class DroppableDirective implements OnDestroy {
       canRegister: () => Boolean(this.effectiveGroup()) && this.#isScrollable(),
     });
 
+    effect(() => {
+      this.vdndDroppable();
+      this.effectiveGroup();
+      this.#positionCalculator.refreshCandidates();
+    });
+
     // React to state changes and handle drop events
     effect(() => {
       const active = this.isActive();
@@ -186,6 +194,7 @@ export class DroppableDirective implements OnDestroy {
 
     // Unregister from auto-scroll
     this.#autoScroll.unregisterContainer(this.vdndDroppable());
+    this.#positionCalculator.refreshCandidates();
   }
 
   /**

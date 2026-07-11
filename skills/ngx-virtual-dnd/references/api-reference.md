@@ -437,6 +437,7 @@ Internal service for DOM hit-testing and drop position calculation. Exported for
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `findDroppableAtPoint` | `(x, y, draggedElement, groupName) => HTMLElement \| null` | Find droppable element at cursor position |
+| `refreshCandidates` | `() => void` | Re-query active drag-session droppables after dynamic DOM changes |
 | `findDraggableAtPoint` | `(x, y, draggedElement) => HTMLElement \| null` | Find draggable element at cursor position |
 | `getDroppableId` | `(element) => string \| null` | Get droppable ID from element's data attribute |
 | `calculateDropIndex` | `(droppable, cursorY, draggedItem, sourceDroppableId) => { ... }` | Calculate drop target index |

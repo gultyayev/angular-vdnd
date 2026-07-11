@@ -68,7 +68,7 @@ export class PositionCalculatorService {
     this.#session = {
       groupName,
       candidates,
-      rects: candidates.map((el) => el.getBoundingClientRect()),
+      rects: candidates.map((el) => this.#getEffectiveDroppableRect(el)),
       dirty: false,
       onViewportChange,
     };
@@ -112,6 +112,24 @@ export class PositionCalculatorService {
   }
 
   /**
+   * Re-query the active session's droppable candidates and refresh their rects.
+   *
+   * Use when the set of rendered droppables can change during a drag (for example,
+   * a conditional list mounting or unmounting). If no drag session is active, this
+   * is a safe no-op.
+   */
+  refreshCandidates(): void {
+    const session = this.#session;
+    if (!session) {
+      return;
+    }
+
+    session.candidates = this.#queryDroppables(session.groupName);
+    session.rects = session.candidates.map((el) => this.#getEffectiveDroppableRect(el));
+    session.dirty = false;
+  }
+
+  /**
    * Find the droppable element at a given point.
    *
    * Uses pure geometric hit-testing against snapshotted droppable rects. When a
@@ -136,7 +154,7 @@ export class PositionCalculatorService {
     if (session && session.groupName === groupName) {
       if (session.dirty) {
         for (let i = 0; i < session.candidates.length; i++) {
-          session.rects[i] = session.candidates[i].getBoundingClientRect();
+          session.rects[i] = this.#getEffectiveDroppableRect(session.candidates[i]);
         }
         session.dirty = false;
       }
@@ -145,7 +163,7 @@ export class PositionCalculatorService {
 
     // No active session: one-shot geometric query (still avoids elementFromPoint).
     const candidates = this.#queryDroppables(groupName);
-    const rects = candidates.map((el) => el.getBoundingClientRect());
+    const rects = candidates.map((el) => this.#getEffectiveDroppableRect(el));
     return this.#hitTest(x, y, candidates, rects);
   }
 
@@ -190,6 +208,35 @@ export class PositionCalculatorService {
    * tie-break that `elementFromPoint` provided for free — a nested or later
    * overlapping droppable is painted on top of an earlier/ancestor one.
    */
+  #getEffectiveDroppableRect(element: HTMLElement): DOMRect {
+    let rect = element.getBoundingClientRect();
+    const scrollableAncestor = element.parentElement?.closest(
+      '.vdnd-scrollable',
+    ) as HTMLElement | null;
+
+    if (!scrollableAncestor) {
+      return rect;
+    }
+
+    const clipRect = scrollableAncestor.getBoundingClientRect();
+    rect = {
+      top: Math.max(rect.top, clipRect.top),
+      left: Math.max(rect.left, clipRect.left),
+      right: Math.min(rect.right, clipRect.right),
+      bottom: Math.min(rect.bottom, clipRect.bottom),
+      width: Math.max(0, Math.min(rect.right, clipRect.right) - Math.max(rect.left, clipRect.left)),
+      height: Math.max(
+        0,
+        Math.min(rect.bottom, clipRect.bottom) - Math.max(rect.top, clipRect.top),
+      ),
+      x: Math.max(rect.left, clipRect.left),
+      y: Math.max(rect.top, clipRect.top),
+      toJSON: () => ({}),
+    } as DOMRect;
+
+    return rect;
+  }
+
   #hitTest(x: number, y: number, candidates: HTMLElement[], rects: DOMRect[]): HTMLElement | null {
     let match: HTMLElement | null = null;
     for (let i = 0; i < candidates.length; i++) {
