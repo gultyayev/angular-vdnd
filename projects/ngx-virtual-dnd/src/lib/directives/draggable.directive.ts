@@ -331,8 +331,6 @@ export class DraggableDirective implements OnInit, OnDestroy {
       ? undefined
       : this.#elementClone.cloneElement(element);
 
-    const parentDroppableId = this.#getParentDroppableId();
-
     // Find droppable and calculate initial placeholder position
     // This fixes the UI glitch by ensuring placeholder is set before the element is hidden
     const groupName = this.#effectiveGroup();
@@ -341,6 +339,11 @@ export class DraggableDirective implements OnInit, OnDestroy {
       this.#pointerHandler.cleanup();
       return;
     }
+
+    const parentDroppableElement = this.#positionCalculator.getDroppableParent(element, groupName);
+    const parentDroppableId = parentDroppableElement
+      ? this.#positionCalculator.getDroppableId(parentDroppableElement)
+      : null;
 
     // Snapshot droppable rects for this drag session so subsequent hit-testing is
     // pure geometry (no elementFromPoint layout flush per pointermove).
@@ -366,7 +369,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
 
     // Calculate source index BEFORE the element is hidden (display: none)
     // This is critical because getBoundingClientRect() returns all zeros for hidden elements
-    const sourceIndex = this.#calculateSourceIndex(element, droppableElement);
+    const sourceIndex = this.#calculateSourceIndex(element, parentDroppableElement);
 
     let initialPlaceholderId: string | null = null;
     let initialPlaceholderIndex: number | null = null;
@@ -485,10 +488,25 @@ export class DraggableDirective implements OnInit, OnDestroy {
       }
     }
 
-    // Fallback: Use fixed-height math if no strategy available
-    const itemHeight = rect.height || 50;
-    const relativeY = rect.top - containerRect.top + scrollTop;
-    return Math.round(relativeY / itemHeight);
+    // Preserve the geometry fallback for a virtual container whose strategy is unavailable.
+    if (virtualScroll || virtualContent) {
+      const itemHeight = rect.height || 50;
+      const relativeY = rect.top - containerRect.top + scrollTop;
+      return Math.round(relativeY / itemHeight);
+    }
+
+    // Non-virtual fallback: derive the logical index from preceding draggable siblings.
+    // Geometry-based division is incorrect when the list has padding, gaps, margins,
+    // or variable-height items.
+    let sourceIndex = 0;
+    let sibling = element.previousElementSibling;
+    while (sibling) {
+      if (sibling.matches('[data-draggable-id]')) {
+        sourceIndex++;
+      }
+      sibling = sibling.previousElementSibling;
+    }
+    return sourceIndex;
   }
 
   /**

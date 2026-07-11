@@ -25,6 +25,9 @@ interface Item {
  */
 @Component({
   selector: 'app-demo',
+  host: {
+    '[attr.data-last-drop-source-index]': 'lastDropSourceIndex()',
+  },
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     JsonPipe,
@@ -71,6 +74,9 @@ export class DemoComponent {
 
   /** Whether debug panel is expanded */
   readonly debugExpanded = signal(false);
+
+  /** Last source index received by the demo drop handler (used by interaction tests). */
+  readonly lastDropSourceIndex = signal<number | null>(null);
 
   /** List 1 items */
   readonly list1 = signal<Item[]>([]);
@@ -182,6 +188,7 @@ export class DemoComponent {
 
   /** Handle drop events (verbose API) */
   onDrop(event: DropEvent): void {
+    this.lastDropSourceIndex.set(event.source.index);
     if (isNoOpDrop(event)) {
       return;
     }
@@ -200,6 +207,7 @@ export class DemoComponent {
    * Uses the moveItem utility - just ONE line of code!
    */
   onDropSimplified(event: DropEvent): void {
+    this.lastDropSourceIndex.set(event.source.index);
     moveItem(event, {
       'list-1': this.list1,
       'list-2': this.list2,

@@ -102,6 +102,40 @@ test.describe('Drag and Drop', () => {
     const newFirstItem = await demoPage.getItemText('list1', 0);
     expect(newFirstItem).toBe(itemText);
   });
+
+  test('should preserve the source index when a rapid drag activates over another list', async ({
+    page,
+  }) => {
+    const sourceIndex = 4;
+    const sourceItem = demoPage.list1Items.nth(sourceIndex);
+    await sourceItem.scrollIntoViewIfNeeded();
+
+    await expect(async () => {
+      await demoPage.scrollList('list2', 500);
+      expect(await demoPage.getScrollTop('list2')).toBe(500);
+    }).toPass({ timeout: 2000 });
+
+    const sourceBox = await sourceItem.boundingBox();
+    const targetBox = await demoPage.list2VirtualScroll.boundingBox();
+    if (!sourceBox || !targetBox) {
+      throw new Error('Could not get bounding boxes for rapid cross-list drag');
+    }
+
+    await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
+    await page.mouse.down();
+
+    // A single coalesced move crosses the threshold and lands in the destination list.
+    await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + 100, { steps: 1 });
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    await page.mouse.up();
+    await expect(demoPage.dragPreview).not.toBeVisible({ timeout: 2000 });
+
+    await expect(page.locator('[data-last-drop-source-index]')).toHaveAttribute(
+      'data-last-drop-source-index',
+      String(sourceIndex),
+    );
+  });
 });
 
 test.describe('Drag and Drop - Simplified API Mode', () => {
