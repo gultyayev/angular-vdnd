@@ -26,7 +26,8 @@ const DEFAULT_CONFIG: AutoScrollConfig = {
 };
 
 const BASE_FRAME_DURATION_MS = 1000 / 60;
-const MAX_SCROLL_FRAME_DELTA_MS = 100;
+const MIN_SCROLL_FRAME_SCALE = 1;
+const MAX_SCROLL_FRAME_SCALE = 6;
 
 /**
  * Service that handles auto-scrolling when dragging near container edges.
@@ -61,7 +62,11 @@ export class AutoScrollService {
   #lastTickCursorX = NaN;
   #lastTickCursorY = NaN;
 
-  /** Last timestamp used to normalize autoscroll velocity across frame rates */
+  /**
+   * Last timestamp used to scale per-frame autoscroll distance by elapsed frame time.
+   * Scale is intentionally floored at 1 to preserve the existing feel on 60fps+ displays while
+   * compensating slower frames that would otherwise under-scroll.
+   */
   #lastScrollTimestamp = 0;
 
   /** Reusable direction object for tick loop (avoids per-frame allocation) */
@@ -268,18 +273,15 @@ export class AutoScrollService {
 
   #getFrameScale(): number {
     const now = performance.now();
-    let elapsedMs =
+    const elapsedMs =
       this.#lastScrollTimestamp === 0 ? BASE_FRAME_DURATION_MS : now - this.#lastScrollTimestamp;
 
     this.#lastScrollTimestamp = now;
 
-    if (elapsedMs <= 0) {
-      elapsedMs = BASE_FRAME_DURATION_MS;
-    }
-
-    elapsedMs = Math.min(Math.max(elapsedMs, BASE_FRAME_DURATION_MS), MAX_SCROLL_FRAME_DELTA_MS);
-
-    return elapsedMs / BASE_FRAME_DURATION_MS;
+    return Math.min(
+      Math.max(elapsedMs / BASE_FRAME_DURATION_MS, MIN_SCROLL_FRAME_SCALE),
+      MAX_SCROLL_FRAME_SCALE,
+    );
   }
 
   /**

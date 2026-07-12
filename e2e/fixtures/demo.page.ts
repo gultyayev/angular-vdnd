@@ -1,5 +1,5 @@
 import { expect, Locator, Page } from '@playwright/test';
-import { settleDragPosition } from './drag-sync';
+import { settleDragPosition, waitForActiveDroppable } from './drag-sync';
 
 export class DemoPage {
   readonly page: Page;
@@ -174,11 +174,7 @@ export class DemoPage {
   async waitForActiveDroppable(list: 'list1' | 'list2'): Promise<void> {
     const droppableId = list === 'list1' ? 'list-1' : 'list-2';
 
-    await expect(async () => {
-      const raw = await this.page.getByTestId('drag-state-debug').textContent();
-      const debugState = JSON.parse(raw ?? '{}') as { activeDroppable?: unknown };
-      expect(debugState.activeDroppable).toBe(droppableId);
-    }).toPass({ timeout: 2000 });
+    await waitForActiveDroppable(this.page, droppableId);
   }
 
   async scrollList(list: 'list1' | 'list2', scrollTop: number): Promise<void> {

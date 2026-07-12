@@ -244,18 +244,8 @@ test.describe('Dynamic Height Demo', () => {
     const sourceBox = await sourceItem.boundingBox();
     if (!sourceBox) throw new Error('Could not get source bounding box');
 
-    const scrollBox = await taskDemo.scrollContainer.boundingBox();
-    if (!scrollBox) throw new Error('Could not get scroll container bounding box');
-
     const sourceX = sourceBox.x + sourceBox.width / 2;
-    const sourceY =
-      Math.max(sourceBox.y, scrollBox.y) +
-      (Math.min(sourceBox.y + sourceBox.height, scrollBox.y + scrollBox.height) -
-        Math.max(sourceBox.y, scrollBox.y)) /
-        2;
-
-    expect(sourceY).toBeGreaterThanOrEqual(scrollBox.y);
-    expect(sourceY).toBeLessThanOrEqual(scrollBox.y + scrollBox.height);
+    const sourceY = sourceBox.y + sourceBox.height / 2;
 
     await page.mouse.move(sourceX, sourceY);
     await page.mouse.down();

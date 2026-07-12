@@ -24,7 +24,7 @@ export async function settleDragPosition(page: Page, x: number, y: number): Prom
   await expect(async () => {
     // Moving to the same coordinates can be coalesced away by WebKit under load. Jitter first,
     // then move to the exact release point so a fresh pointer event is delivered on every retry.
-    await page.mouse.move(x > 2 ? x - 1 : x + 1, y > 2 ? y - 1 : y + 1);
+    await page.mouse.move(x > 4 ? x - 2 : x + 2, y > 4 ? y - 2 : y + 2);
     await page.mouse.move(x, y);
     const raw = await page.getByTestId('drag-state-debug').textContent();
     const debugState = JSON.parse(raw ?? '{}') as {
@@ -37,4 +37,15 @@ export async function settleDragPosition(page: Page, x: number, y: number): Prom
     expect(Math.abs((cursor?.x ?? Number.NaN) - x)).toBeLessThanOrEqual(1);
     expect(Math.abs((cursor?.y ?? Number.NaN) - y)).toBeLessThanOrEqual(1);
   }).toPass({ timeout: 5000 });
+}
+
+/**
+ * Wait until the processed drag state has resolved to the given droppable id.
+ */
+export async function waitForActiveDroppable(page: Page, droppableId: string): Promise<void> {
+  await expect(async () => {
+    const raw = await page.getByTestId('drag-state-debug').textContent();
+    const debugState = JSON.parse(raw ?? '{}') as { activeDroppable?: unknown };
+    expect(debugState.activeDroppable).toBe(droppableId);
+  }).toPass({ timeout: 2000 });
 }

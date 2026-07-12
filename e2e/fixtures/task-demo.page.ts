@@ -1,5 +1,5 @@
 import { expect, Locator, Page } from '@playwright/test';
-import { settleDragPosition } from './drag-sync';
+import { settleDragPosition, waitForActiveDroppable } from './drag-sync';
 
 export const taskDemoSelectors = {
   scrollContainer: '[data-testid="task-scroll-container"]',
@@ -94,6 +94,13 @@ export class TaskDemoPage {
    */
   async settleDragPosition(x: number, y: number): Promise<void> {
     await settleDragPosition(this.page, x, y);
+  }
+
+  /**
+   * Wait until the processed drag state has resolved to the given droppable id.
+   */
+  async waitForActiveDroppable(droppableId: string): Promise<void> {
+    await waitForActiveDroppable(this.page, droppableId);
   }
 
   async scrollTo(scrollTop: number): Promise<void> {

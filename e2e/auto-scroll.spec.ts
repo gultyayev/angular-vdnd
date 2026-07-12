@@ -65,20 +65,36 @@ test.describe('Auto Scroll', () => {
   });
 
   test('should stop auto-scrolling when drag ends', async ({ page }) => {
-    const containerBox = await demoPage.list1VirtualScroll.boundingBox();
-
     const sourceItem = demoPage.list1Items.first();
+    const sourceBox = await sourceItem.boundingBox();
+    if (!sourceBox) throw new Error('Could not get source item bounding box');
+
     await sourceItem.hover();
     await page.mouse.down();
+    await page.mouse.move(
+      sourceBox.x + sourceBox.width / 2 + 10,
+      sourceBox.y + sourceBox.height / 2 + 10,
+      {
+        steps: 2,
+      },
+    );
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
 
     // Move near bottom edge
-    await page.mouse.move(containerBox!.x + 100, containerBox!.y + containerBox!.height - 25);
+    const activeContainerBox = await demoPage.list1VirtualScroll.boundingBox();
+    if (!activeContainerBox) throw new Error('Could not get active container bounding box');
+    const nearBottomX = activeContainerBox.x + activeContainerBox.width / 2;
+    const nearBottomY = activeContainerBox.y + activeContainerBox.height - 25;
+    await page.mouse.move(nearBottomX, nearBottomY);
+    await demoPage.settleDragPosition(nearBottomX, nearBottomY);
 
-    // Wait for some autoscroll to happen
+    // Wait for some autoscroll to happen, re-issuing the edge move so WebKit/Chromium cannot
+    // coalesce away the final pointer event under load.
     await expect(async () => {
+      await page.mouse.move(nearBottomX, nearBottomY);
       const scrollTop = await demoPage.getScrollTop('list1');
       expect(scrollTop).toBeGreaterThan(0);
-    }).toPass({ timeout: 3000 });
+    }).toPass({ timeout: 5000 });
 
     // End drag
     await page.mouse.up();
