@@ -25,6 +25,7 @@ import {
   VirtualContentComponent,
   VirtualForDirective,
 } from 'ngx-virtual-dnd';
+import { DragStateDebugComponent } from '../drag-state-debug/drag-state-debug';
 import { TopBarComponent } from '../top-bar/top-bar';
 
 interface Task {
@@ -62,6 +63,7 @@ type CategoryFilter = 'all' | 'work' | 'personal' | 'urgent';
     DroppableGroupDirective,
     DragPreviewComponent,
     VirtualContentComponent,
+    DragStateDebugComponent,
   ],
   styleUrl: './page-scroll-demo.scss',
   templateUrl: './page-scroll-demo.html',

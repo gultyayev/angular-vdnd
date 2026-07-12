@@ -1,4 +1,5 @@
 import { expect, Locator, Page } from '@playwright/test';
+import { settleDragPosition } from './drag-sync';
 
 export class DemoPage {
   readonly page: Page;
@@ -38,7 +39,9 @@ export class DemoPage {
     // Wait for items to be rendered using auto-waiting assertion
     await expect(this.list1Items.first()).toBeVisible();
     // Scroll lists into view (in case header/settings push them below viewport)
-    await this.list1Container.scrollIntoViewIfNeeded();
+    await this.list1Container.evaluate((el) =>
+      el.scrollIntoView({ block: 'center', inline: 'nearest' }),
+    );
     // Ensure lists are scrolled to top (WebKit may preserve scroll across navigations)
     await this.scrollList('list1', 0);
     await this.scrollList('list2', 0);
@@ -144,19 +147,22 @@ export class DemoPage {
 
     // Move to target with more steps for smoother movement
     await this.page.mouse.move(targetX, targetY, { steps: 15 });
-    // Firefox/WebKit can miss the final stepped position occasionally.
-    await this.page.mouse.move(targetX, targetY);
 
-    // Confirm hit-testing has resolved to the target droppable before releasing. Under
-    // parallel/WebKit load, a single rAF wait can fire before the scheduler processes the final
-    // pointer position, which can release while the source list is still active and no-op the drop.
+    // Guarantee the drop outcome: wait until the drag scheduler has processed the exact release
+    // coordinates (placeholderIndex/activeDroppable are committed in the same tick), then confirm
+    // the release point resolved to the intended droppable.
+    await this.settleDragPosition(targetX, targetY);
     await this.waitForActiveDroppable(targetList);
-
-    // Drag position updates are rAF-throttled; wait one frame for the final position to process
-    await this.page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     await this.page.mouse.up();
     // Wait for drag to complete (preview should disappear)
     await expect(this.dragPreview).not.toBeVisible({ timeout: 2000 });
+  }
+
+  /**
+   * Guarantee the drop uses the release coordinates — see settleDragPosition in ./drag-sync.
+   */
+  async settleDragPosition(x: number, y: number): Promise<void> {
+    await settleDragPosition(this.page, x, y);
   }
 
   /**

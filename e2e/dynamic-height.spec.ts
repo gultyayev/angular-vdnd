@@ -104,11 +104,13 @@ test.describe('Dynamic Height Demo', () => {
     await expect(dragPreview).toBeVisible({ timeout: 2000 });
 
     // Move to center of second item
+    const targetX = sourceBox.x + sourceBox.width / 2;
     const targetY = targetBox.y + targetBox.height / 2;
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY, { steps: 10 });
+    await page.mouse.move(targetX, targetY, { steps: 10 });
 
-    // Wait one rAF before drop (position update is rAF-throttled)
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    // The test asserts exact post-drop order, so the placeholder index must be computed from
+    // the exact release coordinates before releasing (a rAF wait alone is racy under load).
+    await taskDemo.settleDragPosition(targetX, targetY);
     await page.mouse.up();
 
     // Wait for drop to complete by verifying DOM update
@@ -271,11 +273,9 @@ test.describe('Dynamic Height Demo', () => {
 
     // Move to center of third visible item
     await page.mouse.move(sourceX, targetY, { steps: 10 });
-    // Direct move ensures the final position registers (E2E.md rule #6)
-    await page.mouse.move(sourceX, targetY);
-
-    // Wait one rAF before drop
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    // Ensure the drop uses the exact release coordinates (re-issues the final move, replacing
+    // the E2E.md rule #6 direct move, and outwaits the rAF-vs-input race under load).
+    await taskDemo.settleDragPosition(sourceX, targetY);
     await page.mouse.up();
 
     // Wait for drop to complete — verify source item moved
@@ -517,11 +517,13 @@ test.describe('Dynamic Height Demo', () => {
 
     // Move to center of second item — with the bug (top-edge probe + no midpoint
     // refinement), the placeholder index would lag behind the preview position.
+    const targetX = sourceBox.x + sourceBox.width / 2;
     const targetY = targetBox.y + targetBox.height / 2;
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY, { steps: 10 });
+    await page.mouse.move(targetX, targetY, { steps: 10 });
 
-    // Wait one rAF before drop
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    // The test asserts exact post-drop order — settle the processed position before releasing.
+    // The release point is inside the constraint bounds, so the effective cursor matches.
+    await taskDemo.settleDragPosition(targetX, targetY);
     await page.mouse.up();
 
     // Wait for drop to complete — verify reorder happened
