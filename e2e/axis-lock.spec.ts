@@ -226,16 +226,18 @@ test.describe('Axis Lock', () => {
     await page.mouse.down();
     // Move slightly to ensure WebKit recognizes the drag
     await page.mouse.move(sourceBox.x + 5, sourceBox.y + 5, { steps: 2 });
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 5000 });
 
     // Move to list2 horizontally (Y locked means we can move horizontally freely)
     const targetY = sourceBox.y + sourceBox.height / 2;
     await page.mouse.move(list2Box.x + list2Box.width / 2, targetY, { steps: 10 });
-    // Placeholder visibility proves hit-testing resolved to a drop target
-    await expect(demoPage.placeholder).toBeVisible({ timeout: 2000 });
+    // Placeholder visibility proves a drop target resolved; wait for the active droppable to be
+    // list2 specifically so the release can't land back in list1 when the scheduler lags the pointer.
+    await expect(demoPage.placeholder).toBeVisible({ timeout: 5000 });
+    await demoPage.waitForActiveDroppable('list2');
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     await page.mouse.up();
-    await expect(demoPage.dragPreview).not.toBeVisible({ timeout: 2000 });
+    await expect(demoPage.dragPreview).not.toBeVisible({ timeout: 5000 });
 
     // With Y locked but horizontal movement allowed, item should move to list2
     await expect(async () => {

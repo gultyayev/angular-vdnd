@@ -146,11 +146,36 @@ export class DemoPage {
     await this.page.mouse.move(targetX, targetY, { steps: 15 });
     // Firefox/WebKit can miss the final stepped position occasionally.
     await this.page.mouse.move(targetX, targetY);
+
+    // Confirm hit-testing actually resolved the drop into the target droppable before
+    // releasing. Under parallel/WebKit load a single rAF wait can fire before the scheduler
+    // processes the final pointer position, which releases the mouse while the source list is
+    // still active and silently drops the item back where it started (a no-op the count
+    // assertions then fail on). This holds for empty targets too — an empty list still resolves
+    // as the active droppable (that is how "drop into empty list" works), it just has no
+    // placeholder, so we sync on the active droppable rather than placeholder visibility.
+    await this.waitForActiveDroppable(targetList);
+
     // Drag position updates are rAF-throttled; wait one frame for the final position to process
     await this.page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     await this.page.mouse.up();
     // Wait for drag to complete (preview should disappear)
     await expect(this.dragPreview).not.toBeVisible({ timeout: 2000 });
+  }
+
+  /**
+   * Wait until the drag hit-test has resolved to the given list's droppable, i.e. releasing
+   * now would drop into it. Reads the demo's drag-state debug panel, which mirrors
+   * DragStateService.activeDroppableId(). Use before `mouse.up()` on a cross-list drag so the
+   * drop can't land back in the source list when the scheduler lags behind the pointer.
+   */
+  async waitForActiveDroppable(list: 'list1' | 'list2'): Promise<void> {
+    const droppableId = list === 'list1' ? 'list-1' : 'list-2';
+    await expect(async () => {
+      const raw = await this.page.getByTestId('drag-state-debug').textContent();
+      const activeDroppable = JSON.parse(raw ?? '{}').activeDroppable;
+      expect(activeDroppable).toBe(droppableId);
+    }).toPass({ timeout: 2000 });
   }
 
   async scrollList(list: 'list1' | 'list2', scrollTop: number): Promise<void> {
