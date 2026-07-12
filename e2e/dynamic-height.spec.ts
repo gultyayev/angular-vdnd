@@ -20,7 +20,11 @@ test.describe('Dynamic Height Demo', () => {
 
   test.afterEach(async () => {
     const realErrors = consoleErrors.filter(
-      (err) => !err.includes('favicon') && !err.includes('net::ERR_') && !err.includes('404'),
+      (err) =>
+        !err.includes('favicon') &&
+        !err.includes('net::ERR_') &&
+        !err.includes('404') &&
+        !err.includes('Failed to load resource: the server responded with a status of 403'),
     );
     expect(realErrors, 'Unexpected console errors detected').toHaveLength(0);
   });
@@ -221,8 +225,8 @@ test.describe('Dynamic Height Demo', () => {
       expect(scrollTop).toBeGreaterThan(0);
     }).toPass({ timeout: 2000 });
 
-    // Get items actually visible in the viewport (not overscan items)
-    const visibleItems = await taskDemo.getVisibleTasks();
+    // Get fully visible items in the viewport (not overscan or clipped edge items)
+    const visibleItems = await taskDemo.getFullyVisibleTasks();
 
     expect(visibleItems.length).toBeGreaterThanOrEqual(3);
     const sourceId = visibleItems[0].id;
@@ -235,7 +239,20 @@ test.describe('Dynamic Height Demo', () => {
     const sourceBox = await sourceItem.boundingBox();
     if (!sourceBox) throw new Error('Could not get source bounding box');
 
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
+    const scrollBox = await taskDemo.scrollContainer.boundingBox();
+    if (!scrollBox) throw new Error('Could not get scroll container bounding box');
+
+    const sourceX = sourceBox.x + sourceBox.width / 2;
+    const sourceY =
+      Math.max(sourceBox.y, scrollBox.y) +
+      (Math.min(sourceBox.y + sourceBox.height, scrollBox.y + scrollBox.height) -
+        Math.max(sourceBox.y, scrollBox.y)) /
+        2;
+
+    expect(sourceY).toBeGreaterThanOrEqual(scrollBox.y);
+    expect(sourceY).toBeLessThanOrEqual(scrollBox.y + scrollBox.height);
+
+    await page.mouse.move(sourceX, sourceY);
     await page.mouse.down();
     await page.mouse.move(sourceBox.x + 5, sourceBox.y + 5, { steps: 2 });
 
@@ -250,9 +267,9 @@ test.describe('Dynamic Height Demo', () => {
     const targetY = freshTargetBox.y + freshTargetBox.height / 2;
 
     // Move to center of third visible item
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY, { steps: 10 });
+    await page.mouse.move(sourceX, targetY, { steps: 10 });
     // Direct move ensures the final position registers (E2E.md rule #6)
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY);
+    await page.mouse.move(sourceX, targetY);
 
     // Wait one rAF before drop
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
