@@ -240,11 +240,12 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
 
     // Move to target position
     await page.mouse.move(targetX, targetY, { steps: 10 });
-    await page.mouse.move(targetX, targetY);
-    // Wait for hit-testing to resolve (placeholder proves drop target is identified)
-    await expect(demoPage.placeholder).toBeVisible({ timeout: 2000 });
-    // Ensure rAF-throttled position update has finalized
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    // The test asserts an exact drop slot, so the placeholder index must be computed from the
+    // exact release coordinates — wait for the scheduler to process them, then confirm the
+    // release point resolved to list2 (the source list shows a placeholder too, so placeholder
+    // visibility alone cannot prove the target list is active).
+    await demoPage.settleDragPosition(targetX, targetY);
+    await demoPage.waitForActiveDroppable('list2');
 
     // Drop and wait for drag to complete
     await page.mouse.up();
@@ -308,10 +309,12 @@ test.describe('Drag and Drop - Simplified API Mode', () => {
 
     // Move to target position
     await page.mouse.move(targetX, targetY, { steps: 10 });
-    // Wait for hit-testing to resolve (placeholder proves drop target is identified)
-    await expect(demoPage.placeholder).toBeVisible({ timeout: 2000 });
-    // Ensure rAF-throttled position update has finalized
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    // The test asserts an exact drop slot, so the placeholder index must be computed from the
+    // exact release coordinates — wait for the scheduler to process them, then confirm the
+    // release point resolved to list2 (the source list shows a placeholder too, so placeholder
+    // visibility alone cannot prove the target list is active).
+    await demoPage.settleDragPosition(targetX, targetY);
+    await demoPage.waitForActiveDroppable('list2');
 
     // Drop and wait for drag to complete
     await page.mouse.up();

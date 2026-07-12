@@ -1,4 +1,5 @@
 import { expect, Locator, Page } from '@playwright/test';
+import { settleDragPosition } from './drag-sync';
 
 export const taskDemoSelectors = {
   scrollContainer: '[data-testid="task-scroll-container"]',
@@ -86,6 +87,13 @@ export class TaskDemoPage {
       .evaluateAll((categories) =>
         categories.map((category) => category.textContent?.trim() ?? ''),
       );
+  }
+
+  /**
+   * Guarantee the drop uses the release coordinates — see settleDragPosition in ./drag-sync.
+   */
+  async settleDragPosition(x: number, y: number): Promise<void> {
+    await settleDragPosition(this.page, x, y);
   }
 
   async scrollTo(scrollTop: number): Promise<void> {

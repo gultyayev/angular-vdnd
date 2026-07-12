@@ -62,10 +62,13 @@ test.describe('Page Scroll Demo', () => {
     await expect(taskDemo.dragPreview).toBeVisible({ timeout: 2000 });
 
     // Move to second item position (72px item height)
+    const targetX = sourceBox.x + sourceBox.width / 2;
     const targetY = sourceBox.y + 72 + 36; // Move to center of second slot
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY, { steps: 10 });
-    // Wait one rAF for position update
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    await page.mouse.move(targetX, targetY, { steps: 10 });
+
+    // The test asserts exact post-drop order, so the placeholder index must be computed from
+    // the exact release coordinates before releasing (a rAF wait alone is racy under load).
+    await taskDemo.settleDragPosition(targetX, targetY);
 
     // Drop
     await page.mouse.up();
