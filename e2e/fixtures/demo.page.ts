@@ -35,7 +35,7 @@ export class DemoPage {
   }
 
   async goto(): Promise<void> {
-    await this.page.goto('/');
+    await this.page.goto('/', { waitUntil: 'domcontentloaded' });
     // Wait for items to be rendered using auto-waiting assertion
     await expect(this.list1Items.first()).toBeVisible();
     // Scroll lists into view (in case header/settings push them below viewport)

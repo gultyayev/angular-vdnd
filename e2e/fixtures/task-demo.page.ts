@@ -56,7 +56,7 @@ export class TaskDemoPage {
   }
 
   async goto(path: '/page-scroll' | '/dynamic-height'): Promise<void> {
-    await this.page.goto(path);
+    await this.page.goto(path, { waitUntil: 'domcontentloaded' });
     await this.waitUntilReady();
   }
 
