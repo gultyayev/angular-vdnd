@@ -3,7 +3,7 @@ import { TaskDemoPage, taskDemoSelectors } from './fixtures/task-demo.page';
 
 test.describe('Dynamic Height Demo', () => {
   let taskDemo: TaskDemoPage;
-  let consoleErrors: string[] = [];
+  let consoleErrors: { text: string; url: string }[] = [];
 
   test.beforeEach(async ({ page }) => {
     taskDemo = new TaskDemoPage(page);
@@ -11,7 +11,7 @@ test.describe('Dynamic Height Demo', () => {
 
     page.on('console', (msg) => {
       if (msg.type() === 'error') {
-        consoleErrors.push(msg.text());
+        consoleErrors.push({ text: msg.text(), url: msg.location().url });
       }
     });
 
@@ -20,11 +20,14 @@ test.describe('Dynamic Height Demo', () => {
 
   test.afterEach(async () => {
     const realErrors = consoleErrors.filter(
-      (err) =>
-        !err.includes('favicon') &&
-        !err.includes('net::ERR_') &&
-        !err.includes('404') &&
-        !err.includes('Failed to load resource: the server responded with a status of 403'),
+      ({ text, url }) =>
+        !text.includes('favicon') &&
+        !text.includes('net::ERR_') &&
+        !text.includes('404') &&
+        !(
+          url.startsWith('https://fonts.gstatic.com/') &&
+          text.includes('Failed to load resource: the server responded with a status of 403')
+        ),
     );
     expect(realErrors, 'Unexpected console errors detected').toHaveLength(0);
   });

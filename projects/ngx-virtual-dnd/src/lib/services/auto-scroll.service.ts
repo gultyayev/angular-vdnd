@@ -10,7 +10,7 @@ import { DragSchedulerService } from './drag-scheduler.service';
 export interface AutoScrollConfig {
   /** Distance from edge to start scrolling (in pixels) */
   threshold: number;
-  /** Maximum scroll speed (in pixels per frame) */
+  /** Maximum scroll speed in pixels per 60fps frame (about 16.67ms) */
   maxSpeed: number;
   /** Whether to accelerate scroll based on distance from edge */
   accelerate: boolean;
@@ -24,6 +24,9 @@ const DEFAULT_CONFIG: AutoScrollConfig = {
   maxSpeed: 15,
   accelerate: true,
 };
+
+const BASE_FRAME_DURATION_MS = 1000 / 60;
+const MAX_SCROLL_FRAME_DELTA_MS = 100;
 
 /**
  * Service that handles auto-scrolling when dragging near container edges.
@@ -57,6 +60,9 @@ export class AutoScrollService {
   /** Last tick cursor position for stationary detection */
   #lastTickCursorX = NaN;
   #lastTickCursorY = NaN;
+
+  /** Last timestamp used to normalize autoscroll velocity across frame rates */
+  #lastScrollTimestamp = 0;
 
   /** Reusable direction object for tick loop (avoids per-frame allocation) */
   readonly #tickDirection = { x: 0, y: 0 };
@@ -115,6 +121,7 @@ export class AutoScrollService {
     this.#cursorOverride = null;
     this.#lastTickCursorX = NaN;
     this.#lastTickCursorY = NaN;
+    this.#lastScrollTimestamp = 0;
     this.#scrollState.containerId = null;
     this.#scrollState.direction.x = 0;
     this.#scrollState.direction.y = 0;
@@ -209,6 +216,7 @@ export class AutoScrollService {
     }
 
     if (!scrollPerformed) {
+      this.#lastScrollTimestamp = 0;
       this.#scrollState.containerId = null;
       this.#scrollState.direction.x = 0;
       this.#scrollState.direction.y = 0;
@@ -220,8 +228,9 @@ export class AutoScrollService {
    * Perform the actual scroll operation.
    */
   #performScroll(element: HTMLElement, direction: { x: number; y: number }, speed: number): void {
-    const scrollX = direction.x * speed;
-    const scrollY = direction.y * speed;
+    const frameScale = this.#getFrameScale();
+    const scrollX = direction.x * speed * frameScale;
+    const scrollY = direction.y * speed * frameScale;
 
     // Check bounds before scrolling
     const maxScrollY = element.scrollHeight - element.clientHeight;
@@ -255,6 +264,22 @@ export class AutoScrollService {
     // Note: No ngZone.run() needed here - the callback (DraggableDirective.#recalculatePlaceholder)
     // already enters the zone when updating drag state.
     this.#onScrollCallback?.();
+  }
+
+  #getFrameScale(): number {
+    const now = performance.now();
+    let elapsedMs =
+      this.#lastScrollTimestamp === 0 ? BASE_FRAME_DURATION_MS : now - this.#lastScrollTimestamp;
+
+    this.#lastScrollTimestamp = now;
+
+    if (elapsedMs <= 0) {
+      elapsedMs = BASE_FRAME_DURATION_MS;
+    }
+
+    elapsedMs = Math.min(Math.max(elapsedMs, BASE_FRAME_DURATION_MS), MAX_SCROLL_FRAME_DELTA_MS);
+
+    return elapsedMs / BASE_FRAME_DURATION_MS;
   }
 
   /**

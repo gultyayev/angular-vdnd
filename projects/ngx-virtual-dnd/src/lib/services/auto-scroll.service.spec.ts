@@ -572,6 +572,31 @@ describe('AutoScrollService', () => {
 
       expect(mockElement.scrollTop - before).toBe(5);
     });
+
+    it('should scale scroll distance by elapsed frame time', () => {
+      let now = 100;
+      const performanceNowSpy = jest.spyOn(performance, 'now');
+      performanceNowSpy.mockImplementation(() => now);
+
+      const config: Partial<AutoScrollConfig> = { maxSpeed: 15, accelerate: false };
+      setupDrag({ x: 150, y: 480 });
+      service.registerContainer('test-container', mockElement, config);
+      startMonitoringWithScheduler();
+
+      const start = mockElement.scrollTop;
+      flushRAF();
+      const firstDelta = mockElement.scrollTop - start;
+
+      now = 133.34;
+      const afterFirst = mockElement.scrollTop;
+      flushRAF();
+      const secondDelta = mockElement.scrollTop - afterFirst;
+
+      expect(firstDelta).toBeCloseTo(15, 2);
+      expect(secondDelta).toBeCloseTo(30, 1);
+
+      performanceNowSpy.mockRestore();
+    });
   });
 
   // ---------------------------------------------------------------------------
