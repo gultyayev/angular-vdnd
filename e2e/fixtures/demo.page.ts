@@ -146,11 +146,33 @@ export class DemoPage {
     await this.page.mouse.move(targetX, targetY, { steps: 15 });
     // Firefox/WebKit can miss the final stepped position occasionally.
     await this.page.mouse.move(targetX, targetY);
+
+    // Confirm hit-testing has resolved to the target droppable before releasing. Under
+    // parallel/WebKit load, a single rAF wait can fire before the scheduler processes the final
+    // pointer position, which can release while the source list is still active and no-op the drop.
+    await this.waitForActiveDroppable(targetList);
+
     // Drag position updates are rAF-throttled; wait one frame for the final position to process
     await this.page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     await this.page.mouse.up();
     // Wait for drag to complete (preview should disappear)
     await expect(this.dragPreview).not.toBeVisible({ timeout: 2000 });
+  }
+
+  /**
+   * Wait until the drag hit-test has resolved to the given list's droppable.
+   * Reads the demo's drag-state debug panel, which mirrors DragStateService.activeDroppableId().
+   * Use before mouseup on cross-list drags so the drop cannot land back in the source list when
+   * the scheduler lags behind the pointer.
+   */
+  async waitForActiveDroppable(list: 'list1' | 'list2'): Promise<void> {
+    const droppableId = list === 'list1' ? 'list-1' : 'list-2';
+
+    await expect(async () => {
+      const raw = await this.page.getByTestId('drag-state-debug').textContent();
+      const debugState = JSON.parse(raw ?? '{}') as { activeDroppable?: unknown };
+      expect(debugState.activeDroppable).toBe(droppableId);
+    }).toPass({ timeout: 2000 });
   }
 
   async scrollList(list: 'list1' | 'list2', scrollTop: number): Promise<void> {
