@@ -202,6 +202,14 @@ test.describe('Disabled Elements', () => {
 
     expect(await demoPage.getItemCount('list1')).toBe(initialList1Count);
     expect(await demoPage.getItemCount('list2')).toBe(initialList2Count);
+    await expect(page.locator('app-demo')).not.toHaveAttribute(
+      'data-last-drop-destination-index',
+      /.+/,
+    );
+    await expect(page.locator('app-demo')).not.toHaveAttribute(
+      'data-last-drag-end-destination-index',
+      /.+/,
+    );
   });
 
   test('should skip disabled destinations during keyboard cross-list navigation', async ({
