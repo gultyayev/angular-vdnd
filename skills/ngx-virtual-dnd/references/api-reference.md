@@ -474,7 +474,7 @@ Internal service for managing the body-level overlay container used by `DragPrev
 ```typescript
 interface AutoScrollConfig {
   threshold: number;   // Distance from edge to start scrolling (px). Default: 50
-  maxSpeed: number;    // Maximum scroll speed (px/frame). Default: 15
+  maxSpeed: number;    // Maximum scroll speed in pixels per 60fps frame. Default: 15
   accelerate: boolean; // Accelerate based on distance from edge. Default: true
 }
 ```

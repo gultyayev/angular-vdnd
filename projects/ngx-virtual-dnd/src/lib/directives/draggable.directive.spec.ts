@@ -7,6 +7,7 @@ import { DragStateService } from '../services/drag-state.service';
 import { PositionCalculatorService } from '../services/position-calculator.service';
 import { AutoScrollService } from '../services/auto-scroll.service';
 import { ElementCloneService } from '../services/element-clone.service';
+import { KeyboardDragService } from '../services/keyboard-drag.service';
 import { DragStartEvent, DragEndEvent } from '../models/drag-drop.models';
 
 // Test host component
@@ -492,6 +493,28 @@ describe('DraggableDirective', () => {
       });
       // Should not throw
       expect(() => draggableNative.dispatchEvent(escape)).not.toThrow();
+    });
+
+    it('should move exactly one position per arrow press when the source element is still focused', () => {
+      const keyboardDrag = TestBed.inject(KeyboardDragService);
+
+      // Start a keyboard drag via Space on the element
+      draggableNative.dispatchEvent(
+        new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true, cancelable: true }),
+      );
+      expect(keyboardDrag.isActive()).toBe(true);
+      const initialIndex = keyboardDrag.targetIndex() ?? 0;
+
+      // Race window: the arrow key arrives before Angular applies display:none, so the
+      // still-focused source element receives the keydown (host binding) AND it bubbles to the
+      // document-level listener registered by KeyboardDragHandler. The item must move only ONE
+      // position. (ArrowUp: the test item is last in its list, so ArrowDown would clamp and
+      // mask a double move.)
+      draggableNative.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }),
+      );
+
+      expect(keyboardDrag.targetIndex()).toBe(initialIndex - 1);
     });
 
     it('should cancel drag on escape when dragging', () => {

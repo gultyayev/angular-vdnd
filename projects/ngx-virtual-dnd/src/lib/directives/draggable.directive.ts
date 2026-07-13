@@ -29,6 +29,7 @@ import { VDND_GROUP_TOKEN } from './droppable-group.directive';
 import { createEffectiveGroupSignal } from '../utils/group-resolution';
 import { KeyboardDragHandler } from '../handlers/keyboard-drag.handler';
 import { PointerDragHandler } from '../handlers/pointer-drag.handler';
+import { normalizeDropDestinationIndex } from '../utils/drop-index-normalization';
 
 /**
  * Makes an element draggable within the virtual scroll drag-and-drop system.
@@ -692,21 +693,14 @@ export class DraggableDirective implements OnInit, OnDestroy {
     this.#lastRawPosition = null;
 
     const sourceIndex = this.#dragState.sourceIndex() ?? 0;
-    const placeholderIndex = this.#dragState.placeholderIndex();
-    const activeDroppableId = this.#dragState.activeDroppableId();
-    let destinationIndex = cancelled || activeDroppableId === null ? null : placeholderIndex;
-
-    // Keep DragEndEvent semantics consistent with DropEvent.destination.index.
-    // During same-list drag, placeholderIndex includes the hidden-item adjustment,
-    // but the final insertion index must account for removal of the source item.
-    if (!cancelled && placeholderIndex !== null) {
-      const sourceDroppableId = this.#dragState.sourceDroppableId();
-      if (sourceDroppableId !== null && sourceDroppableId === activeDroppableId) {
-        if (sourceIndex < placeholderIndex) {
-          destinationIndex = placeholderIndex - 1;
-        }
-      }
-    }
+    const destinationIndex = cancelled
+      ? null
+      : normalizeDropDestinationIndex({
+          sourceIndex,
+          placeholderIndex: this.#dragState.placeholderIndex(),
+          sourceDroppableId: this.#dragState.sourceDroppableId(),
+          activeDroppableId: this.#dragState.activeDroppableId(),
+        });
 
     // Emit drag end event
     this.dragEnd.emit({

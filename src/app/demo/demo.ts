@@ -4,6 +4,7 @@ import {
   applyMove,
   DraggableDirective,
   DragPreviewComponent,
+  DragEndEvent,
   DragStateService,
   DropEvent,
   DroppableDirective,
@@ -27,6 +28,8 @@ interface Item {
   selector: 'app-demo',
   host: {
     '[attr.data-last-drop-source-index]': 'lastDropSourceIndex()',
+    '[attr.data-last-drop-destination-index]': 'lastDropDestinationIndex()',
+    '[attr.data-last-drag-end-destination-index]': 'lastDragEndDestinationIndex()',
   },
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
@@ -77,6 +80,12 @@ export class DemoComponent {
 
   /** Last source index received by the demo drop handler (used by interaction tests). */
   readonly lastDropSourceIndex = signal<number | null>(null);
+
+  /** Last destination index received by the demo drop handler (used by interaction tests). */
+  readonly lastDropDestinationIndex = signal<number | null>(null);
+
+  /** Last destination index received by the demo dragEnd handler (used by interaction tests). */
+  readonly lastDragEndDestinationIndex = signal<number | null>(null);
 
   /** List 1 items */
   readonly list1 = signal<Item[]>([]);
@@ -186,9 +195,15 @@ export class DemoComponent {
     this.constrainToContainer.set(checkbox.checked);
   }
 
+  /** Record dragEnd events for interaction tests. */
+  onDragEnd(event: DragEndEvent): void {
+    this.lastDragEndDestinationIndex.set(event.destinationIndex);
+  }
+
   /** Handle drop events (verbose API) */
   onDrop(event: DropEvent): void {
     this.lastDropSourceIndex.set(event.source.index);
+    this.lastDropDestinationIndex.set(event.destination.index);
     if (isNoOpDrop(event)) {
       return;
     }
@@ -208,6 +223,7 @@ export class DemoComponent {
    */
   onDropSimplified(event: DropEvent): void {
     this.lastDropSourceIndex.set(event.source.index);
+    this.lastDropDestinationIndex.set(event.destination.index);
     moveItem(event, {
       'list-1': this.list1,
       'list-2': this.list2,

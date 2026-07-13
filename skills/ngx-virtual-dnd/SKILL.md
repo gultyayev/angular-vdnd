@@ -426,7 +426,7 @@ Configure auto-scroll when dragging near container edges:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `threshold` | `50` | Distance from edge (px) to start scrolling |
-| `maxSpeed` | `15` | Maximum scroll speed (px/frame) |
+| `maxSpeed` | `15` | Maximum scroll speed in pixels per 60fps frame |
 | `accelerate` | `true` | Speed up based on distance from edge |
 
 Set `[autoScrollEnabled]="false"` to disable auto-scroll entirely. Available on `VirtualSortableListComponent`, `DroppableDirective`, `ScrollableDirective`, and `VirtualViewportComponent`.

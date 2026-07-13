@@ -97,16 +97,19 @@ test.describe('Container Resize', () => {
     const itemText = await demoPage.getItemText('list1', 0);
     await demoPage.dragItemToList('list1', 0, 'list2', 0);
 
-    // Verify the drop was successful
-    const finalList1Count = await demoPage.getItemCount('list1');
-    const finalList2Count = await demoPage.getItemCount('list2');
+    // Verify the drop was successful. Count badges are signal-driven and update asynchronously
+    // after the drop, so poll instead of reading once under WebKit load.
+    await expect(async () => {
+      const finalList1Count = await demoPage.getItemCount('list1');
+      const finalList2Count = await demoPage.getItemCount('list2');
 
-    expect(finalList1Count).toBe(initialList1Count - 1);
-    expect(finalList2Count).toBe(initialList2Count + 1);
+      expect(finalList1Count).toBe(initialList1Count - 1);
+      expect(finalList2Count).toBe(initialList2Count + 1);
 
-    // Verify the item is now in list2
-    const newFirstItem = await demoPage.getItemText('list2', 0);
-    expect(newFirstItem).toBe(itemText);
+      // Verify the item is now in list2
+      const newFirstItem = await demoPage.getItemText('list2', 0);
+      expect(newFirstItem).toBe(itemText);
+    }).toPass({ timeout: 5000 });
   });
 
   test('should handle very small container heights', async () => {

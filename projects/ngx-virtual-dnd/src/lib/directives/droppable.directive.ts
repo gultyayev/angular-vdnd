@@ -7,6 +7,7 @@ import {
   input,
   OnDestroy,
   output,
+  untracked,
 } from '@angular/core';
 import { DragStateService } from '../services/drag-state.service';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
@@ -15,6 +16,7 @@ import { VDND_GROUP_TOKEN } from './droppable-group.directive';
 import { createEffectiveGroupSignal } from '../utils/group-resolution';
 import { createAutoScrollRegistration } from '../utils/auto-scroll-registration';
 import { queryByAttribute } from '../utils/attribute-selectors';
+import { normalizeDropDestinationIndex } from '../utils/drop-index-normalization';
 
 /**
  * Marks an element as a valid drop target within the virtual scroll drag-and-drop system.
@@ -155,9 +157,17 @@ export class DroppableDirective implements OnDestroy {
       const draggedItem = this.#dragState.draggedItem();
       const isDragging = this.#dragState.isDragging();
 
+      // Track target/index signals explicitly so the cached drop state stays current as the
+      // placeholder moves. Read the full snapshot untracked to avoid making cursorPosition
+      // part of this effect's dependency graph.
+      this.#dragState.placeholderId();
+      this.#dragState.placeholderIndex();
+      this.#dragState.sourceIndex();
+      this.#dragState.sourceDroppableId();
+
       // Cache state while active for use during drop handling
       if (active && isDragging && draggedItem) {
-        this.#cachedDragState = this.#dragState.getStateSnapshot();
+        this.#cachedDragState = untracked(() => this.#dragState.getStateSnapshot());
       }
 
       // Handle drag end (drop)
@@ -194,7 +204,7 @@ export class DroppableDirective implements OnDestroy {
    */
   #handleDrop(): void {
     // Use cached state since the actual state is cleared before this effect fires
-    const state = this.#cachedDragState;
+    const state = this.#dragState.endedDragState() ?? this.#cachedDragState;
 
     if (!state?.draggedItem || state.activeDroppableId !== this.vdndDroppable()) {
       return;
@@ -210,18 +220,18 @@ export class DroppableDirective implements OnDestroy {
       state.sourceIndex ?? this.#getItemIndex(state.draggedItem.draggableId, sourceDroppableId);
 
     // Use the pre-calculated placeholderIndex if available (more reliable)
-    // Fall back to DOM-based calculation if not
-    let destinationIndex =
+    // Fall back to DOM-based calculation if not. Then normalize to the same
+    // consumer-facing insertion index emitted by DragEndEvent.
+    const placeholderIndex =
       state.placeholderIndex !== null && state.placeholderIndex !== undefined
         ? state.placeholderIndex
         : this.#getDestinationIndex(placeholderId);
-
-    // Adjust for same-list reordering: if moving within the same list and
-    // the destination is after the source, we need to account for the item
-    // being removed from its original position
-    if (sourceDroppableId === this.vdndDroppable() && sourceIndex < destinationIndex) {
-      destinationIndex--;
-    }
+    const destinationIndex = normalizeDropDestinationIndex({
+      sourceIndex,
+      placeholderIndex,
+      sourceDroppableId,
+      activeDroppableId: this.vdndDroppable(),
+    });
 
     this.drop.emit({
       source: {

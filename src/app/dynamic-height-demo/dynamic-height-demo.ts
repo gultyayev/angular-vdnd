@@ -17,6 +17,7 @@ import {
   VirtualContentComponent,
   VirtualForDirective,
 } from 'ngx-virtual-dnd';
+import { DragStateDebugComponent } from '../drag-state-debug/drag-state-debug';
 import { TopBarComponent } from '../top-bar/top-bar';
 
 interface DynamicTask {
@@ -47,6 +48,7 @@ type CategoryFilter = 'all' | 'work' | 'personal' | 'urgent';
     DragPreviewComponent,
     VirtualContentComponent,
     ContentHeaderDirective,
+    DragStateDebugComponent,
   ],
   styleUrl: './dynamic-height-demo.scss',
   templateUrl: './dynamic-height-demo.html',

@@ -289,6 +289,33 @@ describe('DroppableDirective', () => {
 
       expect(component.dropEvents.at(-1)?.source.index).toBe(1);
     });
+
+    it('uses the latest placeholder index when emitting a same-list drop', () => {
+      const item = createMockDraggedItem({
+        draggableId: 'item-2',
+        droppableId: 'test-list',
+      });
+
+      dragStateService.startDrag(
+        item,
+        { x: 100, y: 100 },
+        { x: 0, y: 0 },
+        null,
+        'test-list',
+        'item-3',
+        2,
+        1,
+        true,
+      );
+      fixture.detectChanges();
+
+      dragStateService.setKeyboardTargetIndex(2);
+
+      dragStateService.endDrag();
+      fixture.detectChanges();
+
+      expect(component.dropEvents.at(-1)?.destination.index).toBe(2);
+    });
   });
 
   describe('public methods', () => {
