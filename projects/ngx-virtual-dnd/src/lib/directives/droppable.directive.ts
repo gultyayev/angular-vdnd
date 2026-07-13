@@ -170,8 +170,16 @@ export class DroppableDirective implements OnDestroy {
         this.#cachedDragState = untracked(() => this.#dragState.getStateSnapshot());
       }
 
-      // Handle drag end (drop)
-      if (!isDragging && this.#wasActive && draggedItem === null) {
+      // Handle drag end (drop). Fire when this droppable was the release target — either
+      // observed active during the drag (#wasActive) OR named as the target in the ended
+      // drag snapshot. The snapshot path covers the pointer-up flush, where the final
+      // position is processed and the state cleared in the same synchronous task, so this
+      // effect never observes isActive() === true mid-drag and #wasActive stays false.
+      // Guarded by !disabled() so a target disabled at release does not emit a drop.
+      const endedTargetedThis =
+        untracked(() => this.#dragState.endedDragState())?.activeDroppableId ===
+          this.vdndDroppable() && !this.disabled();
+      if (!isDragging && (this.#wasActive || endedTargetedThis) && draggedItem === null) {
         // Check if drag was cancelled (e.g., Escape key)
         if (!this.#dragState.wasCancelled()) {
           // Drag ended normally - this is a drop

@@ -551,5 +551,26 @@ describe('PositionCalculatorService', () => {
 
       expect(service.findAdjacentDroppable('left', 'right', 'g')).toBeNull();
     });
+
+    it('navigates out of a disabled current container to an enabled neighbour', () => {
+      // The current container was disabled mid-drag (keyboard drag). Navigation must still
+      // be able to escape it toward an enabled neighbour rather than trapping the drag.
+      make('current', 'g', { top: 0, left: 0, right: 100, bottom: 100 }, true);
+      const right = make('right', 'g', { top: 0, left: 200, right: 300, bottom: 100 });
+
+      const result = service.findAdjacentDroppable('current', 'right', 'g');
+      expect(result?.id).toBe('right');
+      expect(result?.element).toBe(right);
+    });
+
+    it('reports a droppable as disabled by id via isDroppableDisabledById', () => {
+      make('enabled', 'g', { top: 0, left: 0, right: 100, bottom: 100 });
+      make('off', 'g', { top: 0, left: 200, right: 300, bottom: 100 }, true);
+
+      expect(service.isDroppableDisabledById('off')).toBe(true);
+      expect(service.isDroppableDisabledById('enabled')).toBe(false);
+      // A missing droppable is treated as not a valid target.
+      expect(service.isDroppableDisabledById('nonexistent')).toBe(true);
+    });
   });
 });

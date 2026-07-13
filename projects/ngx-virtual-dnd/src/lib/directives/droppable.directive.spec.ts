@@ -289,6 +289,67 @@ describe('DroppableDirective', () => {
       expect(component.dropEvents.at(-1)?.source.index).toBe(1);
     });
 
+    it('emits the drop when the target becomes active only at release (pointer-up flush)', () => {
+      // The dragged item originates from another list; this droppable is never the active
+      // target DURING the drag — it becomes active only in the same synchronous block as
+      // endDrag (the pointer-up flush processes the final position, then clears state), so
+      // the effect never observes isActive() === true and #wasActive stays false.
+      const item = createMockDraggedItem({ draggableId: 'item-2', droppableId: 'other-list' });
+
+      dragStateService.startDrag(
+        item,
+        { x: 0, y: 0 },
+        { x: 0, y: 0 },
+        null,
+        'other-list',
+        null,
+        null,
+        0,
+      );
+      fixture.detectChanges(); // effect observes active=false; #wasActive stays false
+
+      // Flush + end in one task, with no change detection in between.
+      dragStateService.updateDragPosition({
+        cursorPosition: { x: 100, y: 100 },
+        activeDroppableId: 'test-list',
+        placeholderId: 'item-3',
+        placeholderIndex: 2,
+      });
+      dragStateService.endDrag();
+      fixture.detectChanges();
+
+      expect(component.dropEvents.length).toBe(1);
+      expect(component.dropEvents.at(-1)?.destination.droppableId).toBe('test-list');
+    });
+
+    it('does not emit a drop for a droppable the release did not target', () => {
+      const item = createMockDraggedItem({ draggableId: 'item-2', droppableId: 'other-list' });
+
+      dragStateService.startDrag(
+        item,
+        { x: 0, y: 0 },
+        { x: 0, y: 0 },
+        null,
+        'other-list',
+        null,
+        null,
+        0,
+      );
+      fixture.detectChanges();
+
+      // Release resolves to a DIFFERENT droppable — this one must stay silent.
+      dragStateService.updateDragPosition({
+        cursorPosition: { x: 100, y: 100 },
+        activeDroppableId: 'somewhere-else',
+        placeholderId: null,
+        placeholderIndex: 1,
+      });
+      dragStateService.endDrag();
+      fixture.detectChanges();
+
+      expect(component.dropEvents.length).toBe(0);
+    });
+
     it('uses the latest placeholder index when emitting a same-list drop', () => {
       const item = createMockDraggedItem({
         draggableId: 'item-2',
