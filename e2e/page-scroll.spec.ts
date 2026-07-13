@@ -3,7 +3,7 @@ import { TaskDemoPage, taskDemoSelectors } from './fixtures/task-demo.page';
 
 test.describe('Page Scroll Demo', () => {
   let taskDemo: TaskDemoPage;
-  let consoleErrors: string[] = [];
+  let consoleErrors: { text: string; url: string }[] = [];
 
   test.beforeEach(async ({ page }) => {
     taskDemo = new TaskDemoPage(page);
@@ -12,7 +12,7 @@ test.describe('Page Scroll Demo', () => {
     // Collect console errors
     page.on('console', (msg) => {
       if (msg.type() === 'error') {
-        consoleErrors.push(msg.text());
+        consoleErrors.push({ text: msg.text(), url: msg.location().url });
       }
     });
 
@@ -22,7 +22,14 @@ test.describe('Page Scroll Demo', () => {
   test.afterEach(async () => {
     // Filter out known benign errors (like favicon not found)
     const realErrors = consoleErrors.filter(
-      (err) => !err.includes('favicon') && !err.includes('net::ERR_') && !err.includes('404'),
+      ({ text, url }) =>
+        !text.includes('favicon') &&
+        !text.includes('net::ERR_') &&
+        !text.includes('404') &&
+        !(
+          url.startsWith('https://fonts.gstatic.com/') &&
+          text.includes('Failed to load resource: the server responded with a status of 403')
+        ),
     );
     expect(realErrors, 'Unexpected console errors detected').toHaveLength(0);
   });
@@ -62,10 +69,13 @@ test.describe('Page Scroll Demo', () => {
     await expect(taskDemo.dragPreview).toBeVisible({ timeout: 2000 });
 
     // Move to second item position (72px item height)
+    const targetX = sourceBox.x + sourceBox.width / 2;
     const targetY = sourceBox.y + 72 + 36; // Move to center of second slot
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY, { steps: 10 });
-    // Wait one rAF for position update
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    await page.mouse.move(targetX, targetY, { steps: 10 });
+
+    // The test asserts exact post-drop order, so the placeholder index must be computed from
+    // the exact release coordinates before releasing (a rAF wait alone is racy under load).
+    await taskDemo.settleDragPosition(targetX, targetY);
 
     // Drop
     await page.mouse.up();
@@ -207,8 +217,8 @@ test.describe('Page Scroll Demo', () => {
     const scrollBox = await taskDemo.scrollContainer.boundingBox();
     if (!scrollBox) throw new Error('Could not get scroll container bounding box');
 
-    const sourceRect = await taskDemo.getItemBoxContainingY(scrollBox.y + scrollBox.height * 0.4);
-    if (!sourceRect) throw new Error('Could not find visible task item at center');
+    const sourceRect = await taskDemo.getVisibleItemBoxAt(0.4);
+    if (!sourceRect) throw new Error('Could not find visible task item near center');
 
     const sourceX = sourceRect.x + sourceRect.width / 2;
     const sourceY = sourceRect.y + sourceRect.height / 2;
@@ -340,7 +350,7 @@ test.describe('Page Scroll Demo', () => {
     await expect(async () => {
       const scrollTop = await taskDemo.getScrollTop();
       expect(scrollTop, `Scroll should reach 2000px, current: ${scrollTop}`).toBeGreaterThan(2000);
-    }).toPass({ timeout: 15000 });
+    }).toPass({ timeout: 25000 });
 
     const placeholder = taskDemo.placeholder;
     await expect(dragPreview).toBeVisible();

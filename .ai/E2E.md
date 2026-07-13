@@ -139,11 +139,11 @@ This library uses `requestAnimationFrame` to throttle drag position updates
 (`draggable.directive.ts`). This creates specific synchronization requirements
 that differ from typical Playwright tests.
 
-### rAF Wait After Mouse Moves
+### rAF Wait After Mouse Moves (Loose Assertions Only)
 
 After any `page.mouse.move()` during a drag, the position hasn't been processed
-until the next animation frame. Always wait one frame before asserting position
-or dropping:
+until the next animation frame. For LOOSE assertions ("item moved somewhere",
+"preview still visible", cleanup drops), wait one frame before dropping:
 
 ```typescript
 await page.mouse.move(targetX, targetY, { steps: 10 });
@@ -152,16 +152,40 @@ await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve
 await page.mouse.up();
 ```
 
-For inline drag code where you know the target list has items, combine
-placeholder visibility (proves hit-testing resolved) with rAF wait (ensures
-final position):
+A rAF wait is NOT sufficient when the test asserts an exact drop position or
+order — see the next section.
+
+### Exact Drop Outcomes: Settle the Processed Drag State
+
+The drop destination is computed from the last drag state the scheduler
+PROCESSED — `DragStateService` commits `cursorPosition`, `activeDroppable` and
+`placeholderIndex` together in one RAF tick, and any pointer position still
+queued at mouseup is discarded (`#endDrag` stops the scheduler first). A rAF
+wait cannot guarantee the final `page.mouse.move()` was processed: pointer
+event delivery is a browser task while rAF is a rendering step, so under
+parallel/WebKit load the frame can fire before the final move is seen and the
+drop then uses a stale placeholder index. Placeholder visibility is also NOT
+proof of the target list — the source list shows a placeholder from drag start.
+
+Before releasing in any test that asserts an exact drop position/order:
 
 ```typescript
 await page.mouse.move(targetX, targetY, { steps: 10 });
-await expect(demoPage.placeholder).toBeVisible({ timeout: 2000 });
-await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+// Polls the processed cursor, re-issuing the move on retry (replaces the rule #6 direct move)
+await demoPage.settleDragPosition(targetX, targetY);
+// Cross-list drags: additionally assert the release point resolved to the target droppable
+await demoPage.waitForActiveDroppable('list2');
 await page.mouse.up();
 ```
+
+Every demo page exposes the processed state via `data-testid="drag-state-debug"`
+(visible debug panel on the main demo, hidden `DragStateDebugComponent` on the
+task demos). The shared implementation lives in `e2e/fixtures/drag-sync.ts` and
+is exposed on both page objects (`DemoPage`, `TaskDemoPage`).
+
+Caveats: the processed cursor is the EFFECTIVE position — do not settle with
+axis locking enabled, and with constrain-to-container only when the release
+point lies inside the constraint bounds.
 
 ### Initial Position Capture
 

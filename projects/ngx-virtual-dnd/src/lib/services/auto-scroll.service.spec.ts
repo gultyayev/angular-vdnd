@@ -248,6 +248,10 @@ describe('AutoScrollService', () => {
     });
 
     it('should only register as participant once even if startMonitoring is called multiple times', () => {
+      let now = 100;
+      const performanceNowSpy = jest.spyOn(performance, 'now');
+      performanceNowSpy.mockImplementation(() => now);
+
       setupDrag({ x: 150, y: 480 });
       service.registerContainer('test-container', mockElement);
       startMonitoringWithScheduler();
@@ -257,12 +261,16 @@ describe('AutoScrollService', () => {
       flushRAF();
       const afterOne = mockElement.scrollTop;
       expect(afterOne).toBeGreaterThan(before);
+
+      now += 1000 / 60;
       flushRAF();
       const afterTwo = mockElement.scrollTop;
       const delta1 = afterOne - before;
       const delta2 = afterTwo - afterOne;
       // Both deltas should be roughly equal (single participant, no double-speed scroll)
       expect(Math.abs(delta1 - delta2)).toBeLessThan(1);
+
+      performanceNowSpy.mockRestore();
     });
 
     it('should accept and store a callback that is invoked on scroll', () => {
@@ -571,6 +579,37 @@ describe('AutoScrollService', () => {
       flushRAF();
 
       expect(mockElement.scrollTop - before).toBe(5);
+    });
+
+    it('should scale scroll distance by elapsed frame time', () => {
+      let now = 100;
+      const performanceNowSpy = jest.spyOn(performance, 'now');
+      performanceNowSpy.mockImplementation(() => now);
+
+      const config: Partial<AutoScrollConfig> = { maxSpeed: 15, accelerate: false };
+      setupDrag({ x: 150, y: 480 });
+      service.registerContainer('test-container', mockElement, config);
+      startMonitoringWithScheduler();
+
+      const start = mockElement.scrollTop;
+      flushRAF();
+      const firstDelta = mockElement.scrollTop - start;
+
+      now = 108.33;
+      const afterFirst = mockElement.scrollTop;
+      flushRAF();
+      const fastFrameDelta = mockElement.scrollTop - afterFirst;
+
+      now = 141.67;
+      const afterFastFrame = mockElement.scrollTop;
+      flushRAF();
+      const slowFrameDelta = mockElement.scrollTop - afterFastFrame;
+
+      expect(firstDelta).toBeCloseTo(15, 2);
+      expect(fastFrameDelta).toBeCloseTo(15, 1);
+      expect(slowFrameDelta).toBeCloseTo(30, 1);
+
+      performanceNowSpy.mockRestore();
     });
   });
 

@@ -1,4 +1,5 @@
 import { expect, Locator, Page } from '@playwright/test';
+import { settleDragPosition, waitForActiveDroppable } from './drag-sync';
 
 export const taskDemoSelectors = {
   scrollContainer: '[data-testid="task-scroll-container"]',
@@ -55,7 +56,7 @@ export class TaskDemoPage {
   }
 
   async goto(path: '/page-scroll' | '/dynamic-height'): Promise<void> {
-    await this.page.goto(path);
+    await this.page.goto(path, { waitUntil: 'domcontentloaded' });
     await this.waitUntilReady();
   }
 
@@ -88,6 +89,20 @@ export class TaskDemoPage {
       );
   }
 
+  /**
+   * Guarantee the drop uses the release coordinates — see settleDragPosition in ./drag-sync.
+   */
+  async settleDragPosition(x: number, y: number): Promise<void> {
+    await settleDragPosition(this.page, x, y);
+  }
+
+  /**
+   * Wait until the processed drag state has resolved to the given droppable id.
+   */
+  async waitForActiveDroppable(droppableId: string): Promise<void> {
+    await waitForActiveDroppable(this.page, droppableId);
+  }
+
   async scrollTo(scrollTop: number): Promise<void> {
     await this.scrollContainer.evaluate((el, top) => {
       el.scrollTop = top;
@@ -115,6 +130,42 @@ export class TaskDemoPage {
       for (const item of document.querySelectorAll(selectors.item)) {
         const rect = item.getBoundingClientRect();
         if (rect.bottom > containerRect.top && rect.top < containerRect.bottom) {
+          visible.push({
+            id: item.getAttribute('data-draggable-id') ?? '',
+            top: rect.top,
+            height: rect.height,
+          });
+        }
+      }
+
+      visible.sort((a, b) => a.top - b.top);
+      return visible;
+    }, taskDemoSelectors);
+  }
+
+  /**
+   * Returns draggable tasks whose full bounding box is inside the scroll container's visible
+   * viewport. Use this for raw mouse drag sources after scrolling, because partially clipped
+   * items can have a geometric center outside the interactive area.
+   */
+  async getFullyVisibleTasks(): Promise<VisibleTask[]> {
+    return this.page.evaluate((selectors) => {
+      const container = document.querySelector(selectors.scrollContainer);
+      if (!container) {
+        return [];
+      }
+
+      const containerRect = container.getBoundingClientRect();
+      const visible: VisibleTask[] = [];
+
+      for (const item of document.querySelectorAll(selectors.item)) {
+        const rect = item.getBoundingClientRect();
+        if (
+          rect.top >= containerRect.top &&
+          rect.bottom <= containerRect.bottom &&
+          rect.width > 0 &&
+          rect.height > 0
+        ) {
           visible.push({
             id: item.getAttribute('data-draggable-id') ?? '',
             top: rect.top,

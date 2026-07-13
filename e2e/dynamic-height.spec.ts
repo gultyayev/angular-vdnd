@@ -3,7 +3,7 @@ import { TaskDemoPage, taskDemoSelectors } from './fixtures/task-demo.page';
 
 test.describe('Dynamic Height Demo', () => {
   let taskDemo: TaskDemoPage;
-  let consoleErrors: string[] = [];
+  let consoleErrors: { text: string; url: string }[] = [];
 
   test.beforeEach(async ({ page }) => {
     taskDemo = new TaskDemoPage(page);
@@ -11,7 +11,7 @@ test.describe('Dynamic Height Demo', () => {
 
     page.on('console', (msg) => {
       if (msg.type() === 'error') {
-        consoleErrors.push(msg.text());
+        consoleErrors.push({ text: msg.text(), url: msg.location().url });
       }
     });
 
@@ -20,7 +20,14 @@ test.describe('Dynamic Height Demo', () => {
 
   test.afterEach(async () => {
     const realErrors = consoleErrors.filter(
-      (err) => !err.includes('favicon') && !err.includes('net::ERR_') && !err.includes('404'),
+      ({ text, url }) =>
+        !text.includes('favicon') &&
+        !text.includes('net::ERR_') &&
+        !text.includes('404') &&
+        !(
+          url.startsWith('https://fonts.gstatic.com/') &&
+          text.includes('Failed to load resource: the server responded with a status of 403')
+        ),
     );
     expect(realErrors, 'Unexpected console errors detected').toHaveLength(0);
   });
@@ -97,11 +104,13 @@ test.describe('Dynamic Height Demo', () => {
     await expect(dragPreview).toBeVisible({ timeout: 2000 });
 
     // Move to center of second item
+    const targetX = sourceBox.x + sourceBox.width / 2;
     const targetY = targetBox.y + targetBox.height / 2;
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY, { steps: 10 });
+    await page.mouse.move(targetX, targetY, { steps: 10 });
 
-    // Wait one rAF before drop (position update is rAF-throttled)
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    // The test asserts exact post-drop order, so the placeholder index must be computed from
+    // the exact release coordinates before releasing (a rAF wait alone is racy under load).
+    await taskDemo.settleDragPosition(targetX, targetY);
     await page.mouse.up();
 
     // Wait for drop to complete by verifying DOM update
@@ -221,8 +230,8 @@ test.describe('Dynamic Height Demo', () => {
       expect(scrollTop).toBeGreaterThan(0);
     }).toPass({ timeout: 2000 });
 
-    // Get items actually visible in the viewport (not overscan items)
-    const visibleItems = await taskDemo.getVisibleTasks();
+    // Get fully visible items in the viewport (not overscan or clipped edge items)
+    const visibleItems = await taskDemo.getFullyVisibleTasks();
 
     expect(visibleItems.length).toBeGreaterThanOrEqual(3);
     const sourceId = visibleItems[0].id;
@@ -235,7 +244,10 @@ test.describe('Dynamic Height Demo', () => {
     const sourceBox = await sourceItem.boundingBox();
     if (!sourceBox) throw new Error('Could not get source bounding box');
 
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
+    const sourceX = sourceBox.x + sourceBox.width / 2;
+    const sourceY = sourceBox.y + sourceBox.height / 2;
+
+    await page.mouse.move(sourceX, sourceY);
     await page.mouse.down();
     await page.mouse.move(sourceBox.x + 5, sourceBox.y + 5, { steps: 2 });
 
@@ -250,12 +262,10 @@ test.describe('Dynamic Height Demo', () => {
     const targetY = freshTargetBox.y + freshTargetBox.height / 2;
 
     // Move to center of third visible item
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY, { steps: 10 });
-    // Direct move ensures the final position registers (E2E.md rule #6)
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY);
-
-    // Wait one rAF before drop
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    await page.mouse.move(sourceX, targetY, { steps: 10 });
+    // Ensure the drop uses the exact release coordinates (re-issues the final move, replacing
+    // the E2E.md rule #6 direct move, and outwaits the rAF-vs-input race under load).
+    await taskDemo.settleDragPosition(sourceX, targetY);
     await page.mouse.up();
 
     // Wait for drop to complete — verify source item moved
@@ -497,11 +507,13 @@ test.describe('Dynamic Height Demo', () => {
 
     // Move to center of second item — with the bug (top-edge probe + no midpoint
     // refinement), the placeholder index would lag behind the preview position.
+    const targetX = sourceBox.x + sourceBox.width / 2;
     const targetY = targetBox.y + targetBox.height / 2;
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetY, { steps: 10 });
+    await page.mouse.move(targetX, targetY, { steps: 10 });
 
-    // Wait one rAF before drop
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    // The test asserts exact post-drop order — settle the processed position before releasing.
+    // The release point is inside the constraint bounds, so the effective cursor matches.
+    await taskDemo.settleDragPosition(targetX, targetY);
     await page.mouse.up();
 
     // Wait for drop to complete — verify reorder happened

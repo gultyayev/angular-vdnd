@@ -150,37 +150,50 @@ export class KeyboardDragHandler {
   /**
    * Unified key dispatch. Returns true if the key was handled.
    * Used by both host bindings and the document-level listener.
+   *
+   * Handled keys are consumed entirely (preventDefault + stopPropagation): right after pickup
+   * the source element can still be focused because Angular has not applied display:none yet,
+   * and without stopping propagation the same keydown would be processed by both the element's
+   * host binding and the document-level listener — moving the item two positions per press.
    */
   handleKey(event: KeyboardEvent): boolean {
     if (!this.isActive()) {
       return false;
     }
 
-    switch (event.key) {
+    const handled = this.#dispatchKey(event.key);
+
+    if (handled) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    return handled;
+  }
+
+  /**
+   * Execute the drag action for a key. Returns true if the key maps to an action.
+   */
+  #dispatchKey(key: string): boolean {
+    switch (key) {
       case ' ': // Space
       case 'Enter':
-        event.preventDefault();
         this.complete();
         return true;
       case 'Escape':
       case 'Tab':
-        event.preventDefault();
         this.cancel();
         return true;
       case 'ArrowUp':
-        event.preventDefault();
         this.#deps.keyboardDrag.moveUp();
         return true;
       case 'ArrowDown':
-        event.preventDefault();
         this.#deps.keyboardDrag.moveDown();
         return true;
       case 'ArrowLeft':
-        event.preventDefault();
         this.#moveToAdjacentDroppable('left');
         return true;
       case 'ArrowRight':
-        event.preventDefault();
         this.#moveToAdjacentDroppable('right');
         return true;
       default:
