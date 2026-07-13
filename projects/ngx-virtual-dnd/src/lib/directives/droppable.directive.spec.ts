@@ -350,6 +350,83 @@ describe('DroppableDirective', () => {
       expect(component.dropEvents.length).toBe(0);
     });
 
+    it('does not replay a completed drop when disabled toggles after the drag ends', () => {
+      // A cross-list drop lands on this droppable via the pointer-up flush.
+      const item = createMockDraggedItem({ draggableId: 'item-2', droppableId: 'other-list' });
+
+      dragStateService.startDrag(
+        item,
+        { x: 0, y: 0 },
+        { x: 0, y: 0 },
+        null,
+        'other-list',
+        null,
+        null,
+        0,
+      );
+      fixture.detectChanges();
+
+      dragStateService.updateDragPosition({
+        cursorPosition: { x: 100, y: 100 },
+        activeDroppableId: 'test-list',
+        placeholderId: 'item-3',
+        placeholderIndex: 2,
+      });
+      dragStateService.endDrag();
+      fixture.detectChanges();
+
+      expect(component.dropEvents.length).toBe(1);
+
+      // endedDragState still names this droppable, but the drop was already consumed.
+      // Toggling disabled re-runs the effect — it must NOT re-emit the historical drop.
+      component.disabled.set(true);
+      fixture.detectChanges();
+      component.disabled.set(false);
+      fixture.detectChanges();
+
+      expect(component.dropEvents.length).toBe(1);
+    });
+
+    it('does not emit a drop when an active target is disabled just before release', () => {
+      const item = createMockDraggedItem({ draggableId: 'item-2', droppableId: 'other-list' });
+
+      dragStateService.startDrag(
+        item,
+        { x: 0, y: 0 },
+        { x: 0, y: 0 },
+        null,
+        'other-list',
+        null,
+        null,
+        0,
+      );
+      fixture.detectChanges();
+
+      // Become the active target during the drag so #wasActive becomes true.
+      dragStateService.updateDragPosition({
+        cursorPosition: { x: 100, y: 100 },
+        activeDroppableId: 'test-list',
+        placeholderId: 'item-3',
+        placeholderIndex: 2,
+      });
+      fixture.detectChanges();
+      expect(directive.isActive()).toBe(true);
+
+      // Disable and end in the same task (no change detection in between), so the effect
+      // sees isDragging=false with a stale #wasActive=true and a live disabled()=true.
+      component.disabled.set(true);
+      dragStateService.endDrag();
+      fixture.detectChanges();
+
+      expect(component.dropEvents.length).toBe(0);
+
+      // Re-enabling after the drag ended must not resurrect the suppressed drop either.
+      component.disabled.set(false);
+      fixture.detectChanges();
+
+      expect(component.dropEvents.length).toBe(0);
+    });
+
     it('uses the latest placeholder index when emitting a same-list drop', () => {
       const item = createMockDraggedItem({
         draggableId: 'item-2',
