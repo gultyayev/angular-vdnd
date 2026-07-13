@@ -11,6 +11,16 @@ export interface LongTask {
 }
 
 /**
+ * Version of the metric *semantics* produced by the collector. Bump this whenever
+ * a change alters what a number means (long-task attribution window, dropped-frame
+ * threshold, aggregation, …). `compare.ts` fails closed when a baseline was
+ * produced by a different schema, because old and new numbers are then not
+ * comparable — the pre-#42 harness (leaking observer, `buffered: true`, >16.7ms
+ * dropped frames) is schema 1; this collector is schema 2.
+ */
+export const METRICS_SCHEMA_VERSION = 2;
+
+/**
  * Frame intervals below this are treated as ordinary 60Hz scheduling jitter.
  * ~1.5x the 16.67ms vsync interval, so a 16.8ms frame is no longer classified
  * the same as a real ~50ms stall (issue #42, problem 3).

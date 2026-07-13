@@ -6,7 +6,9 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  timeout: 120_000,
+  // Scenarios run 6 iterations under 4x CPU throttling, some reloading the page
+  // and holding autoscroll for seconds each — well beyond a normal E2E test.
+  timeout: 240_000,
   reporter: [['list'], ['json', { outputFile: 'results/latest.json' }]],
   use: {
     baseURL: 'http://127.0.0.1:4200',

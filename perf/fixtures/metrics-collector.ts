@@ -4,10 +4,12 @@ import {
   countDroppedFrames,
   filterLongTasksSince,
   percentile,
+  METRICS_SCHEMA_VERSION,
   type LongTask,
 } from './metric-math';
 
 export type { LongTask };
+export { METRICS_SCHEMA_VERSION };
 
 export interface PerfSnapshot {
   timestamp: number;

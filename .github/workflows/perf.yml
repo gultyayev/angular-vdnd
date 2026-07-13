@@ -62,12 +62,16 @@ jobs:
         id: compare
         if: always()
         run: |
-          if npm run --silent perf:compare 2>&1 | tee perf/results/comparison.txt; then
+          # Capture perf:compare's real exit code (a pipe would mask it) so the
+          # gate below can actually fail the build on a regression / bad baseline.
+          npm run --silent perf:compare 2>&1 | tee perf/results/comparison.txt
+          status=${PIPESTATUS[0]}
+          cat perf/results/comparison.txt >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" -eq 0 ]; then
             echo "regression=false" >> "$GITHUB_OUTPUT"
           else
             echo "regression=true" >> "$GITHUB_OUTPUT"
           fi
-          cat perf/results/comparison.txt >> "$GITHUB_STEP_SUMMARY"
 
       - name: Comment on PR
         if: always() && github.event_name == 'pull_request'
@@ -120,6 +124,14 @@ jobs:
           name: perf-results
           path: perf/results/
           retention-days: 30
+
+      # Runs last so the PR comment and artifact upload still happen, but the job
+      # (and therefore the check) fails when a regression or bad baseline was found.
+      - name: Enforce performance gate
+        if: always() && steps.compare.outputs.regression == 'true'
+        run: |
+          echo "::error::Performance regression or incompatible baseline detected — see the comparison table."
+          exit 1
 
   # Regenerate the committed baseline on the current Playwright, in the same
   # environment PRs are measured in. Triggered manually; the fresh baseline is

@@ -1,5 +1,9 @@
 import { test } from '@playwright/test';
-import { MetricsCollector, ScenarioMetrics } from '../fixtures/metrics-collector';
+import {
+  MetricsCollector,
+  ScenarioMetrics,
+  METRICS_SCHEMA_VERSION,
+} from '../fixtures/metrics-collector';
 import { PerfPage } from '../fixtures/perf.page';
 import { aggregate } from '../fixtures/statistics';
 
@@ -52,6 +56,7 @@ test.describe('Drag Within List Performance', () => {
 
     const report = {
       scenario: 'drag-within-list-1000',
+      metricsSchemaVersion: METRICS_SCHEMA_VERSION,
       cpuThrottle: CPU_THROTTLE,
       iterations: ITERATIONS,
       totalBlockingTime: aggregate(results.map((r) => r.totalBlockingTime)),

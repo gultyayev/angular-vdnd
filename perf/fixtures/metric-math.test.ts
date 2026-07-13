@@ -2,12 +2,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DROPPED_FRAME_THRESHOLD_MS,
+  METRICS_SCHEMA_VERSION,
   computeTotalBlockingTime,
   countDroppedFrames,
   filterLongTasksSince,
   percentile,
   type LongTask,
 } from './metric-math.ts';
+
+test('metrics schema version is a positive integer (bumped when semantics change)', () => {
+  assert.ok(Number.isInteger(METRICS_SCHEMA_VERSION) && METRICS_SCHEMA_VERSION >= 2);
+});
 
 test('filterLongTasksSince drops tasks that started before the scenario window', () => {
   // Issue #42, problems 1 & 2: buffered history / stale-observer entries from

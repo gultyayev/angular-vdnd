@@ -18,12 +18,14 @@ export class PerfPage {
    * Only works on the `/` route.
    */
   async setItemCount(count: number): Promise<void> {
-    const input = this.page.locator('#itemCount');
+    // The item-count control is the first number input on the demo page
+    // (mirrors the E2E page object); the count badge is `list-1-count`.
+    const input = this.page.locator('input[type="number"]').first();
     await input.fill(String(count));
     await this.page.locator('button', { hasText: 'Regenerate' }).click();
     // Wait for virtual scroll to render with the new item count
     await expect(async () => {
-      const badge = this.page.locator('.list-badge').first();
+      const badge = this.page.getByTestId('list-1-count');
       const text = await badge.textContent();
       expect(parseInt(text?.trim() ?? '0', 10)).toBe(Math.floor(count / 2));
     }).toPass({ timeout: 5000 });

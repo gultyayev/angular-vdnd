@@ -29,7 +29,9 @@ npm run perf:baseline   # run perf and promote the result to the committed basel
 ```
 
 `perf:compare` flags: `--threshold <pct>` (default 25), `--baseline <file>`,
-`--current <file>`, `--output <file>`, `--fail-on-version-mismatch`.
+`--current <file>`, `--output <file>`, `--allow-baseline-mismatch` (downgrade an
+incompatible-baseline failure to a warning). It exits non-zero — failing CI — on
+a detected regression, a missing scenario/metric, or an incompatible baseline.
 
 ## Measurement methodology
 
@@ -59,7 +61,13 @@ only when the current median is worse than the baseline median by **all** of:
 - more than the percent `--threshold` (default 25%),
 - more than a per-metric **absolute floor** (`MIN_ABS_DELTA` in
   `fixtures/compare-metrics.ts`), and
-- more than **2× the baseline standard deviation** (a stddev-aware noise band).
+- more than **3× the baseline MAD** (median absolute deviation).
+
+MAD is used instead of standard deviation because, with only five samples, a
+single outlier inflates stddev enough to hide a real, sustained regression — a
+baseline of `[0,0,0,0,500]` has stddev ≈224 but MAD 0, so a steady jump to 100 ms
+is correctly gated rather than swallowed by the band. `3 × MAD ≈ 2σ` for normal
+data.
 
 The absolute floor is what keeps a **zero baseline** from auto-failing: a metric
 that was `0` and becomes `1` (e.g. a single 51 ms long task) is `+100%` but stays
@@ -78,18 +86,37 @@ rather than gating. The floors are deliberately conservative:
 | p99FrameTime      | 5     | ms     |
 | jsHeapDelta       | 512   | KB     |
 
-## Baseline hygiene
+## Baseline compatibility (fail closed)
 
-The baseline is a full Playwright JSON report and embeds the **Playwright
-version** it was produced with. `perf:compare` prints the Playwright version of
-both sides and warns when they differ, because baseline and current numbers then
-come from different browser builds and drift is environmental, not code. Pass
-`--fail-on-version-mismatch` to turn that warning into a hard failure.
+A comparison is only meaningful when both sides were produced by the **same
+harness**. `perf:compare` fails closed — before comparing any numbers — when the
+baseline is not comparable to the current run:
 
-Regenerate the baseline **on the current Playwright and in the CI environment**
-(so absolute numbers match where PRs are measured):
+- **Metrics schema.** Each scenario report records `metricsSchemaVersion`
+  (`fixtures/metric-math.ts`). Bump it whenever a change alters what a number
+  _means_ (long-task window, dropped-frame threshold, aggregation). The pre-#42
+  harness — leaking observer, `buffered: true`, `>16.7ms` dropped frames — is
+  schema 1; this collector is schema 2. Comparing across schemas would attribute
+  a **semantics** change (e.g. dropped frames 60 → 0) to the library.
+- **Playwright version.** Embedded in the baseline's JSON report; different
+  browser builds produce different numbers.
 
-- Manually: run the `Performance Benchmarks` workflow via `workflow_dispatch`,
+Both versions are printed in the output. Mismatches fail the run and tell you to
+regenerate; pass `--allow-baseline-mismatch` to compare anyway (unreliable).
+
+The comparison also fails when a scenario or metric present in the baseline is
+**missing** from the current run — a renamed, skipped, or crashed benchmark must
+not silently disappear behind a green check.
+
+## Regenerating the baseline
+
+Regenerate **on the current Playwright and, ideally, in the CI environment** so
+absolute numbers match where PRs are measured:
+
+- In CI: run the `Performance Benchmarks` workflow via `workflow_dispatch`,
   download the `updated-baseline` artifact, and commit it.
-- Or locally: `npm run perf:baseline` (numbers will reflect your machine, so
-  prefer the CI path for the committed baseline).
+- Locally: `npm run perf:baseline` (numbers reflect your machine, so prefer the
+  CI path for the committed baseline).
+
+Because the baseline is hardware-sensitive, regenerate it whenever the harness
+semantics (schema) or Playwright version changes, or the gate will fail closed.

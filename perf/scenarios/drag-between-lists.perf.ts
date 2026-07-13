@@ -1,5 +1,9 @@
 import { test } from '@playwright/test';
-import { MetricsCollector, ScenarioMetrics } from '../fixtures/metrics-collector';
+import {
+  MetricsCollector,
+  ScenarioMetrics,
+  METRICS_SCHEMA_VERSION,
+} from '../fixtures/metrics-collector';
 import { PerfPage } from '../fixtures/perf.page';
 import { aggregate } from '../fixtures/statistics';
 
@@ -73,6 +77,7 @@ test.describe('Drag Between Lists Performance', () => {
 
     const report = {
       scenario: 'drag-between-lists-autoscroll-1000',
+      metricsSchemaVersion: METRICS_SCHEMA_VERSION,
       cpuThrottle: CPU_THROTTLE,
       iterations: ITERATIONS,
       autoscrollHoldMs: AUTOSCROLL_HOLD_MS,

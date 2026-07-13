@@ -7,15 +7,21 @@
  * All gated metrics are "higher is worse", so only increases are treated as
  * regressions. A change is gated only when it is worse on the **median** by
  * more than the percent threshold AND by more than the noise floor — a
- * per-metric absolute minimum combined with a stddev-aware band. This removes
- * the "p95-of-5 = max", "zero-baseline = +100%", and single-noisy-run failure
- * modes (issue #42, problems 4 & 5).
+ * per-metric absolute minimum combined with a robust MAD-based band. This
+ * removes the "p95-of-5 = max", "zero-baseline = +100%", and single-noisy-run
+ * failure modes (issue #42, problems 4 & 5).
  */
 
 import type { AggregatedMetrics } from './statistics.ts';
 
-/** Multiplier applied to the baseline stddev to form the per-metric noise band. */
-export const REGRESSION_STDDEV_MULTIPLIER = 2;
+/**
+ * Multiplier applied to the baseline **MAD** (median absolute deviation) to form
+ * the per-metric noise band. MAD is used instead of stddev because a single
+ * outlier in only five samples inflates stddev enough to mask a real, sustained
+ * regression (e.g. a baseline of `[0,0,0,0,500]` has stddev ≈224 but MAD 0).
+ * `3 × MAD` ≈ `2σ` for normally distributed data (σ̂ = 1.4826 × MAD).
+ */
+export const REGRESSION_MAD_MULTIPLIER = 3;
 
 /**
  * Absolute minimum change (in each metric's own unit) that must be exceeded
@@ -71,7 +77,7 @@ export function evaluateMetric(
   const pct = percentChange(b, c);
 
   const floor = MIN_ABS_DELTA[metric] ?? 0;
-  const noiseBand = REGRESSION_STDDEV_MULTIPLIER * baseline.stddev;
+  const noiseBand = REGRESSION_MAD_MULTIPLIER * (baseline.mad ?? 0);
 
   const worse = absDelta > 0;
   const overThreshold = pct > threshold;

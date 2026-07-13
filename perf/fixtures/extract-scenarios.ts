@@ -29,6 +29,7 @@ interface ResultsFile {
 
 export interface ScenarioReport {
   scenario: string;
+  metricsSchemaVersion?: number;
   [metric: string]: unknown;
 }
 
