@@ -157,17 +157,24 @@ order — see the next section.
 
 ### Exact Drop Outcomes: Settle the Processed Drag State
 
-The drop destination is computed from the last drag state the scheduler
-PROCESSED — `DragStateService` commits `cursorPosition`, `activeDroppable` and
-`placeholderIndex` together in one RAF tick, and any pointer position still
-queued at mouseup is discarded (`#endDrag` stops the scheduler first). A rAF
-wait cannot guarantee the final `page.mouse.move()` was processed: pointer
-event delivery is a browser task while rAF is a rendering step, so under
-parallel/WebKit load the frame can fire before the final move is seen and the
-drop then uses a stale placeholder index. Placeholder visibility is also NOT
-proof of the target list — the source list shows a placeholder from drag start.
+During the drag, `DragStateService` commits `cursorPosition`, `activeDroppable`
+and `placeholderIndex` together once per RAF tick, so mid-drag assertions
+(placeholder position/count) still lag the pointer by up to a frame.
 
-Before releasing in any test that asserts an exact drop position/order:
+At release the picture is different: on a non-cancelled `mouseup`, `#endDrag`
+now flushes the last **delivered** pointer position synchronously (through
+`#updateDrag`) BEFORE stopping the scheduler, so the drop resolves against the
+release coordinates rather than the last RAF-processed frame. The old
+"queued position discarded at mouseup" race is gone — a plain
+`page.mouse.move(target)` immediately followed by `page.mouse.up()` lands on
+`target` with no RAF wait (see the disabled-destination test in
+`disabled-elements.spec.ts`).
+
+The remaining gap is pointer-event **delivery**, not processing: under
+parallel/WebKit load the final `page.mouse.move()` can still be in flight when
+`mouse.up()` fires, so the flush applies a stale position. For tests that
+assert an exact cross-list drop position/order, keep settling before release —
+it guarantees the move was delivered and lets you assert the target resolved:
 
 ```typescript
 await page.mouse.move(targetX, targetY, { steps: 10 });
@@ -177,6 +184,9 @@ await demoPage.settleDragPosition(targetX, targetY);
 await demoPage.waitForActiveDroppable('list2');
 await page.mouse.up();
 ```
+
+Placeholder visibility is NOT proof of the target list — the source list shows
+a placeholder from drag start.
 
 Every demo page exposes the processed state via `data-testid="drag-state-debug"`
 (visible debug panel on the main demo, hidden `DragStateDebugComponent` on the
