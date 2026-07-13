@@ -44,6 +44,7 @@ import { normalizeDropDestinationIndex } from '../utils/drop-index-normalization
   host: {
     '[attr.data-droppable-id]': 'vdndDroppable()',
     '[attr.data-droppable-group]': 'effectiveGroup()',
+    '[attr.data-droppable-disabled]': 'disabled() || null',
     '[attr.data-constrain-to-container]': 'constrainToContainer() || null',
     '[attr.aria-dropeffect]': '"move"',
     '[class.vdnd-droppable]': 'true',

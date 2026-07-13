@@ -441,4 +441,90 @@ describe('PositionCalculatorService', () => {
       expect(service.findAdjacentDroppable('left', 'right', group)?.element).toBe(right);
     });
   });
+
+  describe('disabled droppable filtering', () => {
+    const createdDisabled: HTMLElement[] = [];
+
+    function stub(el: HTMLElement, rect: Partial<DOMRect>): void {
+      el.getBoundingClientRect = () =>
+        ({
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: 0,
+          height: 0,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+          ...rect,
+        }) as DOMRect;
+    }
+
+    function make(
+      id: string,
+      group: string,
+      rect: Partial<DOMRect>,
+      disabled = false,
+    ): HTMLElement {
+      const el = document.createElement('div');
+      el.setAttribute('data-droppable-id', id);
+      el.setAttribute('data-droppable-group', group);
+      if (disabled) {
+        el.setAttribute('data-droppable-disabled', 'true');
+      }
+      stub(el, rect);
+      document.body.appendChild(el);
+      createdDisabled.push(el);
+      return el;
+    }
+
+    afterEach(() => {
+      service.endDragSession();
+      createdDisabled.forEach((el) => el.remove());
+      createdDisabled.length = 0;
+    });
+
+    it('excludes a disabled droppable from hit-test candidates (treated as no target)', () => {
+      const dragged = document.createElement('div');
+      make('disabled-list', 'g', { top: 100, left: 100, right: 300, bottom: 400 }, true);
+
+      service.beginDragSession('g');
+      expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBeNull();
+    });
+
+    it('a disabled droppable does not occlude an enabled one it overlaps', () => {
+      const dragged = document.createElement('div');
+      const enabled = make('enabled', 'g', { top: 0, left: 0, right: 300, bottom: 300 });
+      // Later in document order (would win the painter-order tie-break) but disabled.
+      make('disabled', 'g', { top: 50, left: 50, right: 350, bottom: 350 }, true);
+
+      service.beginDragSession('g');
+      expect(service.findDroppableAtPoint(100, 100, dragged, 'g')).toBe(enabled);
+    });
+
+    it('excludes disabled droppables on the one-shot (no-session) path', () => {
+      const dragged = document.createElement('div');
+      make('disabled-list', 'g', { top: 100, left: 100, right: 300, bottom: 400 }, true);
+
+      expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBeNull();
+    });
+
+    it('skips a disabled droppable during adjacent (cross-list) navigation', () => {
+      make('left', 'g', { top: 0, left: 0, right: 100, bottom: 100 });
+      make('middle', 'g', { top: 0, left: 200, right: 300, bottom: 100 }, true);
+      const right = make('right', 'g', { top: 0, left: 400, right: 500, bottom: 100 });
+
+      const result = service.findAdjacentDroppable('left', 'right', 'g');
+      expect(result?.id).toBe('right');
+      expect(result?.element).toBe(right);
+    });
+
+    it('returns null when the only adjacent droppable is disabled', () => {
+      make('left', 'g', { top: 0, left: 0, right: 100, bottom: 100 });
+      make('right', 'g', { top: 0, left: 200, right: 300, bottom: 100 }, true);
+
+      expect(service.findAdjacentDroppable('left', 'right', 'g')).toBeNull();
+    });
+  });
 });

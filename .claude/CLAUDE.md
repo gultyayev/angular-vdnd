@@ -116,15 +116,16 @@ AutoScrollService → DragStateService, PositionCalculatorService
 
 ### Data Attributes
 
-| Attribute                     | Set By                                                   | Used For                                      |
-| ----------------------------- | -------------------------------------------------------- | --------------------------------------------- |
-| `data-draggable-id`           | DraggableDirective                                       | Identify draggable elements                   |
-| `data-droppable-id`           | DroppableDirective                                       | Identify drop targets                         |
-| `data-droppable-group`        | DroppableDirective                                       | Group membership for cross-list drag          |
-| `data-constrain-to-container` | DroppableDirective                                       | Clamp drag to container boundaries            |
-| `data-item-height`            | VirtualScrollContainerComponent, VirtualContentComponent | Virtual scroll item height                    |
-| `data-total-items`            | VirtualScrollContainerComponent, VirtualContentComponent | Total item count for index calculation        |
-| `data-content-offset`         | VirtualContentComponent                                  | Content offset for virtual scroll positioning |
+| Attribute                     | Set By                                                   | Used For                                                      |
+| ----------------------------- | -------------------------------------------------------- | ------------------------------------------------------------- |
+| `data-draggable-id`           | DraggableDirective                                       | Identify draggable elements                                   |
+| `data-droppable-id`           | DroppableDirective                                       | Identify drop targets                                         |
+| `data-droppable-group`        | DroppableDirective                                       | Group membership for cross-list drag                          |
+| `data-droppable-disabled`     | DroppableDirective                                       | Excludes disabled droppable from hit-test/keyboard candidates |
+| `data-constrain-to-container` | DroppableDirective                                       | Clamp drag to container boundaries                            |
+| `data-item-height`            | VirtualScrollContainerComponent, VirtualContentComponent | Virtual scroll item height                                    |
+| `data-total-items`            | VirtualScrollContainerComponent, VirtualContentComponent | Total item count for index calculation                        |
+| `data-content-offset`         | VirtualContentComponent                                  | Content offset for virtual scroll positioning                 |
 
 ### Test Files
 

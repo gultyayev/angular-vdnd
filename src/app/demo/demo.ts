@@ -30,6 +30,7 @@ interface Item {
     '[attr.data-last-drop-source-index]': 'lastDropSourceIndex()',
     '[attr.data-last-drop-destination-index]': 'lastDropDestinationIndex()',
     '[attr.data-last-drag-end-destination-index]': 'lastDragEndDestinationIndex()',
+    '[attr.data-last-drag-end-cancelled]': 'lastDragEndCancelled()',
   },
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
@@ -72,6 +73,9 @@ export class DemoComponent {
   /** Constrain drag preview and placeholder to container boundaries */
   readonly constrainToContainer = signal(false);
 
+  /** Whether the List 2 droppable is disabled (rejects drops / keyboard navigation) */
+  readonly list2DroppableDisabled = signal(false);
+
   /** Whether settings panel is expanded */
   readonly settingsExpanded = signal(true);
 
@@ -86,6 +90,9 @@ export class DemoComponent {
 
   /** Last destination index received by the demo dragEnd handler (used by interaction tests). */
   readonly lastDragEndDestinationIndex = signal<number | null>(null);
+
+  /** Whether the last dragEnd event was cancelled (used by interaction tests). */
+  readonly lastDragEndCancelled = signal<boolean | null>(null);
 
   /** List 1 items */
   readonly list1 = signal<Item[]>([]);
@@ -195,9 +202,16 @@ export class DemoComponent {
     this.constrainToContainer.set(checkbox.checked);
   }
 
+  /** Toggle the disabled state of the List 2 droppable */
+  toggleList2DroppableDisabled(event: Event): void {
+    const checkbox = event.target as HTMLInputElement;
+    this.list2DroppableDisabled.set(checkbox.checked);
+  }
+
   /** Record dragEnd events for interaction tests. */
   onDragEnd(event: DragEndEvent): void {
     this.lastDragEndDestinationIndex.set(event.destinationIndex);
+    this.lastDragEndCancelled.set(event.cancelled);
   }
 
   /** Handle drop events (verbose API) */

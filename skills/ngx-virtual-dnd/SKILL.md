@@ -451,6 +451,8 @@ Set `[autoScrollEnabled]="false"` to disable auto-scroll entirely. Available on 
 
 Disabled draggables get `vdnd-draggable-disabled`. Disabled droppables get `vdnd-droppable-disabled`.
 
+A disabled droppable is excluded from all drag-time candidate sets: pointer hit-testing skips it (the cursor falls through to whatever enabled droppable sits underneath, or none) and keyboard `ArrowLeft`/`ArrowRight` navigation steps over it. Releasing over a disabled droppable fires **no `drop` event**; `(dragEnd)` still fires with `cancelled: false` and `destinationIndex: null`. Treat a `null` `destinationIndex` as "no valid drop target".
+
 ### Overscan
 
 Control how many items are rendered beyond the visible viewport (default: `3`):

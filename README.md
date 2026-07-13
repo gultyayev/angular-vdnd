@@ -320,6 +320,8 @@ Use the `disabled` input to conditionally disable draggables, droppables, or ent
 
 Disabled draggables get the `vdnd-draggable-disabled` CSS class. Disabled droppables get `vdnd-droppable-disabled`.
 
+A disabled droppable is removed from all drag-time candidate sets: pointer hit-testing skips it (the cursor falls through to whatever enabled droppable sits underneath, or none) and keyboard `ArrowLeft`/`ArrowRight` navigation steps over it. Releasing a drag over a disabled droppable fires **no `drop` event**; the `(dragEnd)` event still fires with `cancelled: false` and `destinationIndex: null`, so consumers that pair `drop`/`dragEnd` should treat a `null` `destinationIndex` as "no valid drop target".
+
 ### Low-Level API
 
 For maximum control, use individual components instead of `VirtualSortableListComponent`:

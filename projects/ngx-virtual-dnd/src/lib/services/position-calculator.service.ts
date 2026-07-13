@@ -35,6 +35,9 @@ export class PositionCalculatorService {
   /** Data attribute used to identify droppable groups */
   readonly #DROPPABLE_GROUP_ATTR = 'data-droppable-group';
 
+  /** Data attribute reflecting a droppable's disabled state (present === disabled) */
+  readonly #DROPPABLE_DISABLED_ATTR = 'data-droppable-disabled';
+
   /** Data attribute used to identify draggable elements */
   readonly #DRAGGABLE_ID_ATTR = 'data-draggable-id';
 
@@ -176,12 +179,27 @@ export class PositionCalculatorService {
 
   /**
    * Query all droppable elements belonging to a group, in document order.
+   *
+   * Disabled droppables are filtered out here so the hot hit-test loop stays a plain
+   * geometry scan: a disabled container is treated as "no droppable" and the cursor
+   * falls through to whatever enabled candidate sits underneath (or none).
    */
   #queryDroppables(groupName: string): HTMLElement[] {
     if (typeof document === 'undefined') {
       return [];
     }
-    return queryAllByAttribute<HTMLElement>(document, this.#DROPPABLE_GROUP_ATTR, groupName);
+    return queryAllByAttribute<HTMLElement>(document, this.#DROPPABLE_GROUP_ATTR, groupName).filter(
+      (el) => !this.#isDroppableDisabled(el),
+    );
+  }
+
+  /**
+   * Whether a droppable element is disabled (reflected via the `data-droppable-disabled`
+   * attribute by `DroppableDirective`). Disabled droppables are excluded from all
+   * drag-time candidate sets — pointer hit-testing and keyboard cross-list navigation.
+   */
+  #isDroppableDisabled(el: HTMLElement): boolean {
+    return el.hasAttribute(this.#DROPPABLE_DISABLED_ATTR);
   }
 
   /**
@@ -371,12 +389,13 @@ export class PositionCalculatorService {
     direction: 'left' | 'right',
     groupName: string,
   ): { element: HTMLElement; id: string; itemCount: number } | null {
-    // Find all droppables in the same group
+    // Find all enabled droppables in the same group. Disabled droppables are excluded so
+    // keyboard cross-list navigation skips them (falling through to the next enabled list).
     const allDroppables = queryAllByAttribute<HTMLElement>(
       document,
       this.#DROPPABLE_GROUP_ATTR,
       groupName,
-    );
+    ).filter((el) => !this.#isDroppableDisabled(el));
 
     if (allDroppables.length <= 1) {
       return null;
