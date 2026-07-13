@@ -1,5 +1,9 @@
 import { test } from '@playwright/test';
-import { MetricsCollector, ScenarioMetrics } from '../fixtures/metrics-collector';
+import {
+  MetricsCollector,
+  ScenarioMetrics,
+  METRICS_SCHEMA_VERSION,
+} from '../fixtures/metrics-collector';
 import { PerfPage } from '../fixtures/perf.page';
 import { aggregate } from '../fixtures/statistics';
 
@@ -67,6 +71,7 @@ test.describe('Dynamic Height Scroll Performance', () => {
 
     const report = {
       scenario: 'dynamic-height-scroll',
+      metricsSchemaVersion: METRICS_SCHEMA_VERSION,
       cpuThrottle: CPU_THROTTLE,
       iterations: ITERATIONS,
       totalBlockingTime: aggregate(results.map((r) => r.totalBlockingTime)),

@@ -1,15 +1,21 @@
 import { CDPSession, Page } from '@playwright/test';
+import {
+  computeTotalBlockingTime,
+  countDroppedFrames,
+  filterLongTasksSince,
+  percentile,
+  METRICS_SCHEMA_VERSION,
+  type LongTask,
+} from './metric-math';
+
+export type { LongTask };
+export { METRICS_SCHEMA_VERSION };
 
 export interface PerfSnapshot {
   timestamp: number;
   jsHeapUsedSize: number;
   layoutCount: number;
   recalcStyleCount: number;
-}
-
-export interface LongTask {
-  startTime: number;
-  duration: number;
 }
 
 export interface ScenarioMetrics {
@@ -70,24 +76,37 @@ export class MetricsCollector {
 
   /**
    * Inject a PerformanceObserver for long tasks and an rAF-based frame tracker into the page.
-   * Must be called before the scenario runs.
+   * Must be called immediately before the scenario runs.
+   *
+   * A single observer is kept on `window.__perfObserver`; any observer left over
+   * from a previous iteration is disconnected first so stale observers can't push
+   * duplicate long tasks into the current iteration's array (issue #42, problem 1).
+   * `buffered` is intentionally omitted so history from page load / warmup isn't
+   * replayed into the measured window (issue #42, problem 2).
    */
   async injectObservers(): Promise<void> {
     await this.#page.evaluate(() => {
       const w = window as Window & Record<string, unknown>;
+
+      const previous = w.__perfObserver as PerformanceObserver | undefined;
+      if (previous) previous.disconnect();
+
       w.__perfLongTasks = [];
       w.__perfFrames = [];
       w.__perfLastFrameTime = 0;
       w.__perfTrackingActive = true;
+      w.__perfScenarioStart = performance.now();
 
-      new PerformanceObserver((list) => {
+      const observer = new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) {
           (w.__perfLongTasks as { startTime: number; duration: number }[]).push({
             startTime: entry.startTime,
             duration: entry.duration,
           });
         }
-      }).observe({ type: 'longtask', buffered: true });
+      });
+      observer.observe({ type: 'longtask' });
+      w.__perfObserver = observer;
 
       const trackFrame = () => {
         const now = performance.now();
@@ -103,13 +122,31 @@ export class MetricsCollector {
     });
   }
 
-  async collectObserverResults(): Promise<{ longTasks: LongTask[]; frameTimes: number[] }> {
+  async collectObserverResults(): Promise<{
+    longTasks: LongTask[];
+    frameTimes: number[];
+    scenarioStart: number;
+  }> {
     return this.#page.evaluate(() => {
       const w = window as Window & Record<string, unknown>;
       w.__perfTrackingActive = false;
+      const observer = w.__perfObserver as PerformanceObserver | undefined;
+      if (observer) {
+        // Flush any records not yet delivered to the callback, then disconnect
+        // so this observer can never fire into a later iteration's array.
+        for (const entry of observer.takeRecords()) {
+          (w.__perfLongTasks as { startTime: number; duration: number }[]).push({
+            startTime: entry.startTime,
+            duration: entry.duration,
+          });
+        }
+        observer.disconnect();
+        w.__perfObserver = undefined;
+      }
       return {
         longTasks: (w.__perfLongTasks as LongTask[]) ?? [],
         frameTimes: (w.__perfFrames as number[]) ?? [],
+        scenarioStart: (w.__perfScenarioStart as number) ?? 0,
       };
     });
   }
@@ -128,25 +165,21 @@ export class MetricsCollector {
 
     const durationMs = Date.now() - startTime;
     const after = await this.getSnapshot();
-    const { longTasks, frameTimes } = await this.collectObserverResults();
+    const { longTasks, frameTimes, scenarioStart } = await this.collectObserverResults();
 
-    const totalBlockingTime = longTasks.reduce(
-      (sum, task) => sum + Math.max(0, task.duration - 50),
-      0,
-    );
+    // Attribute only long tasks that started within the measured window.
+    const scenarioTasks = filterLongTasksSince(longTasks, scenarioStart);
+    const totalBlockingTime = computeTotalBlockingTime(scenarioTasks);
 
     const frameCount = frameTimes.length;
     const avgFrameTime = frameCount > 0 ? frameTimes.reduce((a, b) => a + b, 0) / frameCount : 0;
     const maxFrameGap = frameCount > 0 ? Math.max(...frameTimes) : 0;
-    const droppedFrames = frameTimes.filter((t) => t > 16.7).length;
-    const sortedFrames = [...frameTimes].sort((a, b) => a - b);
-    const p99Index = sortedFrames.length > 0 ? Math.ceil(sortedFrames.length * 0.99) - 1 : 0;
-    const p99FrameTime =
-      sortedFrames.length > 0 ? sortedFrames[Math.min(p99Index, sortedFrames.length - 1)] : 0;
+    const droppedFrames = countDroppedFrames(frameTimes);
+    const p99FrameTime = percentile(frameTimes, 0.99);
 
     return {
       durationMs,
-      longTaskCount: longTasks.length,
+      longTaskCount: scenarioTasks.length,
       totalBlockingTime,
       layoutCount: after.layoutCount - before.layoutCount,
       recalcStyleCount: after.recalcStyleCount - before.recalcStyleCount,
