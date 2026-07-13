@@ -10,7 +10,7 @@ const METRIC_LABELS: Record<string, { label: string; unit: string }> = {
   recalcStyleCount: { label: 'Style Recalcs', unit: '' },
   avgFrameTime: { label: 'Avg Frame Time', unit: 'ms' },
   maxFrameGap: { label: 'Max Frame Gap', unit: 'ms' },
-  droppedFrames: { label: 'Dropped Frames (>16.7ms)', unit: '' },
+  droppedFrames: { label: 'Dropped Frames (>25ms)', unit: '' },
   p99FrameTime: { label: 'p99 Frame Time', unit: 'ms' },
   jsHeapDelta: { label: 'Heap Delta', unit: 'KB' },
 };

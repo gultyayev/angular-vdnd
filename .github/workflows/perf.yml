@@ -3,17 +3,35 @@ name: Performance Benchmarks
 on:
   pull_request:
     branches: [master]
+  workflow_dispatch:
 
 permissions:
   contents: read
   pull-requests: write
 
 concurrency:
-  group: perf-${{ github.event.pull_request.number }}
+  group: perf-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  harness-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      # Pure statistics / gating logic — no browsers or npm install required.
+      - name: Unit-test perf harness logic
+        run: npm run perf:test
+
   benchmark:
+    if: github.event_name == 'pull_request'
+    needs: harness-unit-tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -101,4 +119,41 @@ jobs:
         with:
           name: perf-results
           path: perf/results/
+          retention-days: 30
+
+  # Regenerate the committed baseline on the current Playwright, in the same
+  # environment PRs are measured in. Triggered manually; the fresh baseline is
+  # uploaded as an artifact to download and commit (avoids machine-to-machine
+  # drift from regenerating locally).
+  refresh-baseline:
+    if: github.event_name == 'workflow_dispatch'
+    needs: harness-unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Angular Library
+        run: npm run build:lib
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Regenerate baseline
+        run: npm run perf:baseline
+
+      - name: Upload updated baseline
+        uses: actions/upload-artifact@v7
+        with:
+          name: updated-baseline
+          path: perf/baselines/baseline.json
           retention-days: 30

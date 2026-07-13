@@ -1,6 +1,7 @@
-import { writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { AggregatedMetrics } from './fixtures/statistics.ts';
+import { evaluateMetric } from './fixtures/compare-metrics.ts';
 import { extractScenarios } from './fixtures/extract-scenarios.ts';
 
 const COMPARISON_METRICS = [
@@ -15,20 +16,26 @@ const COMPARISON_METRICS = [
   'jsHeapDelta',
 ];
 
-function percentChange(baseline: number, current: number): number {
-  if (baseline === 0) return current === 0 ? 0 : 100;
-  return ((current - baseline) / Math.abs(baseline)) * 100;
-}
-
 function parseArg(args: string[], flag: string): string | undefined {
   const idx = args.indexOf(flag);
   return idx !== -1 ? args[idx + 1] : undefined;
+}
+
+/** Read the Playwright version embedded in a JSON reporter output file. */
+function readPlaywrightVersion(filePath: string): string | undefined {
+  try {
+    const data = JSON.parse(readFileSync(filePath, 'utf-8')) as { config?: { version?: string } };
+    return data.config?.version;
+  } catch {
+    return undefined;
+  }
 }
 
 function main(): void {
   const args = process.argv.slice(2);
   const threshold = parseFloat(parseArg(args, '--threshold') ?? '25');
   const outputPath = parseArg(args, '--output');
+  const failOnVersionMismatch = args.includes('--fail-on-version-mismatch');
 
   const baselinePath = resolve(
     parseArg(args, '--baseline') ?? resolve(import.meta.dirname, 'baselines/baseline.json'),
@@ -63,16 +70,36 @@ function main(): void {
     lines.push(line);
   };
 
-  emit(`\n## Performance Comparison (threshold: ${threshold}%)\n`);
-  emit('| Scenario | Metric | Baseline p95 | Current p95 | Change |');
-  emit('|----------|--------|-------------|------------|--------|');
+  emit(`\n## Performance Comparison (threshold: ${threshold}% on median)\n`);
+
+  // Environment metadata: surface the Playwright version on both sides so
+  // browser-build drift isn't silently attributed to code (issue #42, problem 6).
+  const baselineVersion = readPlaywrightVersion(baselinePath);
+  const currentVersion = readPlaywrightVersion(latestPath);
+  emit(`- Baseline Playwright: **${baselineVersion ?? 'unknown'}**`);
+  emit(`- Current Playwright: **${currentVersion ?? 'unknown'}**`);
+
+  const versionMismatch =
+    !!baselineVersion && !!currentVersion && baselineVersion !== currentVersion;
+  if (versionMismatch) {
+    emit(
+      `\n> ⚠️ **Playwright version mismatch** (baseline ${baselineVersion} vs current ${currentVersion}). ` +
+        'Baseline and current numbers come from different browser builds — differences may be ' +
+        'environmental, not code. Regenerate the baseline on the current Playwright ' +
+        '(`npm run perf:baseline`).',
+    );
+  }
+  emit('');
+
+  emit('| Scenario | Metric | Baseline median | Current median | Change | Status |');
+  emit('|----------|--------|-----------------|----------------|--------|--------|');
 
   let hasRegression = false;
 
   for (const [name, baselineReport] of baseline) {
     const currentReport = latest.get(name);
     if (!currentReport) {
-      emit(`| ${name} | - | - | - | MISSING |`);
+      emit(`| ${name} | - | - | - | - | MISSING |`);
       continue;
     }
 
@@ -82,16 +109,18 @@ function main(): void {
 
       if (!bMetric || !cMetric) continue;
 
-      const change = percentChange(bMetric.p95, cMetric.p95);
-      const changeStr = `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`;
-      const flag = change > threshold ? ' REGRESSION' : '';
-
-      if (change > threshold) {
+      const evaluation = evaluateMetric(metric, bMetric, cMetric, threshold);
+      const changeStr = `${evaluation.percentChange >= 0 ? '+' : ''}${evaluation.percentChange.toFixed(1)}%`;
+      let status = 'ok';
+      if (evaluation.regression) {
+        status = 'REGRESSION';
         hasRegression = true;
+      } else if (evaluation.suppressed) {
+        status = 'noise (below floor)';
       }
 
       emit(
-        `| ${name} | ${metric} | ${bMetric.p95.toFixed(1)} | ${cMetric.p95.toFixed(1)} | ${changeStr}${flag} |`,
+        `| ${name} | ${metric} | ${evaluation.baseline.toFixed(1)} | ${evaluation.current.toFixed(1)} | ${changeStr} | ${status} |`,
       );
     }
   }
@@ -99,7 +128,7 @@ function main(): void {
   emit('');
 
   if (hasRegression) {
-    emit(`**Performance regression detected** (>${threshold}% on p95 values).`);
+    emit(`**Performance regression detected** (>${threshold}% on median, above the noise floor).`);
   } else {
     emit('No significant regressions detected.');
   }
@@ -108,7 +137,7 @@ function main(): void {
     writeFileSync(outputPath, lines.join('\n') + '\n');
   }
 
-  if (hasRegression) {
+  if (hasRegression || (versionMismatch && failOnVersionMismatch)) {
     process.exit(1);
   }
 }
