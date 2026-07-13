@@ -287,4 +287,13 @@ export class DemoPage {
   async enableConstrainToContainer(): Promise<void> {
     await this.page.getByTestId('constrain-to-container-checkbox').click();
   }
+
+  /**
+   * Disable the List 2 droppable (verbose API) so it rejects drops and
+   * keyboard cross-list navigation.
+   */
+  async disableList2Droppable(): Promise<void> {
+    await this.page.getByTestId('disable-list2-droppable-checkbox').check();
+    await expect(this.list2Container).toHaveAttribute('data-droppable-disabled', 'true');
+  }
 }

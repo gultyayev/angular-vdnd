@@ -207,12 +207,24 @@ export class KeyboardDragHandler {
   complete(): void {
     const ctx = this.#deps.getContext();
     const sourceIndex = this.#deps.dragState.sourceIndex() ?? 0;
-    const destinationIndex = normalizeDropDestinationIndex({
-      sourceIndex,
-      placeholderIndex: this.#deps.dragState.placeholderIndex(),
-      sourceDroppableId: this.#deps.dragState.sourceDroppableId(),
-      activeDroppableId: this.#deps.dragState.activeDroppableId(),
-    });
+    const activeDroppableId = this.#deps.dragState.activeDroppableId();
+
+    // Revalidate the active target: it may have been disabled after the drag navigated
+    // into it. A disabled (or missing) target is not a valid drop — report no destination.
+    // The droppable's own disabled guard suppresses the drop event, keeping dragEnd and
+    // drop consistent (non-cancelled dragEnd with destinationIndex: null, no drop).
+    const hasValidTarget =
+      activeDroppableId !== null &&
+      !this.#deps.positionCalculator.isDroppableDisabledById(activeDroppableId);
+
+    const destinationIndex = hasValidTarget
+      ? normalizeDropDestinationIndex({
+          sourceIndex,
+          placeholderIndex: this.#deps.dragState.placeholderIndex(),
+          sourceDroppableId: this.#deps.dragState.sourceDroppableId(),
+          activeDroppableId,
+        })
+      : null;
 
     // Remove document listener
     this.#cleanupDocumentListener();

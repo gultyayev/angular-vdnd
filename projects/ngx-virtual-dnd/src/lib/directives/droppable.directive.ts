@@ -44,6 +44,7 @@ import { normalizeDropDestinationIndex } from '../utils/drop-index-normalization
   host: {
     '[attr.data-droppable-id]': 'vdndDroppable()',
     '[attr.data-droppable-group]': 'effectiveGroup()',
+    '[attr.data-droppable-disabled]': 'disabled() || null',
     '[attr.data-constrain-to-container]': 'constrainToContainer() || null',
     '[attr.aria-dropeffect]': '"move"',
     '[class.vdnd-droppable]': 'true',
@@ -117,6 +118,13 @@ export class DroppableDirective implements OnDestroy {
   #cachedDragState: DragState | null = null;
 
   /**
+   * The terminal drag snapshot this droppable has already processed. `endedDragState`
+   * persists until the next drag starts, so this guards against replaying the same drop
+   * when the effect re-runs (e.g. `disabled()` toggling) after the drag has ended.
+   */
+  #handledEndedState: DragState | null = null;
+
+  /**
    * Check if this element is actually scrollable.
    */
   #isScrollable(): boolean {
@@ -169,14 +177,28 @@ export class DroppableDirective implements OnDestroy {
         this.#cachedDragState = untracked(() => this.#dragState.getStateSnapshot());
       }
 
-      // Handle drag end (drop)
-      if (!isDragging && this.#wasActive && draggedItem === null) {
-        // Check if drag was cancelled (e.g., Escape key)
-        if (!this.#dragState.wasCancelled()) {
-          // Drag ended normally - this is a drop
-          this.#handleDrop();
+      // Handle drag end (drop). This droppable is the release target when it was either
+      // observed active during the drag (#wasActive) OR named as the target in the ended
+      // drag snapshot. The snapshot path covers the pointer-up flush, where the final
+      // position is processed and the state cleared in the same synchronous task, so this
+      // effect never observes isActive() === true mid-drag and #wasActive stays false.
+      const endedState = untracked(() => this.#dragState.endedDragState());
+      const endedTargetedThis = endedState?.activeDroppableId === this.vdndDroppable();
+
+      if (!isDragging && draggedItem === null && (this.#wasActive || endedTargetedThis)) {
+        // Consume each terminal snapshot exactly once. endedDragState persists until the
+        // next drag starts and disabled()/other inputs re-run this effect, so without a
+        // per-snapshot guard a later state change would replay the same historical drop.
+        if (endedState !== this.#handledEndedState) {
+          this.#handledEndedState = endedState;
+          // Emit only for an enabled target that ended normally. A target disabled at
+          // release still consumes the snapshot (so re-enabling can't resurrect the drop)
+          // but emits nothing, keeping dragEnd and drop consistent.
+          if (!this.disabled() && !this.#dragState.wasCancelled()) {
+            this.#handleDrop();
+          }
+          this.#cachedDragState = null;
         }
-        this.#cachedDragState = null;
       }
 
       // Clear cached state when leaving without dropping

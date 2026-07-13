@@ -35,6 +35,9 @@ export class PositionCalculatorService {
   /** Data attribute used to identify droppable groups */
   readonly #DROPPABLE_GROUP_ATTR = 'data-droppable-group';
 
+  /** Data attribute reflecting a droppable's disabled state (present === disabled) */
+  readonly #DROPPABLE_DISABLED_ATTR = 'data-droppable-disabled';
+
   /** Data attribute used to identify draggable elements */
   readonly #DRAGGABLE_ID_ATTR = 'data-draggable-id';
 
@@ -176,6 +179,11 @@ export class PositionCalculatorService {
 
   /**
    * Query all droppable elements belonging to a group, in document order.
+   *
+   * All group members are included — the disabled check happens per-frame in
+   * {@link #hitTest} rather than here, because a droppable can be disabled or
+   * re-enabled mid-drag (e.g. a consumer disabling incompatible targets from a
+   * `(dragStart)` handler, which fires AFTER the candidate snapshot is captured).
    */
   #queryDroppables(groupName: string): HTMLElement[] {
     if (typeof document === 'undefined') {
@@ -185,17 +193,36 @@ export class PositionCalculatorService {
   }
 
   /**
+   * Whether a droppable element is currently disabled (reflected via the
+   * `data-droppable-disabled` attribute by `DroppableDirective`). Read live on each
+   * hit-test / navigation step so disabled↔enabled transitions during an active drag
+   * take effect immediately. Disabled droppables are excluded from all drag-time
+   * candidate sets — pointer hit-testing and keyboard cross-list navigation.
+   */
+  #isDroppableDisabled(el: HTMLElement): boolean {
+    return el.hasAttribute(this.#DROPPABLE_DISABLED_ATTR);
+  }
+
+  /**
    * Geometric hit-test: return the last candidate (in document order) whose rect
    * contains the point. "Last in document order" reproduces the painter's-order
    * tie-break that `elementFromPoint` provided for free — a nested or later
    * overlapping droppable is painted on top of an earlier/ancestor one.
+   *
+   * Currently-disabled candidates are skipped here (not filtered from the snapshot) so
+   * that toggling `disabled` mid-drag takes effect on the very next frame. The check is
+   * a cheap `hasAttribute` read that does not force layout, keeping the loop hot.
    */
   #hitTest(x: number, y: number, candidates: HTMLElement[], rects: DOMRect[]): HTMLElement | null {
     let match: HTMLElement | null = null;
     for (let i = 0; i < candidates.length; i++) {
+      const candidate = candidates[i];
+      if (this.#isDroppableDisabled(candidate)) {
+        continue;
+      }
       const r = rects[i];
       if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-        match = candidates[i];
+        match = candidate;
       }
     }
     return match;
@@ -371,7 +398,10 @@ export class PositionCalculatorService {
     direction: 'left' | 'right',
     groupName: string,
   ): { element: HTMLElement; id: string; itemCount: number } | null {
-    // Find all droppables in the same group
+    // Include disabled droppables when establishing left-to-right order and locating the
+    // current container — otherwise a container disabled mid-drag (its own index becomes
+    // -1) would trap the drag with no reachable neighbour. Disabled droppables are skipped
+    // as *targets* during the outward scan below instead.
     const allDroppables = queryAllByAttribute<HTMLElement>(
       document,
       this.#DROPPABLE_GROUP_ATTR,
@@ -382,8 +412,9 @@ export class PositionCalculatorService {
       return null;
     }
 
-    // Get bounding rects and IDs, sorted by X position
-    const droppableInfos: { element: HTMLElement; id: string; rect: DOMRect }[] = [];
+    // Get bounding rects, IDs, and disabled state, sorted by X position
+    const droppableInfos: { element: HTMLElement; id: string; rect: DOMRect; disabled: boolean }[] =
+      [];
 
     allDroppables.forEach((el) => {
       const htmlEl = el as HTMLElement;
@@ -393,6 +424,7 @@ export class PositionCalculatorService {
           element: htmlEl,
           id,
           rect: htmlEl.getBoundingClientRect(),
+          disabled: this.#isDroppableDisabled(htmlEl),
         });
       }
     });
@@ -400,28 +432,39 @@ export class PositionCalculatorService {
     // Sort by X position (left to right)
     droppableInfos.sort((a, b) => a.rect.left - b.rect.left);
 
-    // Find current droppable index
+    // Find current droppable index (among all, including a now-disabled current container)
     const currentIndex = droppableInfos.findIndex((d) => d.id === currentDroppableId);
     if (currentIndex === -1) {
       return null;
     }
 
-    // Get the adjacent droppable
-    const targetIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
-    if (targetIndex < 0 || targetIndex >= droppableInfos.length) {
-      return null;
+    // Scan outward in the requested direction, skipping disabled droppables, until the
+    // first enabled neighbour (or run off the end of the list).
+    const step = direction === 'left' ? -1 : 1;
+    for (let i = currentIndex + step; i >= 0 && i < droppableInfos.length; i += step) {
+      const target = droppableInfos[i];
+      if (target.disabled) {
+        continue;
+      }
+      return {
+        element: target.element,
+        id: target.id,
+        itemCount: this.#getDroppableItemCount(target.element),
+      };
     }
 
-    const target = droppableInfos[targetIndex];
+    return null;
+  }
 
-    // Get item count from the target droppable
-    const itemCount = this.#getDroppableItemCount(target.element);
-
-    return {
-      element: target.element,
-      id: target.id,
-      itemCount,
-    };
+  /**
+   * Whether the droppable with the given ID is currently disabled. A droppable that cannot
+   * be found is reported as disabled (treat missing as not a valid target). Used to
+   * revalidate a keyboard drag's active target at drop time, since it may have been disabled
+   * after the drag navigated into it.
+   */
+  isDroppableDisabledById(id: string): boolean {
+    const element = this.getDroppableById(id);
+    return element === null || this.#isDroppableDisabled(element);
   }
 
   /**

@@ -211,7 +211,7 @@ Marks an element as a drop target.
 | `vdndDroppable` | `string` | - | Yes | Unique droppable ID |
 | `vdndDroppableGroup` | `string` | `undefined` | No | Group name (or inherit from parent `vdndGroup`) |
 | `vdndDroppableData` | `unknown` | `undefined` | No | Custom data (available in `DropDestination.data`) |
-| `disabled` | `boolean` | `false` | No | Disable dropping |
+| `disabled` | `boolean` | `false` | No | Disable dropping. Excluded from pointer hit-testing and keyboard cross-list navigation; releasing over it fires no `drop` and yields `dragEnd` with `destinationIndex: null` |
 | `autoScrollEnabled` | `boolean` | `true` | No | Enable edge auto-scrolling |
 | `autoScrollConfig` | `Partial<AutoScrollConfig>` | `{}` | No | Auto-scroll configuration |
 | `constrainToContainer` | `boolean` | `false` | No | Clamp drag to container boundaries |
@@ -353,6 +353,8 @@ interface DragEndEvent {
   destinationIndex: number | null;
 }
 ```
+
+`destinationIndex` is `null` when there is no valid drop target — a cancelled drag (Escape) or a release over a disabled droppable / outside every droppable. A non-`null` value pairs with a `drop` event on the destination.
 
 ---
 

@@ -320,6 +320,8 @@ Use the `disabled` input to conditionally disable draggables, droppables, or ent
 
 Disabled draggables get the `vdnd-draggable-disabled` CSS class. Disabled droppables get `vdnd-droppable-disabled`.
 
+A disabled droppable is removed from all drag-time candidate sets: pointer hit-testing skips it (the cursor falls through to whatever enabled droppable sits underneath, or none) and keyboard `ArrowLeft`/`ArrowRight` navigation steps over it. Releasing a drag over a disabled droppable fires **no `drop` event**; the `(dragEnd)` event still fires with `cancelled: false` and `destinationIndex: null`, so consumers that pair `drop`/`dragEnd` should treat a `null` `destinationIndex` as "no valid drop target".
+
 ### Low-Level API
 
 For maximum control, use individual components instead of `VirtualSortableListComponent`:
@@ -446,11 +448,13 @@ export class MyComponent {
   }
 
   announceEnd(e: DragEndEvent) {
-    this.announce(
-      e.cancelled
-        ? `Cancelled. Returned to position ${e.sourceIndex + 1}`
-        : `Dropped at position ${e.destinationIndex! + 1}`,
-    );
+    // destinationIndex is null when there is no valid drop target: an Escape cancel,
+    // a release outside every droppable, or a release over a disabled droppable.
+    if (e.destinationIndex === null) {
+      this.announce(`Returned to position ${e.sourceIndex + 1}`);
+      return;
+    }
+    this.announce(`Dropped at position ${e.destinationIndex + 1}`);
   }
 }
 ```
@@ -489,7 +493,7 @@ All event types are importable from `ngx-virtual-dnd`.
 | `(dragEnd)`   | `DragEndEvent`   | `DraggableDirective`                                 |
 | `(drop)`      | `DropEvent`      | `DroppableDirective`, `VirtualSortableListComponent` |
 
-`DragEndEvent` includes a `cancelled` boolean to distinguish drops from cancellations.
+`DragEndEvent.destinationIndex` is `null` when no drop occurred — an Escape cancel, a release outside every droppable, or a release over a disabled droppable — so branch on `destinationIndex === null` to detect that. The `cancelled` boolean is `true` only for an active Escape cancel.
 
 ## How It Works
 

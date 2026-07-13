@@ -67,6 +67,7 @@ describe('KeyboardDragHandler', () => {
       getDroppableParent: jest.fn().mockReturnValue(createElement()),
       getDroppableId: jest.fn().mockReturnValue('list-1'),
       findAdjacentDroppable: jest.fn(),
+      isDroppableDisabledById: jest.fn().mockReturnValue(false),
     };
 
     mockDragIndexCalculator = {
@@ -359,6 +360,23 @@ describe('KeyboardDragHandler', () => {
         }),
       );
       expect(mockKeyboardDrag.completeKeyboardDrag).toHaveBeenCalled();
+    });
+
+    it('reports no destination when the active target was disabled mid-drag', () => {
+      mockDragState.sourceIndex.mockReturnValue(1);
+      mockDragState.placeholderIndex.mockReturnValue(3);
+      mockDragState.activeDroppableId.mockReturnValue('list-2');
+      // list-2 was disabled after the drag navigated into it.
+      mockPositionCalculator.isDroppableDisabledById.mockReturnValue(true);
+
+      handler.complete();
+
+      expect(mockCallbacks.onDragEnd).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cancelled: false,
+          destinationIndex: null,
+        }),
+      );
     });
 
     it('normalizes destination index for a same-list no-op drop', () => {

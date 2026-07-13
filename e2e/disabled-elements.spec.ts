@@ -145,6 +145,83 @@ test.describe('Disabled Elements', () => {
     await expect(firstItem).toHaveClass(/vdnd-draggable/);
   });
 
+  test.describe('disabled droppable (destination)', () => {
+    test('should not fire a drop when released over a disabled droppable', async ({ page }) => {
+      await demoPage.disableList2Droppable();
+
+      const initialList1Count = await demoPage.getItemCount('list1');
+      const initialList2Count = await demoPage.getItemCount('list2');
+      const draggedText = await demoPage.getItemText('list1', 0);
+
+      const sourceItem = demoPage.list1Items.first();
+      await sourceItem.scrollIntoViewIfNeeded();
+      await demoPage.list2VirtualScroll.scrollIntoViewIfNeeded();
+      const sourceBox = await sourceItem.boundingBox();
+      const targetBox = await demoPage.list2VirtualScroll.boundingBox();
+      if (!sourceBox || !targetBox) {
+        throw new Error('Could not get bounding boxes for drag operation');
+      }
+
+      const targetX = targetBox.x + targetBox.width / 2;
+      const targetY = targetBox.y + Math.min(80, targetBox.height / 2);
+
+      await sourceItem.hover();
+      await page.mouse.down();
+      await page.mouse.move(
+        sourceBox.x + sourceBox.width / 2 + 10,
+        sourceBox.y + sourceBox.height / 2 + 10,
+        { steps: 2 },
+      );
+      await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+
+      // Move over the disabled List 2 droppable and release immediately — no RAF settle.
+      // The drop must resolve against the release position (the disabled list), which the
+      // synchronous pointer-up flush in #endDrag guarantees even if no frame was processed.
+      await page.mouse.move(targetX, targetY, { steps: 15 });
+      await page.mouse.move(targetX, targetY);
+      await page.mouse.up();
+      await expect(demoPage.dragPreview).not.toBeVisible({ timeout: 2000 });
+
+      // dragEnd must fire (non-cancelled) but report no destination — no drop event.
+      const appDemo = page.locator('app-demo');
+      await expect(appDemo).toHaveAttribute('data-last-drag-end-cancelled', 'false');
+      expect(await appDemo.getAttribute('data-last-drag-end-destination-index')).toBeNull();
+
+      // Counts unchanged and the item stays in List 1 — the disabled container did not swallow it.
+      expect(await demoPage.getItemCount('list1')).toBe(initialList1Count);
+      expect(await demoPage.getItemCount('list2')).toBe(initialList2Count);
+      expect(await demoPage.getItemText('list1', 0)).toBe(draggedText);
+    });
+
+    test('keyboard ArrowRight does not navigate into a disabled droppable', async () => {
+      await demoPage.disableList2Droppable();
+
+      const initialList1Count = await demoPage.getItemCount('list1');
+      const initialList2Count = await demoPage.getItemCount('list2');
+      const draggedText = await demoPage.getItemText('list1', 0);
+
+      await demoPage.startKeyboardDrag('list1', 0);
+      await expect(demoPage.dragPreview).toBeVisible();
+
+      // Attempt to cross into the disabled List 2.
+      await demoPage.keyboardMoveToList('right');
+
+      // Navigation must be rejected: no placeholder appears in List 2, it stays in List 1.
+      await expect(
+        demoPage.list2Container.locator('.vdnd-drag-placeholder-visible'),
+      ).not.toBeVisible();
+      await expect(demoPage.list1Container.locator('.vdnd-drag-placeholder-visible')).toBeVisible();
+
+      await demoPage.keyboardDrop();
+      await expect(demoPage.dragPreview).not.toBeVisible();
+
+      // Item never left List 1.
+      expect(await demoPage.getItemCount('list1')).toBe(initialList1Count);
+      expect(await demoPage.getItemCount('list2')).toBe(initialList2Count);
+      expect(await demoPage.getItemText('list1', 0)).toBe(draggedText);
+    });
+  });
+
   test('should handle drag delay with disabled state correctly', async ({ page }) => {
     // Set a drag delay
     const delayInput = page.locator('[data-testid="drag-delay-input"]');

@@ -677,6 +677,17 @@ export class DraggableDirective implements OnInit, OnDestroy {
    * End the drag operation.
    */
   #endDrag(cancelled: boolean): void {
+    // Flush the final pointer position for a real drop. Pointer moves only QUEUE a cursor
+    // for the next RAF tick; on release the scheduler is stopped below and any un-processed
+    // cursor is discarded, so without this the drop would resolve against the last
+    // RAF-PROCESSED position — a release that just entered a different (e.g. newly disabled)
+    // droppable could otherwise land on the previously-targeted one. Guarded on group
+    // presence so it never re-enters #endDrag via #updateDrag's group-lost cancel path.
+    // Cancels skip this: their destination is intentionally null.
+    if (!cancelled && this.#lastRawPosition && this.isDragging() && this.#effectiveGroup()) {
+      this.#updateDrag(this.#lastRawPosition);
+    }
+
     // Stop the scheduler RAF loop first, then remove the autoscroll participant.
     this.#scheduler.stop();
     this.#autoScroll.stopMonitoring();

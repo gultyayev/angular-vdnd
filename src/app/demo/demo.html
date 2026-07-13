@@ -254,6 +254,27 @@
                 </span>
                 <span class="check-lbl">Constrain to container</span>
               </label>
+              <label class="check">
+                <input
+                  type="checkbox"
+                  [checked]="list2DroppableDisabled()"
+                  (change)="toggleList2DroppableDisabled($event)"
+                  data-testid="disable-list2-droppable-checkbox"
+                />
+                <span class="check-box" aria-hidden="true">
+                  <svg viewBox="0 0 14 14">
+                    <path
+                      d="M3 7.2 5.8 10 11 4.2"
+                      fill="none"
+                      stroke-width="2.2"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </span>
+                <span class="check-lbl">Disable List 2 drop target</span>
+              </label>
             </div>
 
             <!-- API mode -->
@@ -444,6 +465,7 @@
               class="list"
               vdndDroppable="list-2"
               vdndDroppableGroup="demo"
+              [disabled]="list2DroppableDisabled()"
               [constrainToContainer]="constrainToContainer()"
               (drop)="onDrop($event)"
             >

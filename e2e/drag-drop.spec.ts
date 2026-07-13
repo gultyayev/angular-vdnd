@@ -136,6 +136,50 @@ test.describe('Drag and Drop', () => {
       String(sourceIndex),
     );
   });
+
+  test('emits a cross-list drop when released immediately over the target (no settle)', async ({
+    page,
+  }) => {
+    // Guards the pointer-up flush: the release position is applied synchronously at mouseup,
+    // so the destination droppable emits its drop even when no RAF frame processed the final
+    // move. Without the flush the drop would resolve against the last processed frame (the
+    // source list) and no drop event would fire for the target.
+    const initialList1 = await demoPage.getItemCount('list1');
+    const initialList2 = await demoPage.getItemCount('list2');
+    const movedText = await demoPage.getItemText('list1', 0);
+
+    const sourceItem = demoPage.list1Items.first();
+    await sourceItem.scrollIntoViewIfNeeded();
+    await demoPage.list2VirtualScroll.scrollIntoViewIfNeeded();
+    const sourceBox = await sourceItem.boundingBox();
+    const targetBox = await demoPage.list2VirtualScroll.boundingBox();
+    if (!sourceBox || !targetBox) {
+      throw new Error('Could not get bounding boxes for immediate cross-list drop');
+    }
+
+    await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(
+      sourceBox.x + sourceBox.width / 2 + 10,
+      sourceBox.y + sourceBox.height / 2 + 10,
+      { steps: 2 },
+    );
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+
+    // Move onto the enabled target near its top and release immediately — no RAF wait,
+    // no settleDragPosition (settling would let a frame process the move and mask the flush).
+    const targetX = targetBox.x + targetBox.width / 2;
+    const targetY = targetBox.y + 25;
+    await page.mouse.move(targetX, targetY, { steps: 15 });
+    await page.mouse.move(targetX, targetY);
+    await page.mouse.up();
+    await expect(demoPage.dragPreview).not.toBeVisible({ timeout: 2000 });
+
+    // A drop fired: the item moved from list1 to list2.
+    await expect.poll(() => demoPage.getItemCount('list1')).toBe(initialList1 - 1);
+    await expect.poll(() => demoPage.getItemCount('list2')).toBe(initialList2 + 1);
+    expect(await demoPage.getItemText('list2', 0)).toBe(movedText);
+  });
 });
 
 test.describe('Drag and Drop - Simplified API Mode', () => {

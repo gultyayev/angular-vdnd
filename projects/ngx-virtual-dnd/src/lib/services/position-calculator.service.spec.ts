@@ -441,4 +441,136 @@ describe('PositionCalculatorService', () => {
       expect(service.findAdjacentDroppable('left', 'right', group)?.element).toBe(right);
     });
   });
+
+  describe('disabled droppable filtering', () => {
+    const createdDisabled: HTMLElement[] = [];
+
+    function stub(el: HTMLElement, rect: Partial<DOMRect>): void {
+      el.getBoundingClientRect = () =>
+        ({
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: 0,
+          height: 0,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+          ...rect,
+        }) as DOMRect;
+    }
+
+    function make(
+      id: string,
+      group: string,
+      rect: Partial<DOMRect>,
+      disabled = false,
+    ): HTMLElement {
+      const el = document.createElement('div');
+      el.setAttribute('data-droppable-id', id);
+      el.setAttribute('data-droppable-group', group);
+      if (disabled) {
+        el.setAttribute('data-droppable-disabled', 'true');
+      }
+      stub(el, rect);
+      document.body.appendChild(el);
+      createdDisabled.push(el);
+      return el;
+    }
+
+    afterEach(() => {
+      service.endDragSession();
+      createdDisabled.forEach((el) => el.remove());
+      createdDisabled.length = 0;
+    });
+
+    it('excludes a disabled droppable from hit-test candidates (treated as no target)', () => {
+      const dragged = document.createElement('div');
+      make('disabled-list', 'g', { top: 100, left: 100, right: 300, bottom: 400 }, true);
+
+      service.beginDragSession('g');
+      expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBeNull();
+    });
+
+    it('excludes a droppable that becomes disabled during an active drag session', () => {
+      const dragged = document.createElement('div');
+      const drop = make('list', 'g', { top: 100, left: 100, right: 300, bottom: 400 });
+
+      service.beginDragSession('g');
+      expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBe(drop);
+
+      // Consumer disables it mid-drag (e.g. from a (dragStart) handler, which fires
+      // AFTER the candidate snapshot is captured). It must stop being a target.
+      drop.setAttribute('data-droppable-disabled', 'true');
+      expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBeNull();
+    });
+
+    it('includes a droppable that becomes enabled during an active drag session', () => {
+      const dragged = document.createElement('div');
+      const drop = make('list', 'g', { top: 100, left: 100, right: 300, bottom: 400 }, true);
+
+      service.beginDragSession('g');
+      expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBeNull();
+
+      // Consumer re-enables it mid-drag — it must become targetable again.
+      drop.removeAttribute('data-droppable-disabled');
+      expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBe(drop);
+    });
+
+    it('a disabled droppable does not occlude an enabled one it overlaps', () => {
+      const dragged = document.createElement('div');
+      const enabled = make('enabled', 'g', { top: 0, left: 0, right: 300, bottom: 300 });
+      // Later in document order (would win the painter-order tie-break) but disabled.
+      make('disabled', 'g', { top: 50, left: 50, right: 350, bottom: 350 }, true);
+
+      service.beginDragSession('g');
+      expect(service.findDroppableAtPoint(100, 100, dragged, 'g')).toBe(enabled);
+    });
+
+    it('excludes disabled droppables on the one-shot (no-session) path', () => {
+      const dragged = document.createElement('div');
+      make('disabled-list', 'g', { top: 100, left: 100, right: 300, bottom: 400 }, true);
+
+      expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBeNull();
+    });
+
+    it('skips a disabled droppable during adjacent (cross-list) navigation', () => {
+      make('left', 'g', { top: 0, left: 0, right: 100, bottom: 100 });
+      make('middle', 'g', { top: 0, left: 200, right: 300, bottom: 100 }, true);
+      const right = make('right', 'g', { top: 0, left: 400, right: 500, bottom: 100 });
+
+      const result = service.findAdjacentDroppable('left', 'right', 'g');
+      expect(result?.id).toBe('right');
+      expect(result?.element).toBe(right);
+    });
+
+    it('returns null when the only adjacent droppable is disabled', () => {
+      make('left', 'g', { top: 0, left: 0, right: 100, bottom: 100 });
+      make('right', 'g', { top: 0, left: 200, right: 300, bottom: 100 }, true);
+
+      expect(service.findAdjacentDroppable('left', 'right', 'g')).toBeNull();
+    });
+
+    it('navigates out of a disabled current container to an enabled neighbour', () => {
+      // The current container was disabled mid-drag (keyboard drag). Navigation must still
+      // be able to escape it toward an enabled neighbour rather than trapping the drag.
+      make('current', 'g', { top: 0, left: 0, right: 100, bottom: 100 }, true);
+      const right = make('right', 'g', { top: 0, left: 200, right: 300, bottom: 100 });
+
+      const result = service.findAdjacentDroppable('current', 'right', 'g');
+      expect(result?.id).toBe('right');
+      expect(result?.element).toBe(right);
+    });
+
+    it('reports a droppable as disabled by id via isDroppableDisabledById', () => {
+      make('enabled', 'g', { top: 0, left: 0, right: 100, bottom: 100 });
+      make('off', 'g', { top: 0, left: 200, right: 300, bottom: 100 }, true);
+
+      expect(service.isDroppableDisabledById('off')).toBe(true);
+      expect(service.isDroppableDisabledById('enabled')).toBe(false);
+      // A missing droppable is treated as not a valid target.
+      expect(service.isDroppableDisabledById('nonexistent')).toBe(true);
+    });
+  });
 });
