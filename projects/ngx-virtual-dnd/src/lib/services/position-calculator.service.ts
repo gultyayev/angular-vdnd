@@ -180,23 +180,24 @@ export class PositionCalculatorService {
   /**
    * Query all droppable elements belonging to a group, in document order.
    *
-   * Disabled droppables are filtered out here so the hot hit-test loop stays a plain
-   * geometry scan: a disabled container is treated as "no droppable" and the cursor
-   * falls through to whatever enabled candidate sits underneath (or none).
+   * All group members are included — the disabled check happens per-frame in
+   * {@link #hitTest} rather than here, because a droppable can be disabled or
+   * re-enabled mid-drag (e.g. a consumer disabling incompatible targets from a
+   * `(dragStart)` handler, which fires AFTER the candidate snapshot is captured).
    */
   #queryDroppables(groupName: string): HTMLElement[] {
     if (typeof document === 'undefined') {
       return [];
     }
-    return queryAllByAttribute<HTMLElement>(document, this.#DROPPABLE_GROUP_ATTR, groupName).filter(
-      (el) => !this.#isDroppableDisabled(el),
-    );
+    return queryAllByAttribute<HTMLElement>(document, this.#DROPPABLE_GROUP_ATTR, groupName);
   }
 
   /**
-   * Whether a droppable element is disabled (reflected via the `data-droppable-disabled`
-   * attribute by `DroppableDirective`). Disabled droppables are excluded from all
-   * drag-time candidate sets — pointer hit-testing and keyboard cross-list navigation.
+   * Whether a droppable element is currently disabled (reflected via the
+   * `data-droppable-disabled` attribute by `DroppableDirective`). Read live on each
+   * hit-test / navigation step so disabled↔enabled transitions during an active drag
+   * take effect immediately. Disabled droppables are excluded from all drag-time
+   * candidate sets — pointer hit-testing and keyboard cross-list navigation.
    */
   #isDroppableDisabled(el: HTMLElement): boolean {
     return el.hasAttribute(this.#DROPPABLE_DISABLED_ATTR);
@@ -207,13 +208,21 @@ export class PositionCalculatorService {
    * contains the point. "Last in document order" reproduces the painter's-order
    * tie-break that `elementFromPoint` provided for free — a nested or later
    * overlapping droppable is painted on top of an earlier/ancestor one.
+   *
+   * Currently-disabled candidates are skipped here (not filtered from the snapshot) so
+   * that toggling `disabled` mid-drag takes effect on the very next frame. The check is
+   * a cheap `hasAttribute` read that does not force layout, keeping the loop hot.
    */
   #hitTest(x: number, y: number, candidates: HTMLElement[], rects: DOMRect[]): HTMLElement | null {
     let match: HTMLElement | null = null;
     for (let i = 0; i < candidates.length; i++) {
+      const candidate = candidates[i];
+      if (this.#isDroppableDisabled(candidate)) {
+        continue;
+      }
       const r = rects[i];
       if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-        match = candidates[i];
+        match = candidate;
       }
     }
     return match;

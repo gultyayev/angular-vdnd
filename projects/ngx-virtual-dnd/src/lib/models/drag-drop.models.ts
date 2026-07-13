@@ -129,13 +129,22 @@ export interface DragEndEvent {
   draggableId: string;
   /** ID of the droppable container the item originated from */
   droppableId: string;
-  /** Whether the drag was cancelled (escaped, dropped outside) */
+  /**
+   * Whether the drag was actively cancelled (Escape key). Releasing over no valid
+   * target (outside any droppable, or over a disabled droppable) is NOT a cancel —
+   * it reports `cancelled: false` with `destinationIndex: null`. Branch on
+   * `destinationIndex === null` to detect "no drop occurred".
+   */
   cancelled: boolean;
   /** Optional user-provided data associated with the item */
   data?: unknown;
   /** Original 0-indexed position in source list (for cancel announcements) */
   sourceIndex: number;
-  /** Final 0-indexed position (null if cancelled) */
+  /**
+   * Final 0-indexed insertion position, or `null` when there is no valid drop target —
+   * a cancelled drag, a release outside every droppable, or a release over a disabled
+   * droppable. A non-null value pairs with a `DropEvent` on the destination.
+   */
   destinationIndex: number | null;
 }
 

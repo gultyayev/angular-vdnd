@@ -174,11 +174,11 @@ test.describe('Disabled Elements', () => {
       );
       await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
 
-      // Move over the disabled List 2 droppable.
+      // Move over the disabled List 2 droppable and release immediately — no RAF settle.
+      // The drop must resolve against the release position (the disabled list), which the
+      // synchronous pointer-up flush in #endDrag guarantees even if no frame was processed.
       await page.mouse.move(targetX, targetY, { steps: 15 });
       await page.mouse.move(targetX, targetY);
-      // Position update is rAF-throttled — wait one frame before releasing.
-      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
       await page.mouse.up();
       await expect(demoPage.dragPreview).not.toBeVisible({ timeout: 2000 });
 

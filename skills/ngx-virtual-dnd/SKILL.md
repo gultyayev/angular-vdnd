@@ -608,11 +608,13 @@ export class MyComponent {
   }
 
   announceEnd(event: DragEndEvent): void {
-    this.announce(
-      event.cancelled
-        ? `Cancelled. Returned to position ${event.sourceIndex + 1}`
-        : `Dropped at position ${event.destinationIndex! + 1}`,
-    );
+    // destinationIndex is null when there is no valid drop target: an Escape cancel,
+    // a release outside every droppable, or a release over a disabled droppable.
+    if (event.destinationIndex === null) {
+      this.announce(`Returned to position ${event.sourceIndex + 1}`);
+      return;
+    }
+    this.announce(`Dropped at position ${event.destinationIndex + 1}`);
   }
 }
 ```
@@ -646,7 +648,7 @@ export class MyComponent {
 | `(dragEnd)` | `DragEndEvent` | `DraggableDirective` |
 | `(drop)` | `DropEvent` | `DroppableDirective`, `VirtualSortableListComponent` |
 
-`DragEndEvent.cancelled` distinguishes drops from cancellations. `DragEndEvent.sourceIndex` and `DragEndEvent.destinationIndex` provide 0-indexed positions for announcements.
+`DragEndEvent.sourceIndex` and `DragEndEvent.destinationIndex` provide 0-indexed positions for announcements. To detect whether a drop actually occurred, branch on `destinationIndex === null` (no valid target — Escape cancel, release outside every droppable, or release over a disabled droppable). `cancelled` is `true` only for an active Escape cancel, so it does not by itself distinguish drops from no-op releases.
 
 ## Critical Rules
 

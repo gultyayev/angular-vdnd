@@ -493,6 +493,31 @@ describe('PositionCalculatorService', () => {
       expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBeNull();
     });
 
+    it('excludes a droppable that becomes disabled during an active drag session', () => {
+      const dragged = document.createElement('div');
+      const drop = make('list', 'g', { top: 100, left: 100, right: 300, bottom: 400 });
+
+      service.beginDragSession('g');
+      expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBe(drop);
+
+      // Consumer disables it mid-drag (e.g. from a (dragStart) handler, which fires
+      // AFTER the candidate snapshot is captured). It must stop being a target.
+      drop.setAttribute('data-droppable-disabled', 'true');
+      expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBeNull();
+    });
+
+    it('includes a droppable that becomes enabled during an active drag session', () => {
+      const dragged = document.createElement('div');
+      const drop = make('list', 'g', { top: 100, left: 100, right: 300, bottom: 400 }, true);
+
+      service.beginDragSession('g');
+      expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBeNull();
+
+      // Consumer re-enables it mid-drag — it must become targetable again.
+      drop.removeAttribute('data-droppable-disabled');
+      expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBe(drop);
+    });
+
     it('a disabled droppable does not occlude an enabled one it overlaps', () => {
       const dragged = document.createElement('div');
       const enabled = make('enabled', 'g', { top: 0, left: 0, right: 300, bottom: 300 });
