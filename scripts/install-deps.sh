@@ -5,3 +5,4 @@ if [ "$CLAUDE_CODE_REMOTE" != "true" ]; then
 fi
 
 npm ci
+npx playwright install --with-deps chromium firefox webkit
