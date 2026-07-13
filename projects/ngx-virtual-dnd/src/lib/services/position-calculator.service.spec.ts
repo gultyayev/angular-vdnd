@@ -350,12 +350,13 @@ describe('PositionCalculatorService', () => {
       expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBe(drop);
     });
 
-    it('excludes disabled droppables from hit-test candidates', () => {
+    it('lets an enabled droppable win when a disabled droppable overlaps it', () => {
       const dragged = document.createElement('div');
       const enabled = makeDroppable('enabled', 'g', { top: 0, left: 0, right: 200, bottom: 200 });
       const disabled = makeDroppable('disabled', 'g', { top: 0, left: 0, right: 200, bottom: 200 });
       disabled.setAttribute('data-droppable-disabled', 'true');
 
+      // Regression for #22: a later disabled droppable overlaps the enabled target.
       service.beginDragSession('g');
 
       expect(service.findDroppableAtPoint(100, 100, dragged, 'g')).toBe(enabled);
