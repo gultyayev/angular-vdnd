@@ -1,4 +1,4 @@
-import { expect, Page, test } from '@playwright/test';
+import { expect, Locator, Page, test } from '@playwright/test';
 import { DemoPage } from './fixtures/demo.page';
 
 interface DriftSnapshot {
@@ -119,6 +119,30 @@ async function waitForDriftSnapshot(
   return matchingSnapshot;
 }
 
+interface DragStartBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+async function startPointerDragFromBox(
+  page: Page,
+  dragPreview: Locator,
+  box: DragStartBox,
+): Promise<void> {
+  const startX = box.x + box.width / 2;
+  const startY = box.y + box.height / 2;
+
+  await expect(async () => {
+    await page.mouse.up().catch(() => undefined);
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 10, startY + 10, { steps: 3 });
+    await expect(dragPreview).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 5000 });
+}
+
 test.describe('Autoscroll Placeholder Drift', () => {
   let demoPage: DemoPage;
 
@@ -143,20 +167,13 @@ test.describe('Autoscroll Placeholder Drift', () => {
       throw new Error('Could not get bounding boxes');
     }
 
-    // Start drag from center of first item
-    const startX = itemBox.x + itemBox.width / 2;
-    const startY = itemBox.y + itemBox.height / 2;
-    await page.mouse.move(startX, startY);
-    await page.mouse.down();
-    // Small initial move to trigger drag detection
-    await page.mouse.move(startX + 5, startY + 5, { steps: 2 });
-
-    // Wait for drag preview to confirm drag started
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    // Start drag from center of first item and verify the preview mounted before autoscroll.
+    await startPointerDragFromBox(page, demoPage.dragPreview, itemBox);
 
     // Move to bottom edge to trigger autoscroll
-    const nearBottomY = containerBox.y + containerBox.height - 20;
+    const nearBottomY = containerBox.y + containerBox.height - 15;
     await page.mouse.move(containerBox.x + 100, nearBottomY, { steps: 10 });
+    await page.mouse.move(containerBox.x + 100, nearBottomY);
 
     const snapshot = await waitForDriftSnapshot(
       page,
@@ -206,16 +223,7 @@ test.describe('Autoscroll Placeholder Drift', () => {
     if (!sourceBox) {
       throw new Error('Could not get source item bounding box');
     }
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(
-      sourceBox.x + sourceBox.width / 2 + 10,
-      sourceBox.y + sourceBox.height / 2 + 10,
-      {
-        steps: 2,
-      },
-    );
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    await startPointerDragFromBox(page, demoPage.dragPreview, sourceBox);
 
     // 3. Move to bottom edge to trigger autoscroll
     const nearBottomY = containerBox.y + containerBox.height - 25;
