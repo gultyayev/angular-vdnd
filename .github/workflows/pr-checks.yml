@@ -33,7 +33,7 @@ jobs:
       - name: Validate PR title
         run: echo "${{ github.event.pull_request.title }}" | npx commitlint
 
-  quality-checks:
+  build-and-unit:
     name: Lint, Build & Unit Tests
     needs: pr-title
     if: github.event.action != 'edited'
@@ -75,7 +75,7 @@ jobs:
 
   e2e:
     name: E2E (${{ matrix.project }})
-    needs: quality-checks
+    needs: build-and-unit
     if: github.event.action != 'edited'
     runs-on: ubuntu-latest
     strategy:
@@ -125,3 +125,28 @@ jobs:
       # The github reporter annotates failures inline in the PR.
       - name: Run E2E tests
         run: npx playwright test --reporter=dot,github --fail-on-flaky-tests --project=${{ matrix.project }}
+
+  # Single, stable required-status context that aggregates the build/unit job and the whole
+  # E2E matrix. Keeping the job id `quality-checks` (no `name:` override) preserves the check
+  # name branch protection already knows, while `if: always()` guarantees the context is
+  # always reported — so it never gets stuck in "Expected — Waiting for status to be reported".
+  quality-checks:
+    needs: [build-and-unit, e2e]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate required checks
+        run: |
+          # Pure metadata edits (title/body) skip the heavy jobs; the code was already
+          # validated by the synchronize run on this same commit, so pass without re-running.
+          if [ "${{ github.event.action }}" = "edited" ]; then
+            echo "PR metadata edited; code checks unchanged for this commit — passing."
+            exit 0
+          fi
+          echo "build-and-unit: ${{ needs.build-and-unit.result }}"
+          echo "e2e:            ${{ needs.e2e.result }}"
+          if [ "${{ needs.build-and-unit.result }}" != "success" ] || [ "${{ needs.e2e.result }}" != "success" ]; then
+            echo "::error::One or more required checks did not succeed."
+            exit 1
+          fi
+          echo "All quality checks passed."
