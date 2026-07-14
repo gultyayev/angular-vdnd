@@ -34,6 +34,7 @@ jobs:
         run: echo "${{ github.event.pull_request.title }}" | npx commitlint
 
   quality-checks:
+    name: Lint, Build & Unit Tests
     needs: pr-title
     if: github.event.action != 'edited'
     runs-on: ubuntu-latest
@@ -64,8 +65,63 @@ jobs:
       - name: Run unit tests
         run: npm test -- --silent
 
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+      # Share the built library so E2E jobs can serve the demo without rebuilding it 5x.
+      - name: Upload built library
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-lib
+          path: dist/
+          retention-days: 1
 
+  e2e:
+    name: E2E (${{ matrix.project }})
+    needs: quality-checks
+    if: github.event.action != 'edited'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Full browser matrix on PRs — one job per Playwright project, parallelized to keep
+      # wall time acceptable. Matches CLAUDE.md rule 3 (all-browsers run before done) and
+      # guards against the browser-specific regressions this repo has a history of
+      # (see .claude/history/safari-autoscroll.md). Each job installs only its own engine.
+      matrix:
+        include:
+          - project: chromium
+            browser: chromium
+          - project: firefox
+            browser: firefox
+          - project: webkit
+            browser: webkit
+          - project: chromium-mobile
+            browser: chromium
+          - project: webkit-mobile
+            browser: webkit
+    steps:
+      - name: Checkout PR merge commit
+        uses: actions/checkout@v7
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download built library
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-lib
+          path: dist/
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      # --fail-on-flaky-tests turns passed-on-retry results into failures, so the retries: 2
+      # in playwright.config.ts absorb genuine browser variance without silently hiding flakes.
+      # The github reporter annotates failures inline in the PR.
       - name: Run E2E tests
-        run: npx playwright test --reporter=dot --max-failures=1 --project=chromium
+        run: npx playwright test --reporter=dot,github --fail-on-flaky-tests --project=${{ matrix.project }}
