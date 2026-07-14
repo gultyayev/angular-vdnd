@@ -181,6 +181,7 @@ export class DemoPage {
     const container = list === 'list1' ? this.list1VirtualScroll : this.list2VirtualScroll;
     await container.evaluate((el, top) => {
       el.scrollTop = top;
+      el.dispatchEvent(new Event('scroll'));
     }, scrollTop);
   }
 

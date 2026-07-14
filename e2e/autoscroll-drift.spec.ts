@@ -125,6 +125,9 @@ test.describe('Autoscroll Placeholder Drift', () => {
   test.beforeEach(async ({ page }) => {
     demoPage = new DemoPage(page);
     await demoPage.goto();
+    await demoPage.list1VirtualScroll.evaluate((el) =>
+      el.scrollIntoView({ block: 'center', inline: 'nearest' }),
+    );
     // Item count defaults to 100 in the demo
   });
 
@@ -199,11 +202,24 @@ test.describe('Autoscroll Placeholder Drift', () => {
     }
 
     // 2. Start drag from center of first item
-    await sourceItem.hover();
+    const sourceBox = await sourceItem.boundingBox();
+    if (!sourceBox) {
+      throw new Error('Could not get source item bounding box');
+    }
+    await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
     await page.mouse.down();
+    await page.mouse.move(
+      sourceBox.x + sourceBox.width / 2 + 10,
+      sourceBox.y + sourceBox.height / 2 + 10,
+      {
+        steps: 2,
+      },
+    );
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
 
     // 3. Move to bottom edge to trigger autoscroll
     const nearBottomY = containerBox.y + containerBox.height - 25;
+    await page.mouse.move(containerBox.x + 100, nearBottomY, { steps: 10 });
     await page.mouse.move(containerBox.x + 100, nearBottomY);
 
     const snapshot = await waitForDriftSnapshot(
@@ -249,10 +265,23 @@ test.describe('Autoscroll Placeholder Drift', () => {
       throw new Error('Could not get container bounding box');
     }
 
-    await sourceItem.hover();
+    const sourceBox = await sourceItem.boundingBox();
+    if (!sourceBox) {
+      throw new Error('Could not get source item bounding box');
+    }
+    await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
     await page.mouse.down();
+    await page.mouse.move(
+      sourceBox.x + sourceBox.width / 2 + 10,
+      sourceBox.y + sourceBox.height / 2 + 10,
+      {
+        steps: 2,
+      },
+    );
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
 
     const nearBottomY = containerBox.y + containerBox.height - 25;
+    await page.mouse.move(containerBox.x + 100, nearBottomY, { steps: 10 });
     await page.mouse.move(containerBox.x + 100, nearBottomY);
 
     const snapshot = await waitForDriftSnapshot(
@@ -297,17 +326,31 @@ test.describe('Autoscroll Placeholder Drift', () => {
     }).toPass({ timeout: 2000 });
 
     const sourceItem = demoPage.list1Items.last();
+    await sourceItem.scrollIntoViewIfNeeded();
     const containerBox = await demoPage.list1VirtualScroll.boundingBox();
 
     if (!containerBox) {
       throw new Error('Could not get container bounding box');
     }
 
-    await sourceItem.hover();
+    const sourceBox = await sourceItem.boundingBox();
+    if (!sourceBox) {
+      throw new Error('Could not get source item bounding box');
+    }
+    await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
     await page.mouse.down();
+    await page.mouse.move(
+      sourceBox.x + sourceBox.width / 2 + 10,
+      sourceBox.y + sourceBox.height / 2 + 10,
+      {
+        steps: 2,
+      },
+    );
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
 
     // Move to top edge
     const nearTopY = containerBox.y + 25;
+    await page.mouse.move(containerBox.x + 100, nearTopY, { steps: 10 });
     await page.mouse.move(containerBox.x + 100, nearTopY);
 
     const snapshot = await waitForDriftSnapshot(
@@ -351,10 +394,25 @@ test.describe('Autoscroll Placeholder Drift', () => {
       throw new Error('Could not get container bounding box');
     }
 
-    await sourceItem.hover();
+    const sourceBox = await sourceItem.boundingBox();
+    if (!sourceBox) {
+      throw new Error('Could not get source item bounding box');
+    }
+    await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
     await page.mouse.down();
+    await page.mouse.move(
+      sourceBox.x + sourceBox.width / 2 + 10,
+      sourceBox.y + sourceBox.height / 2 + 10,
+      {
+        steps: 2,
+      },
+    );
+    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
 
     // Move to bottom and wait for autoscroll to reach absolute end
+    await page.mouse.move(containerBox.x + 100, containerBox.y + containerBox.height - 20, {
+      steps: 10,
+    });
     await page.mouse.move(containerBox.x + 100, containerBox.y + containerBox.height - 20);
     await expect(async () => {
       const scrollInfo = await demoPage.list1VirtualScroll.evaluate((el) => ({
@@ -400,10 +458,15 @@ test.describe('Autoscroll Placeholder Drift', () => {
 
     // Start drag
     const itemBox = await sourceItem.boundingBox();
-    await sourceItem.hover();
+    if (!itemBox) {
+      throw new Error('Could not get source item bounding box');
+    }
+    await page.mouse.move(itemBox.x + itemBox.width / 2, itemBox.y + itemBox.height / 2);
     await page.mouse.down();
     // Small initial move to trigger drag detection
-    await page.mouse.move(itemBox!.x + 5, itemBox!.y + 5, { steps: 2 });
+    await page.mouse.move(itemBox.x + itemBox.width / 2 + 10, itemBox.y + itemBox.height / 2 + 10, {
+      steps: 2,
+    });
     await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
 
     const nearBottomY = containerBox.y + containerBox.height - 20;
@@ -610,10 +673,20 @@ test.describe('Autoscroll Placeholder Drift', () => {
       }
 
       const webkitItemBox = await sourceItem.boundingBox();
-      await sourceItem.hover();
+      if (!webkitItemBox) {
+        throw new Error('Could not get source item bounding box');
+      }
+      await page.mouse.move(
+        webkitItemBox.x + webkitItemBox.width / 2,
+        webkitItemBox.y + webkitItemBox.height / 2,
+      );
       await page.mouse.down();
       // Small initial move to trigger drag detection
-      await page.mouse.move(webkitItemBox!.x + 5, webkitItemBox!.y + 5, { steps: 2 });
+      await page.mouse.move(
+        webkitItemBox.x + webkitItemBox.width / 2 + 10,
+        webkitItemBox.y + webkitItemBox.height / 2 + 10,
+        { steps: 2 },
+      );
       await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
 
       const nearBottomY = containerBox.y + containerBox.height - 15;
@@ -668,10 +741,13 @@ test.describe('Autoscroll Placeholder Drift', () => {
   });
 
   test('no gap should remain after drop at maximum scroll', async ({ page }, testInfo) => {
-    // Test that dropping an item when scrolled to bottom doesn't leave a gap
+    // Test that dropping an item when scrolled to bottom doesn't leave a gap.
     // Scroll list1 to the bottom first — wrap write+read in toPass
     await expect(async () => {
-      await demoPage.scrollList('list1', 5000);
+      await demoPage.list1VirtualScroll.evaluate((el) => {
+        el.scrollTop = 5000;
+        el.dispatchEvent(new Event('scroll'));
+      });
       const scrollTop = await demoPage.getScrollTop('list1');
       expect(scrollTop).toBeGreaterThan(1000);
     }).toPass({ timeout: 2000 });
@@ -679,17 +755,22 @@ test.describe('Autoscroll Placeholder Drift', () => {
     const getVisibleBottomItem = async () =>
       demoPage.list1VirtualScroll.evaluate((container) => {
         const containerRect = container.getBoundingClientRect();
+        const viewportBottom = window.innerHeight;
         const items = container.querySelectorAll('[data-draggable-id]');
-        // Pick the last visible item
+        // Pick the last item with a safe grab point inside both the scroll container and viewport.
         let bestItem: { x: number; y: number; width: number; height: number } | null = null;
         for (const item of items) {
           const rect = item.getBoundingClientRect();
-          if (
-            rect.bottom > containerRect.top &&
-            rect.top < containerRect.bottom &&
-            rect.height > 0
-          ) {
-            bestItem = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+          const visibleTop = Math.max(rect.top, containerRect.top, 0);
+          const visibleBottom = Math.min(rect.bottom, containerRect.bottom, viewportBottom);
+          const visibleHeight = visibleBottom - visibleTop;
+          if (visibleHeight > 10 && rect.width > 0) {
+            bestItem = {
+              x: rect.x,
+              y: visibleTop,
+              width: rect.width,
+              height: visibleHeight,
+            };
           }
         }
         return bestItem;
