@@ -120,11 +120,44 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps ${{ matrix.browser }}
 
-      # --fail-on-flaky-tests turns passed-on-retry results into failures, so the retries: 2
-      # in playwright.config.ts absorb genuine browser variance without silently hiding flakes.
-      # The github reporter annotates failures inline in the PR.
+      # retries: 2 in playwright.config.ts absorb genuine browser variance. Passed-on-retry
+      # (flaky) tests do NOT fail the job — they are surfaced in the job summary below so they
+      # stay visible without blocking (issue #40 acceptance). Genuine failures (every attempt
+      # fails) still fail the job. The github reporter annotates real failures inline in the PR.
       - name: Run E2E tests
-        run: npx playwright test --reporter=dot,github --fail-on-flaky-tests --project=${{ matrix.project }}
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report.json
+        run: npx playwright test --reporter=dot,github,json --project=${{ matrix.project }}
+
+      # Make flaky (passed-on-retry) tests visible in the CI summary instead of hiding them.
+      - name: Surface flaky tests in job summary
+        if: always()
+        run: |
+          report="playwright-report.json"
+          [ -f "$report" ] || exit 0
+          flaky=$(node -e '
+            const r = require("./" + process.argv[1]);
+            const out = [];
+            const walk = (s) => {
+              for (const spec of (s.specs || [])) {
+                for (const t of (spec.tests || [])) {
+                  if (t.status === "flaky") out.push((spec.file || "") + " › " + spec.title);
+                }
+              }
+              for (const c of (s.suites || [])) walk(c);
+            };
+            for (const s of (r.suites || [])) walk(s);
+            console.log([...new Set(out)].join("\n"));
+          ' "$report")
+          if [ -n "$flaky" ]; then
+            {
+              echo "### ⚠️ Flaky tests on ${{ matrix.project }} (passed on retry)"
+              echo ""
+              echo '```'
+              echo "$flaky"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   # Single, stable required-status context that aggregates the build/unit job and the whole
   # E2E matrix. Keeping the job id `quality-checks` (no `name:` override) preserves the check
