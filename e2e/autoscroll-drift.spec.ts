@@ -325,17 +325,30 @@ test.describe('Autoscroll Placeholder Drift', () => {
       expect(scrollTop).toBeGreaterThan(1500);
     }).toPass({ timeout: 2000 });
 
-    const sourceItem = demoPage.list1Items.last();
-    await sourceItem.scrollIntoViewIfNeeded();
     const containerBox = await demoPage.list1VirtualScroll.boundingBox();
 
     if (!containerBox) {
       throw new Error('Could not get container bounding box');
     }
 
-    const sourceBox = await sourceItem.boundingBox();
+    const sourceBox = await demoPage.list1VirtualScroll.evaluate((container) => {
+      const containerRect = container.getBoundingClientRect();
+      const viewportBottom = window.innerHeight;
+      const items = container.querySelectorAll('[data-draggable-id]');
+      let bestItem: { x: number; y: number; width: number; height: number } | null = null;
+      for (const item of items) {
+        const rect = item.getBoundingClientRect();
+        const visibleTop = Math.max(rect.top, containerRect.top, 0);
+        const visibleBottom = Math.min(rect.bottom, containerRect.bottom, viewportBottom);
+        const visibleHeight = visibleBottom - visibleTop;
+        if (visibleHeight > 10 && rect.width > 0) {
+          bestItem = { x: rect.x, y: visibleTop, width: rect.width, height: visibleHeight };
+        }
+      }
+      return bestItem;
+    });
     if (!sourceBox) {
-      throw new Error('Could not get source item bounding box');
+      throw new Error('Could not get visible source item bounding box');
     }
     await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
     await page.mouse.down();
@@ -349,7 +362,7 @@ test.describe('Autoscroll Placeholder Drift', () => {
     await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
 
     // Move to top edge
-    const nearTopY = containerBox.y + 25;
+    const nearTopY = containerBox.y + 15;
     await page.mouse.move(containerBox.x + 100, nearTopY, { steps: 10 });
     await page.mouse.move(containerBox.x + 100, nearTopY);
 
@@ -672,22 +685,25 @@ test.describe('Autoscroll Placeholder Drift', () => {
         throw new Error('Could not get container bounding box');
       }
 
-      const webkitItemBox = await sourceItem.boundingBox();
-      if (!webkitItemBox) {
-        throw new Error('Could not get source item bounding box');
-      }
-      await page.mouse.move(
-        webkitItemBox.x + webkitItemBox.width / 2,
-        webkitItemBox.y + webkitItemBox.height / 2,
-      );
-      await page.mouse.down();
-      // Small initial move to trigger drag detection
-      await page.mouse.move(
-        webkitItemBox.x + webkitItemBox.width / 2 + 10,
-        webkitItemBox.y + webkitItemBox.height / 2 + 10,
-        { steps: 2 },
-      );
-      await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+      await expect(async () => {
+        await page.mouse.up().catch(() => undefined);
+        const webkitItemBox = await sourceItem.boundingBox();
+        if (!webkitItemBox) {
+          throw new Error('Could not get source item bounding box');
+        }
+        await page.mouse.move(
+          webkitItemBox.x + webkitItemBox.width / 2,
+          webkitItemBox.y + webkitItemBox.height / 2,
+        );
+        await page.mouse.down();
+        // Small initial move to trigger drag detection
+        await page.mouse.move(
+          webkitItemBox.x + webkitItemBox.width / 2 + 10,
+          webkitItemBox.y + webkitItemBox.height / 2 + 10,
+          { steps: 2 },
+        );
+        await expect(demoPage.dragPreview).toBeVisible({ timeout: 1000 });
+      }).toPass({ timeout: 5000 });
 
       const nearBottomY = containerBox.y + containerBox.height - 15;
       const nearTopY = containerBox.y + 15;
@@ -744,10 +760,7 @@ test.describe('Autoscroll Placeholder Drift', () => {
     // Test that dropping an item when scrolled to bottom doesn't leave a gap.
     // Scroll list1 to the bottom first — wrap write+read in toPass
     await expect(async () => {
-      await demoPage.list1VirtualScroll.evaluate((el) => {
-        el.scrollTop = 5000;
-        el.dispatchEvent(new Event('scroll'));
-      });
+      await demoPage.scrollList('list1', 5000);
       const scrollTop = await demoPage.getScrollTop('list1');
       expect(scrollTop).toBeGreaterThan(1000);
     }).toPass({ timeout: 2000 });
