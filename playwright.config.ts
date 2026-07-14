@@ -25,7 +25,15 @@ export default defineConfig({
     },
     {
       name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      use: {
+        ...devices['Desktop Firefox'],
+        // Firefox routes even localhost through an HTTP(S)_PROXY env var and ignores
+        // NO_PROXY/bypass entries for it, so page.goto('127.0.0.1:4200') hangs in proxied
+        // environments (e.g. Claude Code on the web). Chromium/WebKit honor the bypass and
+        // are unaffected. E2E only ever hits the local dev server, so force a direct
+        // connection (network.proxy.type = 0 = no proxy) for Firefox.
+        launchOptions: { firefoxUserPrefs: { 'network.proxy.type': 0 } },
+      },
       testIgnore: /.*\.mobile\.spec\.ts/,
     },
     {
