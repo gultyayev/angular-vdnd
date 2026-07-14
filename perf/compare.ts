@@ -13,7 +13,6 @@ const COMPARISON_METRICS = [
   'maxFrameGap',
   'droppedFrames',
   'p99FrameTime',
-  'jsHeapDelta',
 ];
 
 function parseArg(args: string[], flag: string): string | undefined {

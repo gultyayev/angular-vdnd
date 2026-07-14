@@ -12,7 +12,6 @@ const METRIC_LABELS: Record<string, { label: string; unit: string }> = {
   maxFrameGap: { label: 'Max Frame Gap', unit: 'ms' },
   droppedFrames: { label: 'Dropped Frames (>25ms)', unit: '' },
   p99FrameTime: { label: 'p99 Frame Time', unit: 'ms' },
-  jsHeapDelta: { label: 'Heap Delta', unit: 'KB' },
 };
 
 function formatValue(value: number, unit: string): string {

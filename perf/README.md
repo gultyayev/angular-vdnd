@@ -84,7 +84,6 @@ rather than gating. The floors are deliberately conservative:
 | maxFrameGap       | 15    | ms     |
 | droppedFrames     | 3     | frames |
 | p99FrameTime      | 5     | ms     |
-| jsHeapDelta       | 512   | KB     |
 
 ## Baseline compatibility (fail closed)
 

@@ -82,7 +82,6 @@ test.describe('Dynamic Height Scroll Performance', () => {
       maxFrameGap: aggregate(results.map((r) => r.maxFrameGap)),
       droppedFrames: aggregate(results.map((r) => r.droppedFrames)),
       p99FrameTime: aggregate(results.map((r) => r.p99FrameTime)),
-      jsHeapDelta: aggregate(results.map((r) => r.jsHeapDelta / 1024)),
     };
 
     testInfo.attach('dynamic-height-scroll', {

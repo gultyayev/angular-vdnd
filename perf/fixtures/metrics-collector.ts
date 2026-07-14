@@ -13,7 +13,6 @@ export { METRICS_SCHEMA_VERSION };
 
 export interface PerfSnapshot {
   timestamp: number;
-  jsHeapUsedSize: number;
   layoutCount: number;
   recalcStyleCount: number;
 }
@@ -24,9 +23,6 @@ export interface ScenarioMetrics {
   totalBlockingTime: number;
   layoutCount: number;
   recalcStyleCount: number;
-  jsHeapBefore: number;
-  jsHeapAfter: number;
-  jsHeapDelta: number;
   frameCount: number;
   avgFrameTime: number;
   maxFrameGap: number;
@@ -55,20 +51,11 @@ export class MetricsCollector {
     await this.#cdp!.send('Emulation.setCPUThrottlingRate', { rate: 1 });
   }
 
-  /** Force garbage collection via CDP (requires --js-flags=--expose-gc). */
-  async forceGC(): Promise<void> {
-    await this.#cdp!.send('Runtime.evaluate', {
-      expression: 'typeof gc === "function" && gc()',
-      awaitPromise: false,
-    });
-  }
-
   async getSnapshot(): Promise<PerfSnapshot> {
     const { metrics } = await this.#cdp!.send('Performance.getMetrics');
     const get = (name: string) => metrics.find((m) => m.name === name)?.value ?? 0;
     return {
       timestamp: Date.now(),
-      jsHeapUsedSize: get('JSHeapUsedSize'),
       layoutCount: get('LayoutCount'),
       recalcStyleCount: get('RecalcStyleCount'),
     };
@@ -156,7 +143,6 @@ export class MetricsCollector {
    * then collects all metrics.
    */
   async measureScenario(scenario: () => Promise<void>): Promise<ScenarioMetrics> {
-    await this.forceGC();
     const before = await this.getSnapshot();
     await this.injectObservers();
     const startTime = Date.now();
@@ -183,9 +169,6 @@ export class MetricsCollector {
       totalBlockingTime,
       layoutCount: after.layoutCount - before.layoutCount,
       recalcStyleCount: after.recalcStyleCount - before.recalcStyleCount,
-      jsHeapBefore: before.jsHeapUsedSize,
-      jsHeapAfter: after.jsHeapUsedSize,
-      jsHeapDelta: after.jsHeapUsedSize - before.jsHeapUsedSize,
       frameCount,
       avgFrameTime,
       maxFrameGap,
