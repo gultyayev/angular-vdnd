@@ -499,7 +499,17 @@ All event types are importable from `ngx-virtual-dnd`.
 
 Traditional drag-and-drop libraries query sibling DOM elements via `getBoundingClientRect()`. This fails with virtual scrolling because items outside the viewport aren't rendered.
 
-This library uses **element-under-point detection**: temporarily hide the dragged element, use `document.elementFromPoint()` to find what's at the cursor, walk up to find the droppable, and calculate placeholder position mathematically.
+This library uses **geometric hit-testing against a cached rect snapshot**: at drag start it snapshots the candidate droppables for the group and their bounding rects, then per pointer-move it finds the droppable under the cursor by pure geometry (no per-frame `elementFromPoint` layout flush) and calculates the placeholder position mathematically. The snapshot is kept current during the drag — rects are re-read on scroll/resize and when a candidate resizes, the candidate list is refreshed when a droppable mounts or unmounts mid-drag, and each rect is clipped to its scrollable (`vdndScrollable`) ancestor so a droppable scrolled out of a clipping container isn't hit over its off-screen extent.
+
+### Hit-Testing Limitations
+
+Because hit-testing is geometry against cached rects (not live browser hit-testing), a few complex-layout cases diverge from what `elementFromPoint` would report during a drag:
+
+- **Occluding overlays** — a modal, toolbar, or other element painted over a droppable does not block a geometric hit; the droppable underneath still receives the drop.
+- **Stacking contexts / explicit `z-index`** — overlapping droppables resolve by document order (later-in-DOM wins), which reproduces default paint order but not a `z-index` that lifts an earlier droppable above a later one.
+- **`visibility: hidden` / `pointer-events: none`** — not consulted; use the droppable `disabled` input to exclude a target from hit-testing.
+
+These are uncommon in typical list layouts. If you hit one, prefer separate drag-and-drop groups or the `disabled` input over relying on overlay/z-index occlusion.
 
 ## Browser Support
 

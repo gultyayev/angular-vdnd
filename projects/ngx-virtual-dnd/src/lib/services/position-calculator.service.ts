@@ -11,12 +11,20 @@ interface DragSessionSnapshot {
   groupName: string;
   /** Candidate droppables in document order (document order === default paint order). */
   candidates: HTMLElement[];
-  /** Cached bounding rects, parallel to `candidates`. */
+  /**
+   * Nearest `.vdnd-scrollable` ancestor per candidate (parallel to `candidates`), or null
+   * when the candidate is not inside one. Cached rects are clipped to this ancestor so a
+   * droppable scrolled out of its clipping container does not hit-test over its full extent.
+   */
+  scrollables: (HTMLElement | null)[];
+  /** Cached, clip-adjusted bounding rects, parallel to `candidates`. */
   rects: DOMRect[];
-  /** When true, rects are re-read on the next hit-test (set on scroll/resize). */
+  /** When true, rects are re-read on the next hit-test (set on scroll/resize/element resize). */
   dirty: boolean;
   /** Bound scroll/resize listener used to mark rects dirty. */
   onViewportChange: () => void;
+  /** Observes candidate resizes so container-only layout changes invalidate cached rects. */
+  resizeObserver: ResizeObserver | null;
 }
 
 /**
@@ -41,6 +49,9 @@ export class PositionCalculatorService {
   /** Data attribute used to identify draggable elements */
   readonly #DRAGGABLE_ID_ATTR = 'data-draggable-id';
 
+  /** Class marking a scrollable (clipping) container, used to clip candidate rects. */
+  readonly #SCROLLABLE_CLASS = 'vdnd-scrollable';
+
   /** Maximum DOM levels to traverse when looking for parent elements */
   readonly #MAX_PARENT_TRAVERSAL = 15;
 
@@ -61,29 +72,64 @@ export class PositionCalculatorService {
   beginDragSession(groupName: string): void {
     this.endDragSession();
 
-    const candidates = this.#queryDroppables(groupName);
     const onViewportChange = () => {
       if (this.#session) {
         this.#session.dirty = true;
       }
     };
 
+    const candidates = this.#queryDroppables(groupName);
+    const scrollables = candidates.map((el) => this.#scrollableAncestor(el));
+
     this.#session = {
       groupName,
       candidates,
-      rects: candidates.map((el) => el.getBoundingClientRect()),
+      scrollables,
+      rects: candidates.map((el, i) => this.#snapshotRect(el, scrollables[i])),
       dirty: false,
       onViewportChange,
+      resizeObserver: null,
     };
 
     // Capture-phase scroll catches scrolling on any ancestor scroller (scroll does
-    // not bubble); resize covers viewport changes. Both only mark rects dirty —
-    // the actual re-read is deferred to the next hit-test.
+    // not bubble); resize covers viewport changes. A ResizeObserver on the candidates
+    // catches container-only layout changes that fire neither scroll nor resize. All
+    // three only mark rects dirty — the actual re-read is deferred to the next hit-test.
     if (typeof window !== 'undefined') {
       this.#ngZone.runOutsideAngular(() => {
         window.addEventListener('scroll', onViewportChange, { capture: true, passive: true });
         window.addEventListener('resize', onViewportChange, { passive: true });
+        this.#observeCandidateResizes();
       });
+    }
+  }
+
+  /**
+   * Re-snapshot the candidate droppable *list* (not just their rects) for the active
+   * session, so droppables mounted or unmounted mid-drag become visible to hit-testing.
+   * The candidate set is frozen at {@link beginDragSession}; `DroppableDirective` calls
+   * this from its init/destroy lifecycle so a conditionally-rendered list added during a
+   * drag becomes a valid target.
+   *
+   * @param groupName - When provided, the refresh is skipped unless it matches the active
+   *   session's group (a droppable from an unrelated group need not disturb the snapshot).
+   *   Omit to force a refresh of the current session regardless of group.
+   */
+  refreshCandidates(groupName?: string): void {
+    const session = this.#session;
+    if (!session || (groupName !== undefined && groupName !== session.groupName)) {
+      return;
+    }
+
+    session.candidates = this.#queryDroppables(session.groupName);
+    session.scrollables = session.candidates.map((el) => this.#scrollableAncestor(el));
+    session.rects = session.candidates.map((el, i) =>
+      this.#snapshotRect(el, session.scrollables[i]),
+    );
+    session.dirty = false;
+
+    if (typeof window !== 'undefined') {
+      this.#ngZone.runOutsideAngular(() => this.#observeCandidateResizes());
     }
   }
 
@@ -97,9 +143,32 @@ export class PositionCalculatorService {
       return;
     }
     this.#session = null;
+    session.resizeObserver?.disconnect();
     if (typeof window !== 'undefined') {
       window.removeEventListener('scroll', session.onViewportChange, { capture: true });
       window.removeEventListener('resize', session.onViewportChange);
+    }
+  }
+
+  /**
+   * (Re)bind the session's ResizeObserver to the current candidate set. A candidate
+   * resizing (e.g. a sibling list expanding, or a container reflow that fires no window
+   * scroll/resize) marks the cached rects dirty so they are re-read on the next hit-test.
+   * Runs inside `runOutsideAngular` (callers wrap the call).
+   */
+  #observeCandidateResizes(): void {
+    const session = this.#session;
+    if (!session || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    session.resizeObserver?.disconnect();
+    session.resizeObserver ??= new ResizeObserver(() => {
+      if (this.#session) {
+        this.#session.dirty = true;
+      }
+    });
+    for (const candidate of session.candidates) {
+      session.resizeObserver.observe(candidate);
     }
   }
 
@@ -139,7 +208,7 @@ export class PositionCalculatorService {
     if (session && session.groupName === groupName) {
       if (session.dirty) {
         for (let i = 0; i < session.candidates.length; i++) {
-          session.rects[i] = session.candidates[i].getBoundingClientRect();
+          session.rects[i] = this.#snapshotRect(session.candidates[i], session.scrollables[i]);
         }
         session.dirty = false;
       }
@@ -148,7 +217,7 @@ export class PositionCalculatorService {
 
     // No active session: one-shot geometric query (still avoids elementFromPoint).
     const candidates = this.#queryDroppables(groupName);
-    const rects = candidates.map((el) => el.getBoundingClientRect());
+    const rects = candidates.map((el) => this.#snapshotRect(el, this.#scrollableAncestor(el)));
     return this.#hitTest(x, y, candidates, rects);
   }
 
@@ -217,15 +286,54 @@ export class PositionCalculatorService {
     let match: HTMLElement | null = null;
     for (let i = 0; i < candidates.length; i++) {
       const candidate = candidates[i];
-      if (this.#isDroppableDisabled(candidate)) {
+      // Skip candidates removed from the DOM mid-drag: their cached rect is stale and
+      // would otherwise linger until a scroll/resize fires. `isConnected` is a cheap
+      // property read (no layout), keeping the loop hot.
+      if (!candidate.isConnected || this.#isDroppableDisabled(candidate)) {
         continue;
       }
       const r = rects[i];
-      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+      // Clipped-away candidates get an empty (zero-area) rect; `right > left` guards them out.
+      if (
+        r.right > r.left &&
+        r.bottom > r.top &&
+        x >= r.left &&
+        x <= r.right &&
+        y >= r.top &&
+        y <= r.bottom
+      ) {
         match = candidate;
       }
     }
     return match;
+  }
+
+  /**
+   * Nearest `.vdnd-scrollable` ancestor of a candidate, excluding the candidate itself
+   * (clipping a rect by itself is a no-op). Returns null when there is no scrollable
+   * clipping container. Resolved once per candidate snapshot and cached on the session.
+   */
+  #scrollableAncestor(el: HTMLElement): HTMLElement | null {
+    return el.parentElement?.closest<HTMLElement>(`.${this.#SCROLLABLE_CLASS}`) ?? null;
+  }
+
+  /**
+   * Bounding rect of a candidate, intersected with its scrollable ancestor's rect so a
+   * droppable scrolled (or reflowed) out of its clipping container hit-tests only over the
+   * part actually visible inside the viewport. When fully clipped away the intersection is
+   * an empty rect that contains no point.
+   */
+  #snapshotRect(el: HTMLElement, scrollable: HTMLElement | null): DOMRect {
+    const rect = el.getBoundingClientRect();
+    if (!scrollable) {
+      return rect;
+    }
+    const clip = scrollable.getBoundingClientRect();
+    const top = Math.max(rect.top, clip.top);
+    const left = Math.max(rect.left, clip.left);
+    const right = Math.min(rect.right, clip.right);
+    const bottom = Math.min(rect.bottom, clip.bottom);
+    return new DOMRect(left, top, Math.max(0, right - left), Math.max(0, bottom - top));
   }
 
   /**

@@ -1,4 +1,5 @@
 import {
+  afterNextRender,
   computed,
   Directive,
   effect,
@@ -11,6 +12,7 @@ import {
 } from '@angular/core';
 import { DragStateService } from '../services/drag-state.service';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
+import { PositionCalculatorService } from '../services/position-calculator.service';
 import { DragState, DropEvent, END_OF_LIST } from '../models/drag-drop.models';
 import { VDND_GROUP_TOKEN } from './droppable-group.directive';
 import { createEffectiveGroupSignal } from '../utils/group-resolution';
@@ -56,6 +58,7 @@ export class DroppableDirective implements OnDestroy {
   readonly #elementRef = inject(ElementRef<HTMLElement>);
   readonly #dragState = inject(DragStateService);
   readonly #autoScroll = inject(AutoScrollService);
+  readonly #positionCalculator = inject(PositionCalculatorService);
   readonly #parentGroup = inject(VDND_GROUP_TOKEN, { optional: true });
 
   /** Unique identifier for this droppable */
@@ -149,6 +152,15 @@ export class DroppableDirective implements OnDestroy {
   }
 
   constructor() {
+    // If this droppable mounts mid-drag (e.g. a conditionally-rendered list), the active
+    // drag session's candidate snapshot is already frozen. After the first render — once the
+    // `data-droppable-group` host attribute is on the DOM so the query can see it — refresh
+    // the snapshot so this droppable becomes a valid target. No-op when no session is active
+    // or the group differs.
+    afterNextRender(() => {
+      this.#positionCalculator.refreshCandidates(this.effectiveGroup() ?? undefined);
+    });
+
     createAutoScrollRegistration({
       autoScrollService: this.#autoScroll,
       getElement: () => this.#elementRef.nativeElement,
@@ -215,6 +227,12 @@ export class DroppableDirective implements OnDestroy {
     if (this.isActive()) {
       this.#dragState.setActiveDroppable(null);
     }
+
+    // Re-snapshot the drag session's candidates when unmounted mid-drag. This element is
+    // still connected at destroy time, so the hit-test's `isConnected` guard is what stops
+    // it being a target once actually removed; this refresh re-binds the ResizeObserver and
+    // prunes any other already-removed candidates. No-op when no drag session is active.
+    this.#positionCalculator.refreshCandidates(this.effectiveGroup() ?? undefined);
 
     // Unregister from auto-scroll
     this.#autoScroll.unregisterContainer(this.vdndDroppable());

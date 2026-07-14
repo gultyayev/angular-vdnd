@@ -349,6 +349,70 @@ describe('PositionCalculatorService', () => {
       // No beginDragSession() — lazy path queries the DOM directly.
       expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBe(drop);
     });
+
+    it('picks up a droppable added mid-session after refreshCandidates', () => {
+      const dragged = document.createElement('div');
+      makeDroppable('list-1', 'g', { top: 0, left: 0, right: 100, bottom: 100 });
+
+      service.beginDragSession('g');
+      // A droppable mounted after the session began is invisible to the frozen list...
+      expect(service.findDroppableAtPoint(150, 150, dragged, 'g')).toBeNull();
+
+      const late = makeDroppable('list-2', 'g', { top: 100, left: 100, right: 300, bottom: 300 });
+      // ...until the candidate list is refreshed.
+      service.refreshCandidates('g');
+      expect(service.findDroppableAtPoint(150, 150, dragged, 'g')).toBe(late);
+    });
+
+    it('refreshCandidates only re-snapshots when the group matches the active session', () => {
+      const dragged = document.createElement('div');
+      makeDroppable('list-1', 'g', { top: 0, left: 0, right: 100, bottom: 100 });
+      service.beginDragSession('g');
+
+      const late = makeDroppable('list-2', 'g', { top: 100, left: 100, right: 300, bottom: 300 });
+      // Refresh scoped to an unrelated group is a no-op — the new droppable stays invisible.
+      service.refreshCandidates('other');
+      expect(service.findDroppableAtPoint(150, 150, dragged, 'g')).toBeNull();
+
+      // Refresh for the session group (or with no group) picks it up.
+      service.refreshCandidates();
+      expect(service.findDroppableAtPoint(150, 150, dragged, 'g')).toBe(late);
+    });
+
+    it('skips a droppable removed from the DOM mid-session (stale rect does not linger)', () => {
+      const dragged = document.createElement('div');
+      const drop = makeDroppable('list', 'g', { top: 100, left: 100, right: 300, bottom: 400 });
+
+      service.beginDragSession('g');
+      expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBe(drop);
+
+      // Removed mid-drag without any scroll/resize firing — its cached rect must not linger.
+      drop.remove();
+      expect(service.findDroppableAtPoint(200, 250, dragged, 'g')).toBeNull();
+    });
+
+    it('clips a candidate rect by its scrollable ancestor (region outside the viewport is not a hit)', () => {
+      const dragged = document.createElement('div');
+      const scroller = document.createElement('div');
+      scroller.className = 'vdnd-scrollable';
+      stubRect(scroller, { top: 0, left: 0, right: 300, bottom: 200 });
+      document.body.appendChild(scroller);
+      created.push(scroller);
+
+      const drop = document.createElement('div');
+      drop.setAttribute('data-droppable-id', 'list');
+      drop.setAttribute('data-droppable-group', 'g');
+      // Droppable extends below the scrollable viewport (bottom 200); its lower half is clipped.
+      stubRect(drop, { top: 0, left: 0, right: 300, bottom: 400 });
+      scroller.appendChild(drop);
+      created.push(drop);
+
+      service.beginDragSession('g');
+      // Inside the visible (unclipped) region → hit.
+      expect(service.findDroppableAtPoint(150, 100, dragged, 'g')).toBe(drop);
+      // Inside the droppable's own rect but below the scroll viewport → clipped away, no hit.
+      expect(service.findDroppableAtPoint(150, 300, dragged, 'g')).toBeNull();
+    });
   });
 
   describe('getDroppableById', () => {
