@@ -17,9 +17,6 @@ export default defineConfig({
     video: 'off',
     screenshot: 'off',
     trace: 'off',
-    launchOptions: {
-      args: ['--js-flags=--expose-gc'],
-    },
   },
   webServer: {
     command: 'npm start -- --host 127.0.0.1 --port 4200 -c production',
