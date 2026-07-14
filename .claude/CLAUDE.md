@@ -361,21 +361,9 @@ npx playwright test --reporter=list
 
 See `.ai/E2E.md` for comprehensive E2E testing patterns (timing, browser differences, assertions, gotchas).
 
-### Chrome MCP (Visual Debugging Only)
-
-Use ONLY for understanding visual layout, not as primary verification.
-
-1. Start dev server: `npm start`
-2. Use `mcp__chrome-devtools__new_page` to open pages
-3. **ALWAYS close pages with `mcp__chrome-devtools__close_page` when done**
-
 ### Cleanup
 
-Always kill `ng serve` before reporting task fixed. Skip if did not use any Chrome MCP tools.
-
-```bash
-pkill -f "ng serve"
-```
+When finished a task always kill servers started during development. Never leave hanging processes, tasks.
 
 ## Accessibility
 
