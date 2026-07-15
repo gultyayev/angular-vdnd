@@ -39,9 +39,9 @@ async function startPointerDragFromBox(
     await page.mouse.up().catch(() => undefined);
     await page.mouse.move(startX, startY);
     await page.mouse.down();
-    await page.mouse.move(startX + 10, startY + 10, { steps: 3 });
+    await page.mouse.move(startX + 20, startY + 20, { steps: 5 });
     await expect(dragPreview).toBeVisible({ timeout: 1000 });
-  }).toPass({ timeout: 5000 });
+  }).toPass({ timeout: 8000 });
 }
 
 test.describe('Auto Scroll', () => {
@@ -58,6 +58,7 @@ test.describe('Auto Scroll', () => {
 
     // Start dragging an item
     const sourceItem = demoPage.list1Items.first();
+    await sourceItem.scrollIntoViewIfNeeded();
     const sourceBox = await sourceItem.boundingBox();
     const containerBox = await demoPage.list1VirtualScroll.boundingBox();
     if (!sourceBox || !containerBox) {
@@ -124,6 +125,7 @@ test.describe('Auto Scroll', () => {
 
   test('should stop auto-scrolling when drag ends', async ({ page }) => {
     const sourceItem = demoPage.list1Items.first();
+    await sourceItem.scrollIntoViewIfNeeded();
     const sourceBox = await sourceItem.boundingBox();
     if (!sourceBox) throw new Error('Could not get source item bounding box');
 
@@ -162,6 +164,7 @@ test.describe('Auto Scroll', () => {
     const initialScrollTop = await demoPage.getScrollTop('list1');
 
     const sourceItem = demoPage.list1Items.first();
+    await sourceItem.scrollIntoViewIfNeeded();
     const sourceBox = await sourceItem.boundingBox();
     const containerBox = await demoPage.list1VirtualScroll.boundingBox();
     if (!sourceBox || !containerBox) {

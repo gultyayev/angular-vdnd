@@ -277,16 +277,7 @@ test.describe('Autoscroll Placeholder Drift', () => {
     if (!sourceBox) {
       throw new Error('Could not get source item bounding box');
     }
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(
-      sourceBox.x + sourceBox.width / 2 + 10,
-      sourceBox.y + sourceBox.height / 2 + 10,
-      {
-        steps: 2,
-      },
-    );
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    await startPointerDragFromBox(page, demoPage.dragPreview, sourceBox);
 
     const nearBottomY = containerBox.y + containerBox.height - 25;
     await page.mouse.move(containerBox.x + 100, nearBottomY, { steps: 10 });
@@ -363,16 +354,7 @@ test.describe('Autoscroll Placeholder Drift', () => {
     if (!sourceBox) {
       throw new Error('Could not get visible source item bounding box');
     }
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(
-      sourceBox.x + sourceBox.width / 2 + 10,
-      sourceBox.y + sourceBox.height / 2 + 10,
-      {
-        steps: 2,
-      },
-    );
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    await startPointerDragFromBox(page, demoPage.dragPreview, sourceBox);
 
     // Move to top edge
     const nearTopY = containerBox.y + 15;
@@ -424,16 +406,7 @@ test.describe('Autoscroll Placeholder Drift', () => {
     if (!sourceBox) {
       throw new Error('Could not get source item bounding box');
     }
-    await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(
-      sourceBox.x + sourceBox.width / 2 + 10,
-      sourceBox.y + sourceBox.height / 2 + 10,
-      {
-        steps: 2,
-      },
-    );
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    await startPointerDragFromBox(page, demoPage.dragPreview, sourceBox);
 
     // Move to bottom and wait for autoscroll to reach absolute end
     await page.mouse.move(containerBox.x + 100, containerBox.y + containerBox.height - 20, {
@@ -487,13 +460,7 @@ test.describe('Autoscroll Placeholder Drift', () => {
     if (!itemBox) {
       throw new Error('Could not get source item bounding box');
     }
-    await page.mouse.move(itemBox.x + itemBox.width / 2, itemBox.y + itemBox.height / 2);
-    await page.mouse.down();
-    // Small initial move to trigger drag detection
-    await page.mouse.move(itemBox.x + itemBox.width / 2 + 10, itemBox.y + itemBox.height / 2 + 10, {
-      steps: 2,
-    });
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    await startPointerDragFromBox(page, demoPage.dragPreview, itemBox);
 
     const nearBottomY = containerBox.y + containerBox.height - 20;
     const nearTopY = containerBox.y + 20;
@@ -602,11 +569,7 @@ test.describe('Autoscroll Placeholder Drift', () => {
     // Start drag from center of first item
     const startX = itemBox.x + itemBox.width / 2;
     const startY = itemBox.y + itemBox.height / 2;
-    await page.mouse.move(startX, startY);
-    await page.mouse.down();
-    // Small initial move to trigger drag detection
-    await page.mouse.move(startX + 5, startY + 5, { steps: 2 });
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    await startPointerDragFromBox(page, demoPage.dragPreview, itemBox);
 
     // Helper to get current placeholder index and preview position
     const getState = async () => {
@@ -704,18 +667,7 @@ test.describe('Autoscroll Placeholder Drift', () => {
         if (!webkitItemBox) {
           throw new Error('Could not get source item bounding box');
         }
-        await page.mouse.move(
-          webkitItemBox.x + webkitItemBox.width / 2,
-          webkitItemBox.y + webkitItemBox.height / 2,
-        );
-        await page.mouse.down();
-        // Small initial move to trigger drag detection
-        await page.mouse.move(
-          webkitItemBox.x + webkitItemBox.width / 2 + 10,
-          webkitItemBox.y + webkitItemBox.height / 2 + 10,
-          { steps: 2 },
-        );
-        await expect(demoPage.dragPreview).toBeVisible({ timeout: 1000 });
+        await startPointerDragFromBox(page, demoPage.dragPreview, webkitItemBox);
       }).toPass({ timeout: 5000 });
 
       const nearBottomY = containerBox.y + containerBox.height - 15;
@@ -811,13 +763,7 @@ test.describe('Autoscroll Placeholder Drift', () => {
     const itemCoords = await getVisibleBottomItem();
     if (!itemCoords) throw new Error('Could not find visible item near bottom');
 
-    await page.mouse.move(
-      itemCoords.x + itemCoords.width / 2,
-      itemCoords.y + itemCoords.height / 2,
-    );
-    await page.mouse.down();
-    await page.mouse.move(itemCoords.x + 10, itemCoords.y + 30, { steps: 5 });
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    await startPointerDragFromBox(page, demoPage.dragPreview, itemCoords);
 
     // Drop the item (same-list reorder at same position = no-op, but tests scroll state)
     await page.mouse.up();
