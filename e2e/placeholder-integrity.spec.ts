@@ -1,5 +1,34 @@
-import { expect, test } from '@playwright/test';
+import { expect, Locator, Page, test } from '@playwright/test';
 import { DemoPage } from './fixtures/demo.page';
+
+interface DragStartBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+async function startPointerDragFromBox(
+  page: Page,
+  dragPreview: Locator,
+  box: DragStartBox,
+): Promise<void> {
+  const startX = box.x + box.width / 2;
+  const startY = box.y + box.height / 2;
+
+  await expect(async () => {
+    await page.mouse.up().catch(() => undefined);
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 10, startY + 10, { steps: 3 });
+    await expect(dragPreview).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 5000 });
+}
+
+async function moveWithinSameList(page: Page, box: DragStartBox): Promise<void> {
+  await page.mouse.move(box.x + box.width / 2, box.y + 75, { steps: 5 });
+  await page.mouse.move(box.x + box.width / 2, box.y + 75);
+}
 
 /**
  * Tests for placeholder rendering integrity.
@@ -21,10 +50,11 @@ test.describe('Placeholder Rendering Integrity', () => {
       const sourceItem = demoPage.list2Items.first();
       const sourceBox = await sourceItem.boundingBox();
 
-      await sourceItem.hover();
-      await page.mouse.down();
-      await page.mouse.move(sourceBox!.x + sourceBox!.width / 2, sourceBox!.y + 75, { steps: 5 });
-      await expect(demoPage.dragPreview).toBeVisible();
+      if (!sourceBox) {
+        throw new Error('Could not get source item bounding box');
+      }
+      await startPointerDragFromBox(page, demoPage.dragPreview, sourceBox);
+      await moveWithinSameList(page, sourceBox);
 
       // Count ghost elements (empty .item divs without text)
       const ghostCount = await demoPage.countGhostElements('list2');
@@ -39,10 +69,13 @@ test.describe('Placeholder Rendering Integrity', () => {
       const sourceItem = demoPage.list1Items.first();
       const targetBox = await demoPage.list2VirtualScroll.boundingBox();
 
-      await sourceItem.hover();
-      await page.mouse.down();
-      await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 75, { steps: 10 });
-      await expect(demoPage.dragPreview).toBeVisible();
+      const sourceBox = await sourceItem.boundingBox();
+      if (!sourceBox || !targetBox) {
+        throw new Error('Could not get drag source/target bounding boxes');
+      }
+      await startPointerDragFromBox(page, demoPage.dragPreview, sourceBox);
+      await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + 75, { steps: 10 });
+      await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + 75);
 
       // Check both lists for ghost elements
       const ghostCountList1 = await demoPage.countGhostElements('list1');
@@ -59,10 +92,11 @@ test.describe('Placeholder Rendering Integrity', () => {
       const sourceItem = demoPage.list2Items.first();
       const sourceBox = await sourceItem.boundingBox();
 
-      await sourceItem.hover();
-      await page.mouse.down();
-      await page.mouse.move(sourceBox!.x + sourceBox!.width / 2, sourceBox!.y + 75, { steps: 5 });
-      await expect(demoPage.dragPreview).toBeVisible();
+      if (!sourceBox) {
+        throw new Error('Could not get source item bounding box');
+      }
+      await startPointerDragFromBox(page, demoPage.dragPreview, sourceBox);
+      await moveWithinSameList(page, sourceBox);
 
       const ghostCount = await demoPage.countGhostElements('list2');
       expect(ghostCount, 'Ghost elements should not exist in simplified API').toBe(0);
@@ -78,10 +112,11 @@ test.describe('Placeholder Rendering Integrity', () => {
       const sourceItem = demoPage.list2Items.first();
       const sourceBox = await sourceItem.boundingBox();
 
-      await sourceItem.hover();
-      await page.mouse.down();
-      await page.mouse.move(sourceBox!.x + sourceBox!.width / 2, sourceBox!.y + 75, { steps: 5 });
-      await expect(demoPage.dragPreview).toBeVisible();
+      if (!sourceBox) {
+        throw new Error('Could not get source item bounding box');
+      }
+      await startPointerDragFromBox(page, demoPage.dragPreview, sourceBox);
+      await moveWithinSameList(page, sourceBox);
 
       // Count visible placeholders — wrap in toPass since count() is one-shot and rAF-dependent
       await expect(async () => {
@@ -103,10 +138,11 @@ test.describe('Placeholder Rendering Integrity', () => {
       const sourceItem = demoPage.list2Items.first();
       const sourceBox = await sourceItem.boundingBox();
 
-      await sourceItem.hover();
-      await page.mouse.down();
-      await page.mouse.move(sourceBox!.x + sourceBox!.width / 2, sourceBox!.y + 75, { steps: 5 });
-      await expect(demoPage.dragPreview).toBeVisible();
+      if (!sourceBox) {
+        throw new Error('Could not get source item bounding box');
+      }
+      await startPointerDragFromBox(page, demoPage.dragPreview, sourceBox);
+      await moveWithinSameList(page, sourceBox);
 
       // Get all rendered content
       const items = await demoPage.getRenderedItemsWithContent('list2');
@@ -137,10 +173,11 @@ test.describe('Placeholder Rendering Integrity', () => {
       const sourceItem = demoPage.list2Items.first();
       const sourceBox = await sourceItem.boundingBox();
 
-      await sourceItem.hover();
-      await page.mouse.down();
-      await page.mouse.move(sourceBox!.x + sourceBox!.width / 2, sourceBox!.y + 75, { steps: 5 });
-      await expect(demoPage.dragPreview).toBeVisible();
+      if (!sourceBox) {
+        throw new Error('Could not get source item bounding box');
+      }
+      await startPointerDragFromBox(page, demoPage.dragPreview, sourceBox);
+      await moveWithinSameList(page, sourceBox);
 
       // Count visible placeholders — wrap in toPass since count() is one-shot and rAF-dependent
       await expect(async () => {
@@ -161,12 +198,14 @@ test.describe('Placeholder Rendering Integrity', () => {
       const sourceItem = demoPage.list1Items.first();
       const targetBox = await demoPage.list2VirtualScroll.boundingBox();
 
-      await sourceItem.hover();
-      await page.mouse.down();
-      await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 100, { steps: 10 });
+      const sourceBox = await sourceItem.boundingBox();
+      if (!sourceBox || !targetBox) {
+        throw new Error('Could not get drag source/target bounding boxes');
+      }
+      await startPointerDragFromBox(page, demoPage.dragPreview, sourceBox);
+      await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + 100, { steps: 10 });
       // Firefox/WebKit can miss the final stepped position; direct follow-up ensures arrival
-      await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 100);
-      await expect(demoPage.dragPreview).toBeVisible();
+      await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + 100);
 
       // Check for any duplicate visible placeholder situations — wrap in toPass
       await expect(async () => {
@@ -192,10 +231,11 @@ test.describe('Placeholder Rendering Integrity', () => {
       const sourceItem = demoPage.list2Items.first();
       const sourceBox = await sourceItem.boundingBox();
 
-      await sourceItem.hover();
-      await page.mouse.down();
-      await page.mouse.move(sourceBox!.x + sourceBox!.width / 2, sourceBox!.y + 75, { steps: 5 });
-      await expect(demoPage.dragPreview).toBeVisible();
+      if (!sourceBox) {
+        throw new Error('Could not get source item bounding box');
+      }
+      await startPointerDragFromBox(page, demoPage.dragPreview, sourceBox);
+      await moveWithinSameList(page, sourceBox);
 
       // Wrap in toPass since count() is one-shot
       let verbosePlaceholders = 0;
@@ -221,14 +261,8 @@ test.describe('Placeholder Rendering Integrity', () => {
         throw new Error('Could not get bounding box for simplified API item');
       }
 
-      await sourceItemSimplified.hover();
-      await page.mouse.down();
-      await page.mouse.move(
-        sourceBoxSimplified!.x + sourceBoxSimplified!.width / 2,
-        sourceBoxSimplified!.y + 75,
-        { steps: 5 },
-      );
-      await expect(demoPage.dragPreview).toBeVisible();
+      await startPointerDragFromBox(page, demoPage.dragPreview, sourceBoxSimplified);
+      await moveWithinSameList(page, sourceBoxSimplified);
 
       let simplifiedPlaceholders = 0;
       await expect(async () => {

@@ -1,5 +1,37 @@
-import { expect, test } from '@playwright/test';
+import { expect, Locator, Page, test } from '@playwright/test';
 import { DemoPage } from './fixtures/demo.page';
+
+interface DragStartBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+async function startPointerDragFromLocator(
+  page: Page,
+  dragPreview: Locator,
+  locator: Locator,
+): Promise<DragStartBox> {
+  let box: DragStartBox | null = null;
+
+  await expect(async () => {
+    await page.mouse.up().catch(() => undefined);
+    box = await locator.boundingBox();
+    expect(box).not.toBeNull();
+    const startX = box!.x + box!.width / 2;
+    const startY = box!.y + box!.height / 2;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 20, startY + 20, { steps: 5 });
+    await expect(dragPreview).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 8000 });
+
+  if (!box) {
+    throw new Error('Could not start pointer drag');
+  }
+  return box;
+}
 
 test.describe('Placeholder Behavior During Drag', () => {
   let demoPage: DemoPage;
@@ -11,18 +43,11 @@ test.describe('Placeholder Behavior During Drag', () => {
 
   test('should show only one placeholder when dragging within same list', async ({ page }) => {
     const sourceItem = demoPage.list2Items.first();
-    const sourceBox = await sourceItem.boundingBox();
-    if (!sourceBox) throw new Error('Could not get source item bounding box');
+    const sourceBox = await startPointerDragFromLocator(page, demoPage.dragPreview, sourceItem);
 
-    // Start dragging
-    await sourceItem.hover();
-    await page.mouse.down();
-
-    // Move down ~75px to trigger drag and be within the list
+    // Move down ~75px to update the placeholder within the list.
     await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + 75, { steps: 5 });
-
-    // Wait for drag preview to appear (indicates drag state is active)
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + 75);
 
     // Placeholder appears after a rAF-throttled position update; use retrying assertion
     await expect(async () => {
@@ -49,15 +74,11 @@ test.describe('Placeholder Behavior During Drag', () => {
     const targetBox = await demoPage.list2VirtualScroll.boundingBox();
     if (!targetBox) throw new Error('Could not get target container bounding box');
 
-    // Start dragging
-    await sourceItem.hover();
-    await page.mouse.down();
+    await startPointerDragFromLocator(page, demoPage.dragPreview, sourceItem);
 
-    // Move to list2
+    // Move to list2.
     await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + 75, { steps: 10 });
-
-    // Wait for drag preview to appear
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + 75);
 
     // Placeholder appears after a rAF-throttled position update; use retrying assertion
     await expect(async () => {
@@ -98,17 +119,16 @@ test.describe('Placeholder Behavior During Drag', () => {
     }
     const secondItemId = await secondItem.getAttribute('data-draggable-id');
 
-    // Start dragging the first item
-    await firstItem.hover();
-    await page.mouse.down();
+    await startPointerDragFromLocator(page, demoPage.dragPreview, firstItem);
     await page.mouse.move(
       firstItemBoxBefore.x + firstItemBoxBefore.width / 2,
       firstItemBoxBefore.y + 75,
       { steps: 5 },
     );
-
-    // Wait for drag preview to appear
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    await page.mouse.move(
+      firstItemBoxBefore.x + firstItemBoxBefore.width / 2,
+      firstItemBoxBefore.y + 75,
+    );
 
     // The second item should now be at or near the position of the first item
     // because the dragged item's space is collapsed (display: none)

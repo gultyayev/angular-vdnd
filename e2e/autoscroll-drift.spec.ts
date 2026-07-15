@@ -339,22 +339,27 @@ test.describe('Autoscroll Placeholder Drift', () => {
       throw new Error('Could not get container bounding box');
     }
 
-    const sourceBox = await demoPage.list1VirtualScroll.evaluate((container) => {
-      const containerRect = container.getBoundingClientRect();
-      const viewportBottom = window.innerHeight;
-      const items = container.querySelectorAll('[data-draggable-id]');
-      let bestItem: { x: number; y: number; width: number; height: number } | null = null;
-      for (const item of items) {
-        const rect = item.getBoundingClientRect();
-        const visibleTop = Math.max(rect.top, containerRect.top, 0);
-        const visibleBottom = Math.min(rect.bottom, containerRect.bottom, viewportBottom);
-        const visibleHeight = visibleBottom - visibleTop;
-        if (visibleHeight > 10 && rect.width > 0) {
-          bestItem = { x: rect.x, y: visibleTop, width: rect.width, height: visibleHeight };
+    let sourceBox: DragStartBox | null = null;
+    await expect(async () => {
+      sourceBox = await demoPage.list1VirtualScroll.evaluate((container) => {
+        const containerRect = container.getBoundingClientRect();
+        const viewportBottom = window.innerHeight;
+        const items = container.querySelectorAll('[data-draggable-id]');
+        let bestItem: { x: number; y: number; width: number; height: number } | null = null;
+        for (const item of items) {
+          const rect = item.getBoundingClientRect();
+          const visibleTop = Math.max(rect.top, containerRect.top, 0);
+          const visibleBottom = Math.min(rect.bottom, containerRect.bottom, viewportBottom);
+          const visibleHeight = visibleBottom - visibleTop;
+          if (visibleHeight > 10 && rect.width > 0) {
+            bestItem = { x: rect.x, y: visibleTop, width: rect.width, height: visibleHeight };
+          }
         }
-      }
-      return bestItem;
-    });
+        return bestItem;
+      });
+      expect(sourceBox).not.toBeNull();
+    }).toPass({ timeout: 3000 });
+
     if (!sourceBox) {
       throw new Error('Could not get visible source item bounding box');
     }
