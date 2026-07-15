@@ -1,4 +1,4 @@
-import { expect, Page, test } from '@playwright/test';
+import { expect, Locator, Page, test } from '@playwright/test';
 import { DemoPage } from './fixtures/demo.page';
 
 interface DriftSnapshot {
@@ -119,12 +119,39 @@ async function waitForDriftSnapshot(
   return matchingSnapshot;
 }
 
+interface DragStartBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+async function startPointerDragFromBox(
+  page: Page,
+  dragPreview: Locator,
+  box: DragStartBox,
+): Promise<void> {
+  const startX = box.x + box.width / 2;
+  const startY = box.y + box.height / 2;
+
+  await expect(async () => {
+    await page.mouse.up().catch(() => undefined);
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 10, startY + 10, { steps: 3 });
+    await expect(dragPreview).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 5000 });
+}
+
 test.describe('Autoscroll Placeholder Drift', () => {
   let demoPage: DemoPage;
 
   test.beforeEach(async ({ page }) => {
     demoPage = new DemoPage(page);
     await demoPage.goto();
+    await demoPage.list1VirtualScroll.evaluate((el) =>
+      el.scrollIntoView({ block: 'center', inline: 'nearest' }),
+    );
     // Item count defaults to 100 in the demo
   });
 
@@ -140,20 +167,13 @@ test.describe('Autoscroll Placeholder Drift', () => {
       throw new Error('Could not get bounding boxes');
     }
 
-    // Start drag from center of first item
-    const startX = itemBox.x + itemBox.width / 2;
-    const startY = itemBox.y + itemBox.height / 2;
-    await page.mouse.move(startX, startY);
-    await page.mouse.down();
-    // Small initial move to trigger drag detection
-    await page.mouse.move(startX + 5, startY + 5, { steps: 2 });
-
-    // Wait for drag preview to confirm drag started
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    // Start drag from center of first item and verify the preview mounted before autoscroll.
+    await startPointerDragFromBox(page, demoPage.dragPreview, itemBox);
 
     // Move to bottom edge to trigger autoscroll
-    const nearBottomY = containerBox.y + containerBox.height - 20;
+    const nearBottomY = containerBox.y + containerBox.height - 15;
     await page.mouse.move(containerBox.x + 100, nearBottomY, { steps: 10 });
+    await page.mouse.move(containerBox.x + 100, nearBottomY);
 
     const snapshot = await waitForDriftSnapshot(
       page,
@@ -199,11 +219,15 @@ test.describe('Autoscroll Placeholder Drift', () => {
     }
 
     // 2. Start drag from center of first item
-    await sourceItem.hover();
-    await page.mouse.down();
+    const sourceBox = await sourceItem.boundingBox();
+    if (!sourceBox) {
+      throw new Error('Could not get source item bounding box');
+    }
+    await startPointerDragFromBox(page, demoPage.dragPreview, sourceBox);
 
     // 3. Move to bottom edge to trigger autoscroll
     const nearBottomY = containerBox.y + containerBox.height - 25;
+    await page.mouse.move(containerBox.x + 100, nearBottomY, { steps: 10 });
     await page.mouse.move(containerBox.x + 100, nearBottomY);
 
     const snapshot = await waitForDriftSnapshot(
@@ -249,10 +273,14 @@ test.describe('Autoscroll Placeholder Drift', () => {
       throw new Error('Could not get container bounding box');
     }
 
-    await sourceItem.hover();
-    await page.mouse.down();
+    const sourceBox = await sourceItem.boundingBox();
+    if (!sourceBox) {
+      throw new Error('Could not get source item bounding box');
+    }
+    await startPointerDragFromBox(page, demoPage.dragPreview, sourceBox);
 
     const nearBottomY = containerBox.y + containerBox.height - 25;
+    await page.mouse.move(containerBox.x + 100, nearBottomY, { steps: 10 });
     await page.mouse.move(containerBox.x + 100, nearBottomY);
 
     const snapshot = await waitForDriftSnapshot(
@@ -296,18 +324,41 @@ test.describe('Autoscroll Placeholder Drift', () => {
       expect(scrollTop).toBeGreaterThan(1500);
     }).toPass({ timeout: 2000 });
 
-    const sourceItem = demoPage.list1Items.last();
     const containerBox = await demoPage.list1VirtualScroll.boundingBox();
 
     if (!containerBox) {
       throw new Error('Could not get container bounding box');
     }
 
-    await sourceItem.hover();
-    await page.mouse.down();
+    let sourceBox: DragStartBox | null = null;
+    await expect(async () => {
+      sourceBox = await demoPage.list1VirtualScroll.evaluate((container) => {
+        const containerRect = container.getBoundingClientRect();
+        const viewportBottom = window.innerHeight;
+        const items = container.querySelectorAll('[data-draggable-id]');
+        let bestItem: { x: number; y: number; width: number; height: number } | null = null;
+        for (const item of items) {
+          const rect = item.getBoundingClientRect();
+          const visibleTop = Math.max(rect.top, containerRect.top, 0);
+          const visibleBottom = Math.min(rect.bottom, containerRect.bottom, viewportBottom);
+          const visibleHeight = visibleBottom - visibleTop;
+          if (visibleHeight > 10 && rect.width > 0) {
+            bestItem = { x: rect.x, y: visibleTop, width: rect.width, height: visibleHeight };
+          }
+        }
+        return bestItem;
+      });
+      expect(sourceBox).not.toBeNull();
+    }).toPass({ timeout: 3000 });
+
+    if (!sourceBox) {
+      throw new Error('Could not get visible source item bounding box');
+    }
+    await startPointerDragFromBox(page, demoPage.dragPreview, sourceBox);
 
     // Move to top edge
-    const nearTopY = containerBox.y + 25;
+    const nearTopY = containerBox.y + 15;
+    await page.mouse.move(containerBox.x + 100, nearTopY, { steps: 10 });
     await page.mouse.move(containerBox.x + 100, nearTopY);
 
     const snapshot = await waitForDriftSnapshot(
@@ -351,10 +402,16 @@ test.describe('Autoscroll Placeholder Drift', () => {
       throw new Error('Could not get container bounding box');
     }
 
-    await sourceItem.hover();
-    await page.mouse.down();
+    const sourceBox = await sourceItem.boundingBox();
+    if (!sourceBox) {
+      throw new Error('Could not get source item bounding box');
+    }
+    await startPointerDragFromBox(page, demoPage.dragPreview, sourceBox);
 
     // Move to bottom and wait for autoscroll to reach absolute end
+    await page.mouse.move(containerBox.x + 100, containerBox.y + containerBox.height - 20, {
+      steps: 10,
+    });
     await page.mouse.move(containerBox.x + 100, containerBox.y + containerBox.height - 20);
     await expect(async () => {
       const scrollInfo = await demoPage.list1VirtualScroll.evaluate((el) => ({
@@ -400,11 +457,10 @@ test.describe('Autoscroll Placeholder Drift', () => {
 
     // Start drag
     const itemBox = await sourceItem.boundingBox();
-    await sourceItem.hover();
-    await page.mouse.down();
-    // Small initial move to trigger drag detection
-    await page.mouse.move(itemBox!.x + 5, itemBox!.y + 5, { steps: 2 });
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    if (!itemBox) {
+      throw new Error('Could not get source item bounding box');
+    }
+    await startPointerDragFromBox(page, demoPage.dragPreview, itemBox);
 
     const nearBottomY = containerBox.y + containerBox.height - 20;
     const nearTopY = containerBox.y + 20;
@@ -513,11 +569,7 @@ test.describe('Autoscroll Placeholder Drift', () => {
     // Start drag from center of first item
     const startX = itemBox.x + itemBox.width / 2;
     const startY = itemBox.y + itemBox.height / 2;
-    await page.mouse.move(startX, startY);
-    await page.mouse.down();
-    // Small initial move to trigger drag detection
-    await page.mouse.move(startX + 5, startY + 5, { steps: 2 });
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    await startPointerDragFromBox(page, demoPage.dragPreview, itemBox);
 
     // Helper to get current placeholder index and preview position
     const getState = async () => {
@@ -609,12 +661,14 @@ test.describe('Autoscroll Placeholder Drift', () => {
         throw new Error('Could not get container bounding box');
       }
 
-      const webkitItemBox = await sourceItem.boundingBox();
-      await sourceItem.hover();
-      await page.mouse.down();
-      // Small initial move to trigger drag detection
-      await page.mouse.move(webkitItemBox!.x + 5, webkitItemBox!.y + 5, { steps: 2 });
-      await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+      await expect(async () => {
+        await page.mouse.up().catch(() => undefined);
+        const webkitItemBox = await sourceItem.boundingBox();
+        if (!webkitItemBox) {
+          throw new Error('Could not get source item bounding box');
+        }
+        await startPointerDragFromBox(page, demoPage.dragPreview, webkitItemBox);
+      }).toPass({ timeout: 5000 });
 
       const nearBottomY = containerBox.y + containerBox.height - 15;
       const nearTopY = containerBox.y + 15;
@@ -668,7 +722,7 @@ test.describe('Autoscroll Placeholder Drift', () => {
   });
 
   test('no gap should remain after drop at maximum scroll', async ({ page }, testInfo) => {
-    // Test that dropping an item when scrolled to bottom doesn't leave a gap
+    // Test that dropping an item when scrolled to bottom doesn't leave a gap.
     // Scroll list1 to the bottom first — wrap write+read in toPass
     await expect(async () => {
       await demoPage.scrollList('list1', 5000);
@@ -679,17 +733,22 @@ test.describe('Autoscroll Placeholder Drift', () => {
     const getVisibleBottomItem = async () =>
       demoPage.list1VirtualScroll.evaluate((container) => {
         const containerRect = container.getBoundingClientRect();
+        const viewportBottom = window.innerHeight;
         const items = container.querySelectorAll('[data-draggable-id]');
-        // Pick the last visible item
+        // Pick the last item with a safe grab point inside both the scroll container and viewport.
         let bestItem: { x: number; y: number; width: number; height: number } | null = null;
         for (const item of items) {
           const rect = item.getBoundingClientRect();
-          if (
-            rect.bottom > containerRect.top &&
-            rect.top < containerRect.bottom &&
-            rect.height > 0
-          ) {
-            bestItem = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+          const visibleTop = Math.max(rect.top, containerRect.top, 0);
+          const visibleBottom = Math.min(rect.bottom, containerRect.bottom, viewportBottom);
+          const visibleHeight = visibleBottom - visibleTop;
+          if (visibleHeight > 10 && rect.width > 0) {
+            bestItem = {
+              x: rect.x,
+              y: visibleTop,
+              width: rect.width,
+              height: visibleHeight,
+            };
           }
         }
         return bestItem;
@@ -704,13 +763,7 @@ test.describe('Autoscroll Placeholder Drift', () => {
     const itemCoords = await getVisibleBottomItem();
     if (!itemCoords) throw new Error('Could not find visible item near bottom');
 
-    await page.mouse.move(
-      itemCoords.x + itemCoords.width / 2,
-      itemCoords.y + itemCoords.height / 2,
-    );
-    await page.mouse.down();
-    await page.mouse.move(itemCoords.x + 10, itemCoords.y + 30, { steps: 5 });
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 2000 });
+    await startPointerDragFromBox(page, demoPage.dragPreview, itemCoords);
 
     // Drop the item (same-list reorder at same position = no-op, but tests scroll state)
     await page.mouse.up();

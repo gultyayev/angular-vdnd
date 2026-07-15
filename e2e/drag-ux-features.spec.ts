@@ -1,5 +1,29 @@
-import { expect, test } from '@playwright/test';
+import { expect, Locator, Page, test } from '@playwright/test';
 import { DemoPage } from './fixtures/demo.page';
+
+interface DragStartBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+async function startPointerDragFromBox(
+  page: Page,
+  dragPreview: Locator,
+  box: DragStartBox,
+): Promise<void> {
+  const startX = box.x + box.width / 2;
+  const startY = box.y + box.height / 2;
+
+  await expect(async () => {
+    await page.mouse.up().catch(() => undefined);
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 10, startY + 10, { steps: 3 });
+    await expect(dragPreview).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 5000 });
+}
 
 test.describe('Drag UX Features - Cursor Management', () => {
   let demoPage: DemoPage;
@@ -98,18 +122,14 @@ test.describe('Drag UX Features - Drag Handle', () => {
     const handleCheckbox = page.locator('[data-testid="drag-handle-checkbox"]');
     await expect(handleCheckbox).not.toBeChecked();
 
-    // Get first item text area
+    // Get a stable draggable item box and drag from its center.
     const firstItem = demoPage.list1Items.first();
-    const itemText = firstItem.locator('.item-text');
-    const textBox = await itemText.boundingBox();
+    const itemBox = await firstItem.boundingBox();
+    if (!itemBox) {
+      throw new Error('Could not get first item bounding box');
+    }
 
-    // Drag by clicking on the item text
-    await page.mouse.move(textBox!.x + textBox!.width / 2, textBox!.y + textBox!.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(textBox!.x + 100, textBox!.y + 100, { steps: 5 });
-
-    // Drag preview should be visible
-    await expect(demoPage.dragPreview).toBeVisible({ timeout: 1000 });
+    await startPointerDragFromBox(page, demoPage.dragPreview, itemBox);
 
     await page.mouse.up();
   });

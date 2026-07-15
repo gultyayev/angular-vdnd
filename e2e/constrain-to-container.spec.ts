@@ -15,6 +15,9 @@ test.describe('Constrain to Container', () => {
     demoPage = new DemoPage(page);
     await demoPage.goto();
     await demoPage.enableConstrainToContainer();
+    await demoPage.list1VirtualScroll.evaluate((el) =>
+      el.scrollIntoView({ block: 'center', inline: 'nearest' }),
+    );
   });
 
   async function getDebugState(page: Parameters<typeof test>[0]['page']): Promise<DebugState> {

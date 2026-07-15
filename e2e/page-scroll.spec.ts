@@ -217,7 +217,11 @@ test.describe('Page Scroll Demo', () => {
     const scrollBox = await taskDemo.scrollContainer.boundingBox();
     if (!scrollBox) throw new Error('Could not get scroll container bounding box');
 
-    const sourceRect = await taskDemo.getVisibleItemBoxAt(0.4);
+    let sourceRect = await taskDemo.getVisibleItemBoxAt(0.4);
+    await expect(async () => {
+      sourceRect = await taskDemo.getVisibleItemBoxAt(0.4);
+      expect(sourceRect).not.toBeNull();
+    }).toPass({ timeout: 3000 });
     if (!sourceRect) throw new Error('Could not find visible task item near center');
 
     const sourceX = sourceRect.x + sourceRect.width / 2;

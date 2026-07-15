@@ -106,6 +106,7 @@ export class TaskDemoPage {
   async scrollTo(scrollTop: number): Promise<void> {
     await this.scrollContainer.evaluate((el, top) => {
       el.scrollTop = top;
+      el.dispatchEvent(new Event('scroll'));
     }, scrollTop);
   }
 
