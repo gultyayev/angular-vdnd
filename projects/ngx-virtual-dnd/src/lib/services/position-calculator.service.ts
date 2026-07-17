@@ -1,4 +1,4 @@
-import { inject, Injectable, isDevMode, NgZone } from '@angular/core';
+import { inject, Injectable, NgZone } from '@angular/core';
 import { queryAllByAttribute, queryByAttribute } from '../utils/attribute-selectors';
 
 /**
@@ -513,7 +513,7 @@ export class PositionCalculatorService {
     currentDroppableId: string,
     direction: 'left' | 'right',
     groupName: string,
-  ): { element: HTMLElement; id: string; itemCount: number } | null {
+  ): { element: HTMLElement; id: string } | null {
     // Include disabled droppables when establishing left-to-right order and locating the
     // current container — otherwise a container disabled mid-drag (its own index becomes
     // -1) would trap the drag with no reachable neighbour. Disabled droppables are skipped
@@ -565,7 +565,6 @@ export class PositionCalculatorService {
       return {
         element: target.element,
         id: target.id,
-        itemCount: this.#getDroppableItemCount(target.element),
       };
     }
 
@@ -581,40 +580,5 @@ export class PositionCalculatorService {
   isDroppableDisabledById(id: string): boolean {
     const element = this.getDroppableById(id);
     return element === null || this.#isDroppableDisabled(element);
-  }
-
-  /**
-   * Get the total item count in a droppable.
-   * Uses spacer height and data attributes if available, otherwise counts DOM elements.
-   */
-  #getDroppableItemCount(droppableElement: HTMLElement): number {
-    const virtualScroll = droppableElement.querySelector('vdnd-virtual-scroll');
-    if (virtualScroll) {
-      const configuredHeight = virtualScroll.getAttribute('data-item-height');
-
-      if (!configuredHeight) {
-        if (isDevMode()) {
-          console.error(
-            '[ngx-virtual-dnd] vdnd-virtual-scroll requires data-item-height attribute ' +
-              'for keyboard navigation. Cross-list keyboard drag will not work correctly.',
-          );
-        }
-        // Short-circuit: return 0 to prevent navigation to this droppable
-        return 0;
-      }
-
-      // Prefer spacer height over scrollHeight for accuracy
-      const spacer = virtualScroll.querySelector(
-        '.vdnd-virtual-scroll-spacer',
-      ) as HTMLElement | null;
-      const totalHeight = spacer
-        ? parseFloat(spacer.style.height) || 0
-        : (virtualScroll as HTMLElement).scrollHeight;
-
-      const itemHeight = parseInt(configuredHeight, 10);
-      return Math.floor(totalHeight / itemHeight);
-    }
-    // Fallback for non-virtual scroll: DOM count is valid
-    return droppableElement.querySelectorAll(`[${this.#DRAGGABLE_ID_ATTR}]`).length;
   }
 }

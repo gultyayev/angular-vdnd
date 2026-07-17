@@ -1,10 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterNextRender } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
 import {
   KeyboardDragCallbacks,
   KeyboardDragDeps,
   KeyboardDragHandler,
 } from './keyboard-drag.handler';
+import { PositionCalculatorService } from '../services/position-calculator.service';
+import { DragIndexCalculatorService } from '../services/drag-index-calculator.service';
 
 jest.mock('@angular/core', () => {
   const actual = jest.requireActual('@angular/core');
@@ -50,6 +53,7 @@ describe('KeyboardDragHandler', () => {
       placeholderIndex: jest.fn().mockReturnValue(2),
       sourceDroppableId: jest.fn().mockReturnValue('list-1'),
       activeDroppableId: jest.fn().mockReturnValue('list-1'),
+      draggedItem: jest.fn().mockReturnValue({ height: 50 }),
     };
 
     mockKeyboardDrag = {
@@ -293,8 +297,9 @@ describe('KeyboardDragHandler', () => {
     });
 
     it('should handle ArrowLeft key (cross-list)', () => {
-      const adjacent = { element: createElement(), id: 'list-2', itemCount: 3 };
-      mockPositionCalculator.findAdjacentDroppable.mockReturnValue(adjacent);
+      const element = createElement();
+      mockPositionCalculator.findAdjacentDroppable.mockReturnValue({ element, id: 'list-2' });
+      mockDragIndexCalculator.getTotalItemCount.mockReturnValue(3);
 
       const event = createKeyEvent('ArrowLeft');
       const result = handler.handleKey(event);
@@ -305,12 +310,17 @@ describe('KeyboardDragHandler', () => {
         'left',
         'test-group',
       );
+      // The item count comes from DragIndexCalculatorService, not findAdjacentDroppable.
+      expect(mockDragIndexCalculator.getTotalItemCount).toHaveBeenCalledWith(
+        expect.objectContaining({ droppableElement: element }),
+      );
       expect(mockKeyboardDrag.moveToDroppable).toHaveBeenCalledWith('list-2', 0, 3);
     });
 
     it('should handle ArrowRight key (cross-list)', () => {
-      const adjacent = { element: createElement(), id: 'list-2', itemCount: 3 };
-      mockPositionCalculator.findAdjacentDroppable.mockReturnValue(adjacent);
+      const element = createElement();
+      mockPositionCalculator.findAdjacentDroppable.mockReturnValue({ element, id: 'list-2' });
+      mockDragIndexCalculator.getTotalItemCount.mockReturnValue(3);
 
       const event = createKeyEvent('ArrowRight');
       const result = handler.handleKey(event);
@@ -333,8 +343,9 @@ describe('KeyboardDragHandler', () => {
 
     it('should clamp target index to new list size on cross-list move', () => {
       mockKeyboardDrag.targetIndex.mockReturnValue(10);
-      const adjacent = { element: createElement(), id: 'list-2', itemCount: 3 };
-      mockPositionCalculator.findAdjacentDroppable.mockReturnValue(adjacent);
+      const element = createElement();
+      mockPositionCalculator.findAdjacentDroppable.mockReturnValue({ element, id: 'list-2' });
+      mockDragIndexCalculator.getTotalItemCount.mockReturnValue(3);
 
       handler.handleKey(createKeyEvent('ArrowRight'));
 
@@ -591,6 +602,117 @@ describe('KeyboardDragHandler', () => {
 
       addSpy.mockRestore();
       removeSpy.mockRestore();
+    });
+  });
+
+  // Issue #25: cross-list keyboard navigation must derive the destination list's item count
+  // through DragIndexCalculatorService (the single source of truth), not the duplicated
+  // spacer/itemHeight division that mis-counted dynamic-height and vdnd-virtual-content lists.
+  describe('cross-list item counting (issue #25)', () => {
+    const created: HTMLElement[] = [];
+    let realPositionCalc: PositionCalculatorService;
+    let realIndexCalc: DragIndexCalculatorService;
+    let localHandler: KeyboardDragHandler;
+
+    function stubRect(el: HTMLElement, left: number): void {
+      el.getBoundingClientRect = () =>
+        ({
+          top: 0,
+          left,
+          right: left + 100,
+          bottom: 100,
+          width: 100,
+          height: 100,
+          x: left,
+          y: 0,
+          toJSON: () => ({}),
+        }) as DOMRect;
+    }
+
+    function makeDroppable(id: string, left: number): HTMLElement {
+      const el = document.createElement('div');
+      el.setAttribute('data-droppable-id', id);
+      el.setAttribute('data-droppable-group', 'test-group');
+      stubRect(el, left);
+      document.body.appendChild(el);
+      created.push(el);
+      return el;
+    }
+
+    beforeEach(() => {
+      TestBed.configureTestingModule({
+        providers: [PositionCalculatorService, DragIndexCalculatorService],
+      });
+      realPositionCalc = TestBed.inject(PositionCalculatorService);
+      realIndexCalc = TestBed.inject(DragIndexCalculatorService);
+
+      mockKeyboardDrag.isActive.mockReturnValue(true);
+      // Large current target index so the clamp lands exactly on the list's item count.
+      mockKeyboardDrag.targetIndex.mockReturnValue(100);
+      mockDragState.activeDroppableId.mockReturnValue('source-list');
+
+      localHandler = new KeyboardDragHandler({
+        dragState: mockDragState,
+        keyboardDrag: mockKeyboardDrag,
+        positionCalculator: realPositionCalc,
+        dragIndexCalculator: realIndexCalc,
+        elementClone: mockElementClone,
+        overlayContainer: { hasTemplatePreview: jest.fn().mockReturnValue(false) },
+        ngZone: mockNgZone,
+        envInjector: mockEnvInjector,
+        callbacks: mockCallbacks,
+        getContext: () => ({ ...mockContext, groupName: 'test-group' }),
+      } as KeyboardDragDeps);
+
+      // Source list on the left so the target is the right-hand neighbour.
+      makeDroppable('source-list', 0);
+    });
+
+    afterEach(() => {
+      localHandler.destroy();
+      created.forEach((el) => el.remove());
+      created.length = 0;
+    });
+
+    it('clamps to the true item count for a dynamic-height list, not spacer/itemHeight division', () => {
+      // Models a dynamic-height list: it publishes its true N via data-total-items (12) while
+      // data-item-height is only a nominal estimate. The old duplicated logic ignored
+      // data-total-items and divided spacer height (900) by data-item-height (50) = 18, which
+      // overshoots when rows vary in height. The fix reads data-total-items instead.
+      const target = makeDroppable('dynamic-list', 200);
+      const virtualScroll = document.createElement('vdnd-virtual-scroll');
+      virtualScroll.setAttribute('data-item-height', '50');
+      virtualScroll.setAttribute('data-total-items', '12');
+      const spacer = document.createElement('div');
+      spacer.className = 'vdnd-virtual-scroll-spacer';
+      spacer.style.height = '900px';
+      virtualScroll.appendChild(spacer);
+      target.appendChild(virtualScroll);
+
+      localHandler.handleKey(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+
+      expect(mockKeyboardDrag.moveToDroppable).toHaveBeenCalledWith('dynamic-list', 12, 12);
+    });
+
+    it('clamps to the true item count for a vdnd-virtual-content list, not the rendered DOM count', () => {
+      // True N = 20 (data-total-items), but only 4 items are rendered in the virtual window.
+      const target = document.createElement('vdnd-virtual-content');
+      target.setAttribute('data-droppable-id', 'content-list');
+      target.setAttribute('data-droppable-group', 'test-group');
+      target.setAttribute('data-item-height', '40');
+      target.setAttribute('data-total-items', '20');
+      stubRect(target, 200);
+      for (let i = 0; i < 4; i++) {
+        const child = document.createElement('div');
+        child.setAttribute('data-draggable-id', `rendered-${i}`);
+        target.appendChild(child);
+      }
+      document.body.appendChild(target);
+      created.push(target);
+
+      localHandler.handleKey(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+
+      expect(mockKeyboardDrag.moveToDroppable).toHaveBeenCalledWith('content-list', 20, 20);
     });
   });
 });

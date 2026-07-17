@@ -341,11 +341,21 @@ export class KeyboardDragHandler {
       return;
     }
 
+    // Derive the destination list's item count from DragIndexCalculatorService — the single
+    // source of truth that correctly handles registered strategies, dynamic-height lists, and
+    // vdnd-virtual-content (page-scroll) lists. Arrowing back to the origin lands on the source
+    // list, so compute isSameList rather than assuming a distinct target.
+    const itemCount = this.#deps.dragIndexCalculator.getTotalItemCount({
+      droppableElement: adjacent.element,
+      isSameList: adjacent.id === this.#deps.dragState.sourceDroppableId(),
+      draggedItemHeight: this.#deps.dragState.draggedItem()?.height ?? 0,
+    });
+
     // Maintain the current target index (clamped to the new list's size)
     const currentTargetIndex = this.#deps.keyboardDrag.targetIndex() ?? 0;
-    const targetIndex = Math.min(currentTargetIndex, adjacent.itemCount);
+    const targetIndex = Math.min(currentTargetIndex, itemCount);
 
-    this.#deps.keyboardDrag.moveToDroppable(adjacent.id, targetIndex, adjacent.itemCount);
+    this.#deps.keyboardDrag.moveToDroppable(adjacent.id, targetIndex, itemCount);
   }
 
   /**
