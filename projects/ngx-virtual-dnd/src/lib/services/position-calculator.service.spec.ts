@@ -351,6 +351,180 @@ describe('PositionCalculatorService', () => {
     });
   });
 
+  describe('mid-drag candidate changes', () => {
+    // Exercises the divergence cases from issue #23: droppables added/removed after
+    // the candidate snapshot was captured at drag start.
+    const created: HTMLElement[] = [];
+
+    function stubRect(el: HTMLElement, rect: Partial<DOMRect>): void {
+      const full = {
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: 0,
+        height: 0,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+        ...rect,
+      } as DOMRect;
+      el.getBoundingClientRect = () => full;
+    }
+
+    function makeDroppable(id: string, group: string, rect: Partial<DOMRect>): HTMLElement {
+      const el = document.createElement('div');
+      el.setAttribute('data-droppable-id', id);
+      el.setAttribute('data-droppable-group', group);
+      stubRect(el, rect);
+      document.body.appendChild(el);
+      created.push(el);
+      return el;
+    }
+
+    afterEach(() => {
+      service.endDragSession();
+      created.forEach((el) => el.remove());
+      created.length = 0;
+    });
+
+    it('refreshCandidates picks up a droppable mounted after the session started', () => {
+      const dragged = document.createElement('div');
+      makeDroppable('a', 'g', { top: 0, left: 0, right: 100, bottom: 100 });
+
+      service.beginDragSession('g');
+
+      // A new droppable mounts mid-drag (e.g. a conditionally rendered list).
+      const b = makeDroppable('b', 'g', { top: 200, left: 200, right: 400, bottom: 400 });
+
+      // Frozen candidate list does not see it yet.
+      expect(service.findDroppableAtPoint(300, 300, dragged, 'g')).toBeNull();
+
+      service.refreshCandidates();
+
+      // After an explicit refresh it becomes a valid target.
+      expect(service.findDroppableAtPoint(300, 300, dragged, 'g')).toBe(b);
+    });
+
+    it('refreshCandidates drops a droppable removed mid-session', () => {
+      const dragged = document.createElement('div');
+      const a = makeDroppable('a', 'g', { top: 0, left: 0, right: 300, bottom: 300 });
+
+      service.beginDragSession('g');
+      expect(service.findDroppableAtPoint(100, 100, dragged, 'g')).toBe(a);
+
+      a.remove();
+      service.refreshCandidates();
+
+      expect(service.findDroppableAtPoint(100, 100, dragged, 'g')).toBeNull();
+    });
+
+    it('notifyCandidatesChanged makes the next hit-test observe a newly mounted droppable', () => {
+      const dragged = document.createElement('div');
+      makeDroppable('a', 'g', { top: 0, left: 0, right: 100, bottom: 100 });
+
+      service.beginDragSession('g');
+
+      const b = makeDroppable('b', 'g', { top: 200, left: 200, right: 400, bottom: 400 });
+      expect(service.findDroppableAtPoint(300, 300, dragged, 'g')).toBeNull();
+
+      // A droppable directive registering mid-drag notifies the calculator.
+      service.notifyCandidatesChanged('g');
+
+      expect(service.findDroppableAtPoint(300, 300, dragged, 'g')).toBe(b);
+    });
+
+    it('notifyCandidatesChanged ignores notifications for a different group', () => {
+      const dragged = document.createElement('div');
+      makeDroppable('a', 'g', { top: 0, left: 0, right: 100, bottom: 100 });
+
+      service.beginDragSession('g');
+      const b = makeDroppable('b', 'g', { top: 200, left: 200, right: 400, bottom: 400 });
+
+      // Notification for an unrelated group must not refresh this session's candidates.
+      service.notifyCandidatesChanged('other-group');
+      expect(service.findDroppableAtPoint(300, 300, dragged, 'g')).toBeNull();
+
+      // The matching group's notification does refresh them.
+      service.notifyCandidatesChanged('g');
+      expect(service.findDroppableAtPoint(300, 300, dragged, 'g')).toBe(b);
+    });
+
+    it('refreshCandidates is a no-op when no session is active', () => {
+      expect(() => service.refreshCandidates()).not.toThrow();
+    });
+  });
+
+  describe('rect clipping by scrollable ancestor', () => {
+    // Issue #23 case 3: a droppable scrolled mostly out of a clipping ancestor still
+    // hit-tests over its full unclipped rect. Rects are clipped to the nearest
+    // `.vdnd-scrollable` ancestor at snapshot/refresh time.
+    const created: HTMLElement[] = [];
+
+    function stubRect(el: HTMLElement, rect: Partial<DOMRect>): void {
+      const full = {
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: 0,
+        height: 0,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+        ...rect,
+      } as DOMRect;
+      el.getBoundingClientRect = () => full;
+    }
+
+    afterEach(() => {
+      service.endDragSession();
+      created.forEach((el) => el.remove());
+      created.length = 0;
+    });
+
+    it('clips a candidate rect to its scrollable ancestor viewport', () => {
+      const dragged = document.createElement('div');
+
+      const scrollable = document.createElement('div');
+      scrollable.className = 'vdnd-scrollable';
+      stubRect(scrollable, { top: 100, left: 100, right: 300, bottom: 300 });
+      document.body.appendChild(scrollable);
+      created.push(scrollable);
+
+      // Droppable content is taller than the scrollable viewport and scrolled so its
+      // unclipped rect (top: 0) extends above the visible clip region (top: 100).
+      const drop = document.createElement('div');
+      drop.setAttribute('data-droppable-id', 'list');
+      drop.setAttribute('data-droppable-group', 'g');
+      stubRect(drop, { top: 0, left: 100, right: 300, bottom: 600 });
+      scrollable.appendChild(drop);
+      created.push(drop);
+
+      service.beginDragSession('g');
+
+      // A point inside the unclipped rect but ABOVE the scrollable viewport must miss.
+      expect(service.findDroppableAtPoint(200, 50, dragged, 'g')).toBeNull();
+      // A point inside the visible (clipped) region hits.
+      expect(service.findDroppableAtPoint(200, 200, dragged, 'g')).toBe(drop);
+      // A point inside the unclipped rect but BELOW the scrollable viewport must miss.
+      expect(service.findDroppableAtPoint(200, 400, dragged, 'g')).toBeNull();
+    });
+
+    it('does not clip when the droppable has no scrollable ancestor', () => {
+      const dragged = document.createElement('div');
+      const drop = document.createElement('div');
+      drop.setAttribute('data-droppable-id', 'list');
+      drop.setAttribute('data-droppable-group', 'g');
+      stubRect(drop, { top: 0, left: 0, right: 300, bottom: 600 });
+      document.body.appendChild(drop);
+      created.push(drop);
+
+      service.beginDragSession('g');
+      expect(service.findDroppableAtPoint(100, 500, dragged, 'g')).toBe(drop);
+    });
+  });
+
   describe('getDroppableById', () => {
     const createdById: HTMLElement[] = [];
 

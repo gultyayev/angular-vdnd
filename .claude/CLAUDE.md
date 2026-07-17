@@ -131,23 +131,24 @@ AutoScrollService → DragStateService, PositionCalculatorService
 
 Unit test filenames mirror source filenames (`foo.service.ts` → `foo.service.spec.ts`). E2E coverage by area:
 
-| Source Area           | E2E Tests                                                       |
-| --------------------- | --------------------------------------------------------------- |
-| DraggableDirective    | `drag-drop.spec.ts`, `keyboard-drag/*.spec.ts`                  |
-| DroppableDirective    | `drop-accuracy.spec.ts`                                         |
-| AutoScrollService     | `auto-scroll.spec.ts`, `autoscroll-drift.spec.ts`               |
-| DynamicHeightStrategy | `dynamic-height.spec.ts`                                        |
-| Placeholder logic     | `placeholder-behavior.spec.ts`, `placeholder-integrity.spec.ts` |
-| Container constraint  | `constrain-to-container.spec.ts`                                |
-| Container resize      | `container-resize.spec.ts`                                      |
-| Keyboard drag         | `keyboard-drag/*.spec.ts` (6 files)                             |
-| Keyboard navigation   | `keyboard-navigation.spec.ts`                                   |
-| Axis lock             | `axis-lock.spec.ts`                                             |
-| Disabled elements     | `disabled-elements.spec.ts`                                     |
-| Drag UX features      | `drag-ux-features.spec.ts`                                      |
-| Empty list            | `empty-list.spec.ts`                                            |
-| Page scroll           | `page-scroll.spec.ts`                                           |
-| Mobile touch          | `touch-scroll.mobile.spec.ts`                                   |
+| Source Area              | E2E Tests                                                       |
+| ------------------------ | --------------------------------------------------------------- |
+| DraggableDirective       | `drag-drop.spec.ts`, `keyboard-drag/*.spec.ts`                  |
+| DroppableDirective       | `drop-accuracy.spec.ts`                                         |
+| AutoScrollService        | `auto-scroll.spec.ts`, `autoscroll-drift.spec.ts`               |
+| DynamicHeightStrategy    | `dynamic-height.spec.ts`                                        |
+| Placeholder logic        | `placeholder-behavior.spec.ts`, `placeholder-integrity.spec.ts` |
+| Container constraint     | `constrain-to-container.spec.ts`                                |
+| Container resize         | `container-resize.spec.ts`                                      |
+| Keyboard drag            | `keyboard-drag/*.spec.ts` (6 files)                             |
+| Keyboard navigation      | `keyboard-navigation.spec.ts`                                   |
+| Axis lock                | `axis-lock.spec.ts`                                             |
+| Disabled elements        | `disabled-elements.spec.ts`                                     |
+| Drag UX features         | `drag-ux-features.spec.ts`                                      |
+| Empty list               | `empty-list.spec.ts`                                            |
+| Page scroll              | `page-scroll.spec.ts`                                           |
+| Mobile touch             | `touch-scroll.mobile.spec.ts`                                   |
+| Mid-drag droppable mount | `mid-drag-mount.spec.ts`                                        |
 
 ### Skills (for library consumers)
 

@@ -15,8 +15,20 @@ interface DragSessionSnapshot {
   rects: DOMRect[];
   /** When true, rects are re-read on the next hit-test (set on scroll/resize). */
   dirty: boolean;
+  /**
+   * When true, the candidate *list* (not just its rects) is re-queried on the next
+   * hit-test. Set when a droppable is added/removed mid-drag so a newly mounted
+   * target becomes hit-testable and a removed one stops lingering.
+   */
+  candidatesStale: boolean;
   /** Bound scroll/resize listener used to mark rects dirty. */
   onViewportChange: () => void;
+  /**
+   * ResizeObserver watching the candidate droppables so a container-only layout
+   * change (which fires no window scroll/resize) still invalidates cached rects.
+   * Null when `ResizeObserver` is unavailable (e.g. SSR / jsdom).
+   */
+  resizeObserver: ResizeObserver | null;
 }
 
 /**
@@ -71,10 +83,16 @@ export class PositionCalculatorService {
     this.#session = {
       groupName,
       candidates,
-      rects: candidates.map((el) => el.getBoundingClientRect()),
+      rects: candidates.map((el) => this.#measureRect(el)),
       dirty: false,
+      candidatesStale: false,
       onViewportChange,
+      resizeObserver: this.#createResizeObserver(),
     };
+
+    // A container-only reflow (an element resize that fires no window scroll/resize)
+    // would otherwise leave stale rects — observe the candidates so it marks them dirty.
+    this.#observeCandidates(this.#session);
 
     // Capture-phase scroll catches scrolling on any ancestor scroller (scroll does
     // not bubble); resize covers viewport changes. Both only mark rects dirty —
@@ -97,6 +115,7 @@ export class PositionCalculatorService {
       return;
     }
     this.#session = null;
+    session.resizeObserver?.disconnect();
     if (typeof window !== 'undefined') {
       window.removeEventListener('scroll', session.onViewportChange, { capture: true });
       window.removeEventListener('resize', session.onViewportChange);
@@ -111,6 +130,41 @@ export class PositionCalculatorService {
   invalidateDroppableRects(): void {
     if (this.#session) {
       this.#session.dirty = true;
+    }
+  }
+
+  /**
+   * Re-query the candidate droppable *list* for the active session and re-read their
+   * rects. Unlike {@link invalidateDroppableRects} (which only refreshes rects), this
+   * picks up droppables added or removed since the snapshot was captured at drag start —
+   * the frozen candidate list is otherwise blind to mid-drag mounts/unmounts.
+   *
+   * Safe to call when no session is active (no-op).
+   */
+  refreshCandidates(): void {
+    const session = this.#session;
+    if (!session) {
+      return;
+    }
+    session.candidates = this.#queryDroppables(session.groupName);
+    session.rects = session.candidates.map((el) => this.#measureRect(el));
+    session.dirty = false;
+    session.candidatesStale = false;
+    this.#observeCandidates(session);
+  }
+
+  /**
+   * Signal that the set of droppables for `groupName` may have changed (a droppable
+   * registered or unregistered mid-drag). Defers the actual re-query to the next
+   * hit-test — where a removed element is already gone from the DOM and a newly added
+   * one has its data attributes applied — keeping this notification path cheap.
+   *
+   * Called by {@link DroppableDirective} lifecycle hooks. No-op when the active session
+   * belongs to a different group or no session is active.
+   */
+  notifyCandidatesChanged(groupName: string): void {
+    if (this.#session && this.#session.groupName === groupName) {
+      this.#session.candidatesStale = true;
     }
   }
 
@@ -137,9 +191,12 @@ export class PositionCalculatorService {
   ): HTMLElement | null {
     const session = this.#session;
     if (session && session.groupName === groupName) {
-      if (session.dirty) {
+      if (session.candidatesStale) {
+        // A droppable was added/removed mid-drag: re-query the list (also refreshes rects).
+        this.refreshCandidates();
+      } else if (session.dirty) {
         for (let i = 0; i < session.candidates.length; i++) {
-          session.rects[i] = session.candidates[i].getBoundingClientRect();
+          session.rects[i] = this.#measureRect(session.candidates[i]);
         }
         session.dirty = false;
       }
@@ -148,7 +205,7 @@ export class PositionCalculatorService {
 
     // No active session: one-shot geometric query (still avoids elementFromPoint).
     const candidates = this.#queryDroppables(groupName);
-    const rects = candidates.map((el) => el.getBoundingClientRect());
+    const rects = candidates.map((el) => this.#measureRect(el));
     return this.#hitTest(x, y, candidates, rects);
   }
 
@@ -190,6 +247,65 @@ export class PositionCalculatorService {
       return [];
     }
     return queryAllByAttribute<HTMLElement>(document, this.#DROPPABLE_GROUP_ATTR, groupName);
+  }
+
+  /**
+   * Measure a candidate's hit-test rect, clipped to its nearest `.vdnd-scrollable`
+   * ancestor. Without clipping a droppable scrolled mostly out of a clipping container
+   * still hit-tests over its full unclipped rect (issue #23 case 3). The intersection is
+   * built as a plain DOMRect; an empty intersection yields a negative width/height so the
+   * `#hitTest` bounds check can never match it.
+   */
+  #measureRect(el: HTMLElement): DOMRect {
+    const rect = el.getBoundingClientRect();
+    const scrollable = el.closest('.vdnd-scrollable');
+    if (!scrollable || scrollable === el) {
+      return rect;
+    }
+
+    const clip = scrollable.getBoundingClientRect();
+    const top = Math.max(rect.top, clip.top);
+    const left = Math.max(rect.left, clip.left);
+    const right = Math.min(rect.right, clip.right);
+    const bottom = Math.min(rect.bottom, clip.bottom);
+    return new DOMRect(left, top, right - left, bottom - top);
+  }
+
+  /**
+   * Create a ResizeObserver (run outside Angular per CLAUDE.md) that marks the session's
+   * cached rects dirty when a candidate resizes. Returns null when ResizeObserver is
+   * unavailable (SSR / jsdom) so callers degrade gracefully.
+   */
+  #createResizeObserver(): ResizeObserver | null {
+    if (typeof ResizeObserver === 'undefined') {
+      return null;
+    }
+    return this.#ngZone.runOutsideAngular(
+      () =>
+        new ResizeObserver(() => {
+          if (this.#session) {
+            this.#session.dirty = true;
+          }
+        }),
+    );
+  }
+
+  /**
+   * Point the session's ResizeObserver at the current candidate list, dropping any
+   * previously observed elements. Called on session start and whenever the candidate
+   * list is refreshed.
+   */
+  #observeCandidates(session: DragSessionSnapshot): void {
+    const observer = session.resizeObserver;
+    if (!observer) {
+      return;
+    }
+    this.#ngZone.runOutsideAngular(() => {
+      observer.disconnect();
+      for (const candidate of session.candidates) {
+        observer.observe(candidate);
+      }
+    });
   }
 
   /**

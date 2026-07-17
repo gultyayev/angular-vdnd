@@ -499,7 +499,16 @@ All event types are importable from `ngx-virtual-dnd`.
 
 Traditional drag-and-drop libraries query sibling DOM elements via `getBoundingClientRect()`. This fails with virtual scrolling because items outside the viewport aren't rendered.
 
-This library uses **element-under-point detection**: temporarily hide the dragged element, use `document.elementFromPoint()` to find what's at the cursor, walk up to find the droppable, and calculate placeholder position mathematically.
+This library uses **geometric hit-testing against a cached rect snapshot**: at drag start it snapshots the candidate droppables of the active group and their bounding rects, then per-pointermove it hit-tests the cursor against those rects (last match in document order wins) and calculates the placeholder position mathematically. Caching the rects avoids the forced layout flush that `document.elementFromPoint()` imposes on the hot drag loop. The snapshot self-heals during the drag: rects are re-read on scroll/resize and when a candidate resizes (via `ResizeObserver`), the candidate **list** is refreshed when a droppable mounts or unmounts mid-drag, and each rect is clipped to its nearest `vdndScrollable` ancestor so a droppable scrolled out of a clipping container is not falsely hit.
+
+### Known Limitations
+
+Because hit-testing is geometry against cached rects (not live `elementFromPoint`), a few browser-native behaviors are **not** reproduced:
+
+- **Occluding overlays** — a modal, toolbar, or other element painted over a droppable does not block a geometric hit; the droppable underneath still resolves as the target.
+- **Stacking contexts / explicit `z-index`** — the "last in document order" tie-break approximates paint order but is not true painter order once `z-index` and stacking contexts are involved. An earlier-in-DOM droppable raised visually on top via `z-index` loses the tie-break to a later sibling.
+
+If your layout depends on these, keep overlapping droppables out of the same drag group, or avoid painting interactive overlays across active drop targets during a drag.
 
 ## Browser Support
 
