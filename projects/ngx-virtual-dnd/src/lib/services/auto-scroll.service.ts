@@ -49,6 +49,14 @@ export class AutoScrollService {
     }
   >();
 
+  /**
+   * Candidate containers ordered innermost (deepest in the DOM) first, so a
+   * nested scrollable wins over its ancestors under the cursor. Rebuilt lazily
+   * whenever registrations change (containers rarely move mid-drag), not per frame.
+   */
+  #orderedContainers: { id: string; element: HTMLElement; config: AutoScrollConfig }[] | null =
+    null;
+
   /** Bound reference to #participantTick for stable add/remove with the scheduler. */
   readonly #boundParticipantTick: () => void = () => this.#participantTick();
 
@@ -95,6 +103,7 @@ export class AutoScrollService {
       element,
       config: { ...DEFAULT_CONFIG, ...config },
     });
+    this.#orderedContainers = null;
   }
 
   /**
@@ -102,6 +111,40 @@ export class AutoScrollService {
    */
   unregisterContainer(id: string): void {
     this.#scrollableContainers.delete(id);
+    this.#orderedContainers = null;
+  }
+
+  /**
+   * Build (or reuse) the candidate list ordered innermost-first by DOM containment.
+   * Containers whose elements have no ancestor/descendant relationship keep their
+   * registration order (stable sort), so unrelated lists behave as before.
+   */
+  #getOrderedContainers(): { id: string; element: HTMLElement; config: AutoScrollConfig }[] {
+    if (this.#orderedContainers) {
+      return this.#orderedContainers;
+    }
+
+    const entries: { id: string; element: HTMLElement; config: AutoScrollConfig }[] = [];
+    for (const [id, { element, config }] of this.#scrollableContainers) {
+      entries.push({ id, element, config });
+    }
+
+    entries.sort((a, b) => {
+      if (a.element === b.element) {
+        return 0;
+      }
+      // If a contains b, b is deeper → b comes first.
+      if (a.element.contains(b.element)) {
+        return 1;
+      }
+      if (b.element.contains(a.element)) {
+        return -1;
+      }
+      return 0;
+    });
+
+    this.#orderedContainers = entries;
+    return entries;
   }
 
   /**
@@ -170,8 +213,13 @@ export class AutoScrollService {
     this.#lastTickCursorY = cursor.y;
 
     let scrollPerformed = false;
+    // Frame scale is shared across candidates within a tick; computed lazily on
+    // the first scroll attempt so stationary/idle frames don't advance the clock.
+    let frameScale = 0;
 
-    for (const [id, { element, config }] of this.#scrollableContainers) {
+    // Candidates are ordered innermost-first: when the deepest container under the
+    // cursor is exhausted at its boundary, the loop falls through to its ancestors.
+    for (const { id, element, config } of this.#getOrderedContainers()) {
       const rect = element.getBoundingClientRect();
       const isInside = this.#positionCalculator.isInsideContainer(cursor, rect);
 
@@ -210,13 +258,22 @@ export class AutoScrollService {
           speed = Math.min(config.maxSpeed, Math.max(1, config.maxSpeed * distanceRatio));
         }
 
-        this.#scrollState.containerId = id;
-        this.#scrollState.direction.x = direction.x;
-        this.#scrollState.direction.y = direction.y;
-        this.#scrollState.speed = speed;
-        this.#performScroll(element, direction, speed);
-        scrollPerformed = true;
-        break;
+        if (frameScale === 0) {
+          frameScale = this.#getFrameScale();
+        }
+
+        // #performScroll reports whether it actually moved the element. Only claim the
+        // tick (and stop descending the candidate list) when a scroll really happened —
+        // an exhausted container must not block its ancestors from scrolling.
+        const scrolled = this.#performScroll(element, direction, frameScale, speed);
+        if (scrolled) {
+          this.#scrollState.containerId = id;
+          this.#scrollState.direction.x = direction.x;
+          this.#scrollState.direction.y = direction.y;
+          this.#scrollState.speed = speed;
+          scrollPerformed = true;
+          break;
+        }
       }
     }
 
@@ -231,36 +288,52 @@ export class AutoScrollService {
 
   /**
    * Perform the actual scroll operation.
+   *
+   * Each axis is evaluated independently: a boundary-exhausted axis is skipped
+   * while the other axis still scrolls (e.g. at a corner where vertical is
+   * maxed out but horizontal is available).
+   *
+   * @returns `true` when at least one axis actually scrolled, `false` when the
+   *   element was already at its boundary in every requested direction. The
+   *   caller uses this to fall through to ancestor containers.
    */
-  #performScroll(element: HTMLElement, direction: { x: number; y: number }, speed: number): void {
-    const frameScale = this.#getFrameScale();
+  #performScroll(
+    element: HTMLElement,
+    direction: { x: number; y: number },
+    frameScale: number,
+    speed: number,
+  ): boolean {
     const scrollX = direction.x * speed * frameScale;
     const scrollY = direction.y * speed * frameScale;
 
-    // Check bounds before scrolling
+    // Check bounds per axis before scrolling
     const maxScrollY = element.scrollHeight - element.clientHeight;
     const maxScrollX = element.scrollWidth - element.clientWidth;
 
-    if (direction.y < 0 && element.scrollTop <= 0) {
-      return;
-    }
-    if (direction.y > 0 && element.scrollTop >= maxScrollY) {
-      return;
-    }
-    if (direction.x < 0 && element.scrollLeft <= 0) {
-      return;
-    }
-    if (direction.x > 0 && element.scrollLeft >= maxScrollX) {
-      return;
-    }
+    let scrolled = false;
 
     // Use direct property assignment for guaranteed synchronous scroll
     // scrollBy() with 'instant' behavior may have async issues in Safari
     if (scrollY !== 0) {
-      element.scrollTop += scrollY;
+      const canScrollUp = direction.y < 0 && element.scrollTop > 0;
+      const canScrollDown = direction.y > 0 && element.scrollTop < maxScrollY;
+      if (canScrollUp || canScrollDown) {
+        element.scrollTop += scrollY;
+        scrolled = true;
+      }
     }
+
     if (scrollX !== 0) {
-      element.scrollLeft += scrollX;
+      const canScrollLeft = direction.x < 0 && element.scrollLeft > 0;
+      const canScrollRight = direction.x > 0 && element.scrollLeft < maxScrollX;
+      if (canScrollLeft || canScrollRight) {
+        element.scrollLeft += scrollX;
+        scrolled = true;
+      }
+    }
+
+    if (!scrolled) {
+      return false;
     }
 
     // Notify callback IMMEDIATELY in the same frame (no RAF delay)
@@ -269,6 +342,8 @@ export class AutoScrollService {
     // Note: No ngZone.run() needed here - the callback (DraggableDirective.#recalculatePlaceholder)
     // already enters the zone when updating drag state.
     this.#onScrollCallback?.();
+
+    return true;
   }
 
   #getFrameScale(): number {

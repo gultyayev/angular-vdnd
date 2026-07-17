@@ -796,6 +796,155 @@ describe('AutoScrollService', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Nested scrollable containers (issue #26)
+  // ---------------------------------------------------------------------------
+  describe('nested scrollable containers', () => {
+    /** Build a scrollable element with mocked rect + scroll geometry. */
+    function makeScrollable(opts: {
+      rect: { top: number; bottom: number; left: number; right: number };
+      scrollHeight: number;
+      clientHeight: number;
+      scrollWidth?: number;
+      clientWidth?: number;
+      scrollTop?: number;
+      scrollLeft?: number;
+    }): HTMLElement {
+      const el = document.createElement('div');
+      Object.defineProperty(el, 'scrollHeight', { value: opts.scrollHeight, configurable: true });
+      Object.defineProperty(el, 'clientHeight', { value: opts.clientHeight, configurable: true });
+      Object.defineProperty(el, 'scrollWidth', {
+        value: opts.scrollWidth ?? opts.clientWidth ?? 200,
+        configurable: true,
+      });
+      Object.defineProperty(el, 'clientWidth', {
+        value: opts.clientWidth ?? 200,
+        configurable: true,
+      });
+      let topVal = opts.scrollTop ?? 0;
+      Object.defineProperty(el, 'scrollTop', {
+        get: () => topVal,
+        set: (v: number) => {
+          topVal = v;
+        },
+        configurable: true,
+      });
+      let leftVal = opts.scrollLeft ?? 0;
+      Object.defineProperty(el, 'scrollLeft', {
+        get: () => leftVal,
+        set: (v: number) => {
+          leftVal = v;
+        },
+        configurable: true,
+      });
+      el.getBoundingClientRect = jest.fn().mockReturnValue({
+        top: opts.rect.top,
+        bottom: opts.rect.bottom,
+        left: opts.rect.left,
+        right: opts.rect.right,
+        height: opts.rect.bottom - opts.rect.top,
+        width: opts.rect.right - opts.rect.left,
+      });
+      return el;
+    }
+
+    it('should scroll the outer container the same tick when the inner container is at its boundary', () => {
+      // Outer page scroller: can still scroll down (scrollTop 0, max 600).
+      const outer = makeScrollable({
+        rect: { top: 100, bottom: 500, left: 50, right: 250 },
+        scrollHeight: 1000,
+        clientHeight: 400,
+        scrollTop: 0,
+      });
+      // Inner list nested inside outer, already scrolled to the bottom (max 600).
+      const inner = makeScrollable({
+        rect: { top: 100, bottom: 480, left: 50, right: 250 },
+        scrollHeight: 1000,
+        clientHeight: 400,
+        scrollTop: 600,
+      });
+      outer.appendChild(inner);
+
+      // Cursor near the bottom edge of BOTH containers.
+      setupDrag({ x: 150, y: 470 });
+      // Register inner FIRST — with registration-order selection the exhausted inner
+      // would swallow the tick and the outer would never scroll.
+      service.registerContainer('inner', inner);
+      service.registerContainer('outer', outer);
+      startMonitoringWithScheduler();
+
+      const beforeOuter = outer.scrollTop;
+      flushRAF();
+
+      // Inner is exhausted → stays put; outer picks up the scroll the same tick.
+      expect(inner.scrollTop).toBe(600);
+      expect(outer.scrollTop).toBeGreaterThan(beforeOuter);
+
+      service.unregisterContainer('inner');
+      service.unregisterContainer('outer');
+    });
+
+    it('should still scroll the available axis at a corner when the other axis is exhausted', () => {
+      // Vertical exhausted (scrollTop at max 600), horizontal still available.
+      const el = makeScrollable({
+        rect: { top: 100, bottom: 500, left: 50, right: 250 },
+        scrollHeight: 1000,
+        clientHeight: 400,
+        scrollWidth: 400,
+        clientWidth: 200,
+        scrollTop: 600,
+        scrollLeft: 0,
+      });
+
+      // Cursor near the bottom-right corner (near both bottom and right edges).
+      setupDrag({ x: 230, y: 480 });
+      service.registerContainer('corner', el);
+      startMonitoringWithScheduler();
+
+      flushRAF();
+
+      // Vertical is blocked, but horizontal must still scroll.
+      expect(el.scrollTop).toBe(600);
+      expect(el.scrollLeft).toBeGreaterThan(0);
+
+      service.unregisterContainer('corner');
+    });
+
+    it('should scroll the innermost container regardless of registration order', () => {
+      const outer = makeScrollable({
+        rect: { top: 100, bottom: 500, left: 50, right: 250 },
+        scrollHeight: 1000,
+        clientHeight: 400,
+        scrollTop: 0,
+      });
+      // Inner shares the rect and can also scroll — depth, not order, must decide.
+      const inner = makeScrollable({
+        rect: { top: 100, bottom: 500, left: 50, right: 250 },
+        scrollHeight: 1000,
+        clientHeight: 400,
+        scrollTop: 0,
+      });
+      outer.appendChild(inner);
+
+      setupDrag({ x: 150, y: 480 });
+      // Register OUTER first: registration order would (wrongly) pick the outer.
+      service.registerContainer('outer', outer);
+      service.registerContainer('inner', inner);
+      startMonitoringWithScheduler();
+
+      const beforeInner = inner.scrollTop;
+      const beforeOuter = outer.scrollTop;
+      flushRAF();
+
+      // Innermost (deepest) container under the cursor wins.
+      expect(inner.scrollTop).toBeGreaterThan(beforeInner);
+      expect(outer.scrollTop).toBe(beforeOuter);
+
+      service.unregisterContainer('outer');
+      service.unregisterContainer('inner');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Callback invocation
   // ---------------------------------------------------------------------------
   describe('callback invocation', () => {
