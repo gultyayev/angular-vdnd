@@ -33,7 +33,8 @@ jobs:
       - name: Validate PR title
         run: echo "${{ github.event.pull_request.title }}" | npx commitlint
 
-  quality-checks:
+  build-and-unit:
+    name: Lint, Build & Unit Tests
     needs: pr-title
     if: github.event.action != 'edited'
     runs-on: ubuntu-latest
@@ -64,8 +65,121 @@ jobs:
       - name: Run unit tests
         run: npm test -- --silent
 
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+      # Share the built library so E2E jobs can serve the demo without rebuilding it 5x.
+      - name: Upload built library
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-lib
+          path: dist/
+          retention-days: 1
 
+  e2e:
+    name: E2E (${{ matrix.project }})
+    needs: build-and-unit
+    if: github.event.action != 'edited'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Full browser matrix on PRs — one job per Playwright project, parallelized to keep
+      # wall time acceptable. Matches CLAUDE.md rule 3 (all-browsers run before done) and
+      # guards against the browser-specific regressions this repo has a history of
+      # (see .claude/history/safari-autoscroll.md). Each job installs only its own engine.
+      matrix:
+        include:
+          - project: chromium
+            browser: chromium
+          - project: firefox
+            browser: firefox
+          - project: webkit
+            browser: webkit
+          - project: chromium-mobile
+            browser: chromium
+          - project: webkit-mobile
+            browser: webkit
+    steps:
+      - name: Checkout PR merge commit
+        uses: actions/checkout@v7
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download built library
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-lib
+          path: dist/
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      # retries: 2 in playwright.config.ts absorb genuine browser variance. Passed-on-retry
+      # (flaky) tests do NOT fail the job — they are surfaced in the job summary below so they
+      # stay visible without blocking (issue #40 acceptance). Genuine failures (every attempt
+      # fails) still fail the job. The github reporter annotates real failures inline in the PR.
       - name: Run E2E tests
-        run: npx playwright test --reporter=dot --max-failures=1 --project=chromium
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report.json
+        run: npx playwright test --reporter=dot,github,json --project=${{ matrix.project }}
+
+      # Make flaky (passed-on-retry) tests visible in the CI summary instead of hiding them.
+      - name: Surface flaky tests in job summary
+        if: always()
+        run: |
+          report="playwright-report.json"
+          [ -f "$report" ] || exit 0
+          flaky=$(node -e '
+            const r = require("./" + process.argv[1]);
+            const out = [];
+            const walk = (s) => {
+              for (const spec of (s.specs || [])) {
+                for (const t of (spec.tests || [])) {
+                  if (t.status === "flaky") out.push((spec.file || "") + " › " + spec.title);
+                }
+              }
+              for (const c of (s.suites || [])) walk(c);
+            };
+            for (const s of (r.suites || [])) walk(s);
+            console.log([...new Set(out)].join("\n"));
+          ' "$report")
+          if [ -n "$flaky" ]; then
+            {
+              echo "### ⚠️ Flaky tests on ${{ matrix.project }} (passed on retry)"
+              echo ""
+              echo '```'
+              echo "$flaky"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # Single, stable required-status context that aggregates the build/unit job and the whole
+  # E2E matrix. Keeping the job id `quality-checks` (no `name:` override) preserves the check
+  # name branch protection already knows, while `if: always()` guarantees the context is
+  # always reported — so it never gets stuck in "Expected — Waiting for status to be reported".
+  quality-checks:
+    needs: [build-and-unit, e2e]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate required checks
+        run: |
+          # Pure metadata edits (title/body) skip the heavy jobs; the code was already
+          # validated by the synchronize run on this same commit, so pass without re-running.
+          if [ "${{ github.event.action }}" = "edited" ]; then
+            echo "PR metadata edited; code checks unchanged for this commit — passing."
+            exit 0
+          fi
+          echo "build-and-unit: ${{ needs.build-and-unit.result }}"
+          echo "e2e:            ${{ needs.e2e.result }}"
+          if [ "${{ needs.build-and-unit.result }}" != "success" ] || [ "${{ needs.e2e.result }}" != "success" ]; then
+            echo "::error::One or more required checks did not succeed."
+            exit 1
+          fi
+          echo "All quality checks passed."
