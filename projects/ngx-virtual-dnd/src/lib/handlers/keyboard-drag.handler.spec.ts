@@ -675,8 +675,10 @@ describe('KeyboardDragHandler', () => {
     });
 
     it('clamps to the true item count for a dynamic-height list, not spacer/itemHeight division', () => {
-      // True N = 12 (data-total-items). The old duplicated logic divided spacer height (900)
-      // by the nominal data-item-height (50) = 18, which overshoots for dynamic heights.
+      // Models a dynamic-height list: it publishes its true N via data-total-items (12) while
+      // data-item-height is only a nominal estimate. The old duplicated logic ignored
+      // data-total-items and divided spacer height (900) by data-item-height (50) = 18, which
+      // overshoots when rows vary in height. The fix reads data-total-items instead.
       const target = makeDroppable('dynamic-list', 200);
       const virtualScroll = document.createElement('vdnd-virtual-scroll');
       virtualScroll.setAttribute('data-item-height', '50');

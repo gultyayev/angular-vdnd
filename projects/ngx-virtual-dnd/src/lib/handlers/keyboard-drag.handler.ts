@@ -343,10 +343,11 @@ export class KeyboardDragHandler {
 
     // Derive the destination list's item count from DragIndexCalculatorService — the single
     // source of truth that correctly handles registered strategies, dynamic-height lists, and
-    // vdnd-virtual-content (page-scroll) lists. Cross-list navigation is never same-list.
+    // vdnd-virtual-content (page-scroll) lists. Arrowing back to the origin lands on the source
+    // list, so compute isSameList rather than assuming a distinct target.
     const itemCount = this.#deps.dragIndexCalculator.getTotalItemCount({
       droppableElement: adjacent.element,
-      isSameList: false,
+      isSameList: adjacent.id === this.#deps.dragState.sourceDroppableId(),
       draggedItemHeight: this.#deps.dragState.draggedItem()?.height ?? 0,
     });
 
