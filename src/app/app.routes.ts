@@ -16,4 +16,9 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./dynamic-height-demo/dynamic-height-demo').then((m) => m.DynamicHeightDemoComponent),
   },
+  {
+    path: 'mid-drag-mount',
+    loadComponent: () =>
+      import('./mid-drag-mount-demo/mid-drag-mount-demo').then((m) => m.MidDragMountDemoComponent),
+  },
 ];

@@ -1,4 +1,5 @@
 import {
+  afterNextRender,
   computed,
   Directive,
   effect,
@@ -11,6 +12,7 @@ import {
 } from '@angular/core';
 import { DragStateService } from '../services/drag-state.service';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
+import { PositionCalculatorService } from '../services/position-calculator.service';
 import { DragState, DropEvent, END_OF_LIST } from '../models/drag-drop.models';
 import { VDND_GROUP_TOKEN } from './droppable-group.directive';
 import { createEffectiveGroupSignal } from '../utils/group-resolution';
@@ -56,6 +58,7 @@ export class DroppableDirective implements OnDestroy {
   readonly #elementRef = inject(ElementRef<HTMLElement>);
   readonly #dragState = inject(DragStateService);
   readonly #autoScroll = inject(AutoScrollService);
+  readonly #positionCalculator = inject(PositionCalculatorService);
   readonly #parentGroup = inject(VDND_GROUP_TOKEN, { optional: true });
 
   /** Unique identifier for this droppable */
@@ -158,6 +161,16 @@ export class DroppableDirective implements OnDestroy {
       canRegister: () => Boolean(this.effectiveGroup()) && this.#isScrollable(),
     });
 
+    // Notify the calculator once this droppable is rendered (host data attributes applied).
+    // Matters when it mounts DURING an active drag — the candidate snapshot was frozen at
+    // drag start, so without this a conditionally rendered list would never become a target.
+    afterNextRender(() => {
+      const group = this.effectiveGroup();
+      if (group) {
+        this.#positionCalculator.notifyCandidatesChanged(group);
+      }
+    });
+
     // React to state changes and handle drop events
     effect(() => {
       const active = this.isActive();
@@ -218,6 +231,13 @@ export class DroppableDirective implements OnDestroy {
 
     // Unregister from auto-scroll
     this.#autoScroll.unregisterContainer(this.vdndDroppable());
+
+    // If this droppable unmounts mid-drag, tell the calculator so it drops it from the
+    // frozen candidate list (deferred re-query runs once the element has left the DOM).
+    const group = untracked(() => this.effectiveGroup());
+    if (group) {
+      this.#positionCalculator.notifyCandidatesChanged(group);
+    }
   }
 
   /**

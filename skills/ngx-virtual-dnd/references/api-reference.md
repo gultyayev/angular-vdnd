@@ -442,6 +442,7 @@ Internal service for DOM hit-testing and drop position calculation. Exported for
 | `findDraggableAtPoint` | `(x, y, draggedElement) => HTMLElement \| null` | Find draggable element at cursor position |
 | `getDroppableId` | `(element) => string \| null` | Get droppable ID from element's data attribute |
 | `calculateDropIndex` | `(droppable, cursorY, draggedItem, sourceDroppableId) => { ... }` | Calculate drop target index |
+| `refreshCandidates` | `() => void` | Re-query the active drag's candidate droppables (picks up droppables added/removed mid-drag). Called automatically by droppable lifecycle hooks; exposed as a manual escape hatch |
 
 ### ElementCloneService
 
