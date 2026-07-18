@@ -366,12 +366,14 @@ Only clicks on elements matching the selector start a drag. The rest of the elem
 Lock dragging to a single axis:
 
 ```html
-<!-- Vertical only -->
+<!-- Horizontal only (Y axis locked) -->
 <div [vdndDraggable]="item.id" lockAxis="y">{{ item.name }}</div>
 
-<!-- Horizontal only -->
+<!-- Vertical only (X axis locked) -->
 <div [vdndDraggable]="item.id" lockAxis="x">{{ item.name }}</div>
 ```
+
+The value names the axis that is _frozen_: `'x'` freezes the X coordinate (vertical-only movement), `'y'` freezes the Y coordinate (horizontal-only movement). This is the opposite of Angular CDK's `cdkDragLockAxis`.
 
 ### Drag Threshold & Delay
 

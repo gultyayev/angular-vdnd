@@ -241,10 +241,13 @@ The preview cannot leave the droppable area, and the placeholder snaps to the ed
 Lock dragging to a single axis:
 
 ```html
+<!-- Lock the Y axis → item moves horizontally only -->
 <div [vdndDraggable]="item.id" lockAxis="y">{{ item.name }}</div>
 ```
 
-Values: `'x'` (horizontal only), `'y'` (vertical only), or omit for free movement.
+Values: `'x'` (X axis locked → **vertical-only** movement), `'y'` (Y axis locked → **horizontal-only** movement), or omit for free movement. The value names the axis that is _frozen_.
+
+> **Note:** This is the opposite of Angular CDK's `cdkDragLockAxis`, where `'x'` means _movement is constrained to_ the X axis (horizontal only). Here `'x'` freezes the X axis. Keep this in mind when migrating from CDK.
 
 ### Drag Threshold & Delay
 

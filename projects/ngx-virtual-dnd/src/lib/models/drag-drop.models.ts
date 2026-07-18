@@ -59,7 +59,7 @@ export interface DragState {
   grabOffset: GrabOffset | null;
   /** Position when drag started (for axis locking) */
   initialPosition: CursorPosition | null;
-  /** Axis to lock movement to ('x' = horizontal only, 'y' = vertical only) */
+  /** Axis to freeze ('x' = X frozen → vertical-only, 'y' = Y frozen → horizontal-only) */
   lockAxis: 'x' | 'y' | null;
   /** Whether this is a keyboard-initiated drag */
   isKeyboardDrag: boolean;
