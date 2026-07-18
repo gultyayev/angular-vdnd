@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.1.3](https://github.com/gultyayev/angular-vdnd/compare/v3.1.2...v3.1.3) (2026-07-18)
+
+### Bug Fixes
+
+- **demo:** remove Ionic md elevation shadow from task page headers ([e22ee19](https://github.com/gultyayev/angular-vdnd/commit/e22ee19410cc215faf57c48c49674af5e5d34373))
+- **e2e:** wait for stable demo layout ([#65](https://github.com/gultyayev/angular-vdnd/issues/65)) ([74e4242](https://github.com/gultyayev/angular-vdnd/commit/74e4242da76c5d1c78ea0d1e61a39997dd994f40))
+- gate perf by measuring base and head on the same runner ([#63](https://github.com/gultyayev/angular-vdnd/issues/63)) ([62d314f](https://github.com/gultyayev/angular-vdnd/commit/62d314f5c471a9269dbe6c5cc661d2695c78a3ea))
+- **lib:** exclude disabled droppables from drag-time candidate sets ([#51](https://github.com/gultyayev/angular-vdnd/issues/51)) ([0efb3ec](https://github.com/gultyayev/angular-vdnd/commit/0efb3ec740c3536c1d05e7a72f2e4ddd0f4d3a7b))
+- **lib:** fall through exhausted nested containers in autoscroll ([#60](https://github.com/gultyayev/angular-vdnd/issues/60)) ([38eee56](https://github.com/gultyayev/angular-vdnd/commit/38eee565d5c46e85dda1b880a8904c125653b574))
+- **lib:** make autoscroll registration resilient to post-init layout changes ([#61](https://github.com/gultyayev/angular-vdnd/issues/61)) ([c71c51c](https://github.com/gultyayev/angular-vdnd/commit/c71c51c5ade6a535216149e05e37e0222bdbfbed))
+- **lib:** normalize keyboard drag end index ([#45](https://github.com/gultyayev/angular-vdnd/issues/45)) ([4f54b8f](https://github.com/gultyayev/angular-vdnd/commit/4f54b8ffb85ccd331e150a8c7f19139b68f6060d))
+- **lib:** preserve source index across rapid cross-list drags ([#44](https://github.com/gultyayev/angular-vdnd/issues/44)) ([6695753](https://github.com/gultyayev/angular-vdnd/commit/6695753c3691930ea1a880a58a7fe128abefa4cc))
+- **lib:** refresh drag hit-test candidates on mid-drag DOM changes ([#58](https://github.com/gultyayev/angular-vdnd/issues/58)) ([b9d21d7](https://github.com/gultyayev/angular-vdnd/commit/b9d21d7bd8c8bed754627c0cb4e0ccd212e70303))
+- **lib:** route keyboard cross-list count through DragIndexCalculatorService ([#59](https://github.com/gultyayev/angular-vdnd/issues/59)) ([a2bd956](https://github.com/gultyayev/angular-vdnd/commit/a2bd95678b48c04bd2447ed62a6f131a460f6b81))
+- make performance regression gate reliable ([#52](https://github.com/gultyayev/angular-vdnd/issues/52)) ([061828c](https://github.com/gultyayev/angular-vdnd/commit/061828c7402e5f769fa42d92428d2f51c808bf7b))
+
+### Performance
+
+- **lib:** stop active droppable effect from re-snapshotting every frame ([#62](https://github.com/gultyayev/angular-vdnd/issues/62)) ([b2acd8a](https://github.com/gultyayev/angular-vdnd/commit/b2acd8a3212411151d575d976b26ef0afb40a5d4))
+
 ## [3.1.2](https://github.com/gultyayev/angular-vdnd/compare/v3.1.1...v3.1.2) (2026-07-07)
 
 ### Bug Fixes
