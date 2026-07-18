@@ -102,9 +102,12 @@ Every `(drop)` handler receives a `DropEvent` with `source` and `destination`:
 ```typescript
 interface DropEvent {
   source: { draggableId: string; droppableId: string; index: number; data?: unknown };
-  destination: { droppableId: string; placeholderId: string; index: number; data?: unknown };
+  // `placeholderId?` is deprecated and no longer populated — see note below.
+  destination: { droppableId: string; index: number; data?: unknown; placeholderId?: string };
 }
 ```
+
+> **Deprecated:** `destination.placeholderId` is no longer populated (optional, always absent). It only ever carried `END_OF_LIST` and never reflected the real drop position. Use `destination.index` for the insertion point. The field is a compatibility shim and will be removed entirely in the next major version.
 
 ### Utility functions
 
@@ -556,7 +559,7 @@ Available signals:
 | `sourceDroppableId` | `Signal<string \| null>` |
 | `sourceIndex` | `Signal<number \| null>` |
 | `activeDroppableId` | `Signal<string \| null>` |
-| `placeholderId` | `Signal<string \| null>` |
+| `placeholderId` | `Signal<string \| null>` — **deprecated**, no longer populated (always `null`); use `placeholderIndex` |
 | `placeholderIndex` | `Signal<number \| null>` |
 | `cursorPosition` | `Signal<CursorPosition \| null>` |
 | `grabOffset` | `Signal<GrabOffset \| null>` |

@@ -498,6 +498,8 @@ All event types are importable from `ngx-virtual-dnd`.
 
 `DragEndEvent.destinationIndex` is `null` when no drop occurred — an Escape cancel, a release outside every droppable, or a release over a disabled droppable — so branch on `destinationIndex === null` to detect that. The `cancelled` boolean is `true` only for an active Escape cancel.
 
+> **Deprecated:** `DropEvent.destination.placeholderId` is no longer populated (it is now optional and always absent). It only ever carried `END_OF_LIST` regardless of the real drop position, so branching on it was unreliable. Use `destination.index` — the actual insertion index in the destination list. The field is a compatibility shim and will be removed entirely in the next major version.
+
 ## How It Works
 
 Traditional drag-and-drop libraries query sibling DOM elements via `getBoundingClientRect()`. This fails with virtual scrolling because items outside the viewport aren't rendered.

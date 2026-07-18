@@ -2,7 +2,6 @@ import { expect, Locator, Page, test } from '@playwright/test';
 import { DemoPage } from './fixtures/demo.page';
 
 interface DriftSnapshot {
-  placeholder: string;
   actualIndex: number;
   expectedIndex: number;
   scrollTop: number;
@@ -10,7 +9,6 @@ interface DriftSnapshot {
 }
 
 interface DragDebugState {
-  placeholder?: string | null;
   placeholderIndex?: number | null;
   draggedItemHeight?: number | null;
   sourceDroppable?: string | null;
@@ -42,11 +40,9 @@ async function getDriftSnapshot(
   const rawDragState = await page.getByTestId('drag-state-debug').textContent();
   const dragState = JSON.parse(rawDragState ?? '{}') as DragDebugState;
   const actualIndex = dragState.placeholderIndex ?? -1;
-  const placeholder = dragState.placeholder ?? 'unknown';
   const expectedIndex = getExpectedPlaceholderIndex(dragState, metrics);
 
   return {
-    placeholder,
     actualIndex,
     expectedIndex,
     scrollTop: metrics.scrollTop,
@@ -192,7 +188,6 @@ test.describe('Autoscroll Placeholder Drift', () => {
     testInfo.attach('list2-extended-drift', {
       body: JSON.stringify(
         {
-          placeholder: snapshot.placeholder,
           actualIndex: snapshot.actualIndex,
           expectedIndex: snapshot.expectedIndex,
           scrollTop: snapshot.scrollTop,
@@ -247,7 +242,6 @@ test.describe('Autoscroll Placeholder Drift', () => {
     testInfo.attach('list1-down-drift', {
       body: JSON.stringify(
         {
-          placeholder: snapshot.placeholder,
           actualIndex: snapshot.actualIndex,
           expectedIndex: snapshot.expectedIndex,
           scrollTop: snapshot.scrollTop,
@@ -300,7 +294,6 @@ test.describe('Autoscroll Placeholder Drift', () => {
     testInfo.attach('extended-drift', {
       body: JSON.stringify(
         {
-          placeholder: snapshot.placeholder,
           actualIndex: snapshot.actualIndex,
           expectedIndex: snapshot.expectedIndex,
           scrollTop: snapshot.scrollTop,
@@ -378,7 +371,6 @@ test.describe('Autoscroll Placeholder Drift', () => {
     testInfo.attach('up-drift', {
       body: JSON.stringify(
         {
-          placeholder: snapshot.placeholder,
           actualIndex: snapshot.actualIndex,
           expectedIndex: snapshot.expectedIndex,
           scrollTop: snapshot.scrollTop,

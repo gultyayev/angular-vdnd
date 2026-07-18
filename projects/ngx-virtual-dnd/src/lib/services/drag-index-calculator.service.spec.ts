@@ -167,6 +167,43 @@ describe('DragIndexCalculatorService', () => {
     }).index;
   }
 
+  // The deprecated `placeholderId` has been removed from the calculator result:
+  // it only ever carried END_OF_LIST and never reflected the real insertion point.
+  // Consumers must branch on `index` — the single source of truth. See issue #31.
+  it('returns only { index } (no placeholderId) and index tracks the real position', () => {
+    const strategy = new MockStrategy([0, 50, 100, 150, 200, 250], (offset) =>
+      Math.floor(offset / 50),
+    );
+    const droppable = createDroppable('list-1', 5, false);
+    service.registerStrategy('list-1', strategy);
+
+    const near = service.calculatePlaceholderIndex({
+      droppableElement: droppable,
+      position: { x: 10, y: 30 }, // near the top
+      previousPosition: null,
+      grabOffset: null,
+      draggedItemHeight: 50,
+      sourceDroppableId: null,
+      sourceIndex: null,
+    });
+
+    const far = service.calculatePlaceholderIndex({
+      droppableElement: droppable,
+      position: { x: 10, y: 180 }, // further down the list
+      previousPosition: null,
+      grabOffset: null,
+      draggedItemHeight: 50,
+      sourceDroppableId: null,
+      sourceIndex: null,
+    });
+
+    // The real insertion point differs between the two positions...
+    expect(far.index).toBeGreaterThan(near.index);
+    // ...and the defunct placeholderId is gone from the result entirely.
+    expect('placeholderId' in near).toBe(false);
+    expect('placeholderId' in far).toBe(false);
+  });
+
   it('applies same-list +1 when strategy does not yet exclude source index', () => {
     const strategy = new MockStrategy([0, 50, 100, 150, 200, 250], (offset) =>
       Math.floor(offset / 50),

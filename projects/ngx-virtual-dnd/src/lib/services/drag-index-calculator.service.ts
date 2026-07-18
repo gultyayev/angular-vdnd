@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { type CursorPosition, END_OF_LIST, type GrabOffset } from '../models/drag-drop.models';
+import { type CursorPosition, type GrabOffset } from '../models/drag-drop.models';
 import { PositionCalculatorService } from './position-calculator.service';
 import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
 
@@ -128,7 +128,7 @@ export class DragIndexCalculatorService {
     draggedItemHeight: number;
     sourceDroppableId: string | null;
     sourceIndex: number | null;
-  }): { index: number; placeholderId: string } {
+  }): { index: number } {
     const {
       droppableElement,
       position,
@@ -260,7 +260,7 @@ export class DragIndexCalculatorService {
     // Clamp to valid range
     placeholderIndex = Math.max(0, Math.min(placeholderIndex, totalItems));
 
-    return { index: placeholderIndex, placeholderId: END_OF_LIST };
+    return { index: placeholderIndex };
   }
 
   #getTotalItemCount(

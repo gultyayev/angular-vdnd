@@ -13,7 +13,7 @@ import {
 import { DragStateService } from '../services/drag-state.service';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
 import { PositionCalculatorService } from '../services/position-calculator.service';
-import { DragState, DropEvent, END_OF_LIST } from '../models/drag-drop.models';
+import { DragState, DropEvent } from '../models/drag-drop.models';
 import { VDND_GROUP_TOKEN } from './droppable-group.directive';
 import { createEffectiveGroupSignal } from '../utils/group-resolution';
 import { createAutoScrollRegistration } from '../utils/auto-scroll-registration';
@@ -106,13 +106,13 @@ export class DroppableDirective implements OnDestroy {
     return activeId === this.vdndDroppable() && !this.disabled();
   });
 
-  /** The current placeholder ID when this droppable is active */
-  readonly placeholderId = computed(() => {
-    if (!this.isActive()) {
-      return null;
-    }
-    return this.#dragState.placeholderId();
-  });
+  /**
+   * @deprecated No longer populated — always emits `null`. It mirrored the
+   * defunct `DragStateService.placeholderId`, which never reflected the real
+   * placeholder position. Read `DragStateService.placeholderIndex` instead. This
+   * constant shim will be removed entirely in the next major version.
+   */
+  readonly placeholderId = computed<string | null>(() => null);
 
   /** Track previous active state to detect the drag-end transition */
   #wasActive = false;
@@ -216,7 +216,6 @@ export class DroppableDirective implements OnDestroy {
     }
 
     const sourceDroppableId = state.sourceDroppableId ?? '';
-    const placeholderId = state.placeholderId ?? END_OF_LIST;
 
     // Use the stored source index from drag state
     // This is critical for virtual scrolling where the original element may no longer
@@ -225,12 +224,12 @@ export class DroppableDirective implements OnDestroy {
       state.sourceIndex ?? this.#getItemIndex(state.draggedItem.draggableId, sourceDroppableId);
 
     // Use the pre-calculated placeholderIndex if available (more reliable)
-    // Fall back to DOM-based calculation if not. Then normalize to the same
-    // consumer-facing insertion index emitted by DragEndEvent.
+    // Fall back to a DOM append at the end of the list if not. Then normalize to
+    // the same consumer-facing insertion index emitted by DragEndEvent.
     const placeholderIndex =
       state.placeholderIndex !== null && state.placeholderIndex !== undefined
         ? state.placeholderIndex
-        : this.#getDestinationIndex(placeholderId);
+        : this.#getEndOfListIndex();
     const destinationIndex = normalizeDropDestinationIndex({
       sourceIndex,
       placeholderIndex,
@@ -247,7 +246,6 @@ export class DroppableDirective implements OnDestroy {
       },
       destination: {
         droppableId: this.vdndDroppable(),
-        placeholderId,
         index: destinationIndex,
         data: this.vdndDroppableData(),
       },
@@ -276,26 +274,19 @@ export class DroppableDirective implements OnDestroy {
   }
 
   /**
-   * Get the destination index based on the placeholder.
+   * Fallback destination index used only when the pre-calculated
+   * `placeholderIndex` is unavailable.
+   *
+   * The placeholder always resolves to the end of the list at the model level
+   * (see the deprecated `DropDestination.placeholderId`), so this returns the
+   * count of real draggables — an append at the end.
    */
-  #getDestinationIndex(placeholderId: string): number {
+  #getEndOfListIndex(): number {
     // Exclude placeholder elements from the count
     const draggables = this.#elementRef.nativeElement.querySelectorAll(
       '[data-draggable-id]:not([data-draggable-id="placeholder"])',
     );
-
-    if (placeholderId === END_OF_LIST) {
-      return draggables.length;
-    }
-
-    // Find the index of the placeholder item
-    for (let i = 0; i < draggables.length; i++) {
-      if (draggables[i].getAttribute('data-draggable-id') === placeholderId) {
-        return i;
-      }
-    }
-
-    return 0;
+    return draggables.length;
   }
 
   /**

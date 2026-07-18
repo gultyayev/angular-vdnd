@@ -241,12 +241,12 @@ describe('DroppableDirective', () => {
     });
   });
 
-  describe('placeholderId computed', () => {
+  describe('placeholderId computed (deprecated)', () => {
     it('should return null when not active', () => {
       expect(directive.placeholderId()).toBeNull();
     });
 
-    it('should return placeholder ID when active', () => {
+    it('stays null even when active (deprecated, no longer populated)', () => {
       const item = createMockDraggedItem();
       dragStateService.startDrag(item);
       dragStateService.updateDragPosition({
@@ -257,7 +257,7 @@ describe('DroppableDirective', () => {
       });
       fixture.detectChanges();
 
-      expect(directive.placeholderId()).toBe('item-2');
+      expect(directive.placeholderId()).toBeNull();
 
       dragStateService.endDrag();
     });

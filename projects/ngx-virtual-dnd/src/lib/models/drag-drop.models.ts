@@ -49,9 +49,15 @@ export interface DragState {
   sourceIndex: number | null;
   /** ID of the droppable currently being hovered over */
   activeDroppableId: string | null;
-  /** ID of the item the placeholder should appear before, or 'END_OF_LIST' */
-  placeholderId: string | null;
-  /** Index where the placeholder should be inserted (more stable than placeholderId) */
+  /**
+   * @deprecated No longer populated — always absent/`null`. It only ever held
+   * `END_OF_LIST` and never reflected the real insertion point. Use
+   * `placeholderIndex`, the single source of truth for placeholder position.
+   * This optional field is a compatibility shim and will be removed entirely in
+   * the next major version.
+   */
+  placeholderId?: string | null;
+  /** Index where the placeholder should be inserted (the reliable insertion point) */
   placeholderIndex: number | null;
   /** Current cursor position */
   cursorPosition: CursorPosition | null;
@@ -103,8 +109,14 @@ export interface DropSource {
 export interface DropDestination {
   /** ID of the droppable container receiving the item */
   droppableId: string;
-  /** ID of the item to insert before, or 'END_OF_LIST' */
-  placeholderId: string;
+  /**
+   * @deprecated No longer emitted — always absent. It only ever carried
+   * `END_OF_LIST` regardless of the real drop position, so branching on it was
+   * unreliable. Use `index`, the actual insertion index in the destination list.
+   * This optional field is a compatibility shim and will be removed entirely in
+   * the next major version.
+   */
+  placeholderId?: string;
   /** Target index in the destination list */
   index: number;
   /** Optional user-provided data associated with the droppable */
@@ -157,7 +169,6 @@ export const INITIAL_DRAG_STATE: DragState = {
   sourceDroppableId: null,
   sourceIndex: null,
   activeDroppableId: null,
-  placeholderId: null,
   placeholderIndex: null,
   cursorPosition: null,
   grabOffset: null,

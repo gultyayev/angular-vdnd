@@ -3,8 +3,8 @@ import { CursorPosition, DraggedItem, DragState, GrabOffset } from '../models/dr
 
 /**
  * Internal state type without high-frequency fields.
- * `cursorPosition`, `keyboardTargetIndex`, `activeDroppableId`, `placeholderId`
- * and `placeholderIndex` are split into dedicated signals so that high-frequency
+ * `cursorPosition`, `keyboardTargetIndex`, `activeDroppableId` and
+ * `placeholderIndex` are split into dedicated signals so that high-frequency
  * pointer/placeholder updates don't trigger re-evaluation of rarely-changing
  * computeds (or rebuild the core state object every frame).
  */
@@ -33,7 +33,7 @@ const INITIAL_CORE_STATE: CoreDragState = {
  * Uses signals for reactive state management.
  *
  * Architecture: High-frequency fields (`cursorPosition`, `keyboardTargetIndex`,
- * `activeDroppableId`, `placeholderId`, `placeholderIndex`) are stored in dedicated
+ * `activeDroppableId`, `placeholderIndex`) are stored in dedicated
  * signals, separate from the core state. This prevents 60fps cursor and
  * placeholder updates from rebuilding the core state object or re-evaluating the
  * 8+ computeds that only depend on rarely-changing properties (isDragging,
@@ -54,9 +54,6 @@ export class DragStateService {
 
   /** ID of the droppable currently being hovered over — changes on droppable crossings */
   readonly #activeDroppableId = signal<string | null>(null);
-
-  /** ID of the item the placeholder should appear before */
-  readonly #placeholderId = signal<string | null>(null);
 
   /** Index where the placeholder should be inserted — updated on each placeholder move */
   readonly #placeholderIndex = signal<number | null>(null);
@@ -91,8 +88,13 @@ export class DragStateService {
   /** ID of the droppable currently being hovered over */
   readonly activeDroppableId = this.#activeDroppableId.asReadonly();
 
-  /** ID of the item the placeholder should appear before */
-  readonly placeholderId = this.#placeholderId.asReadonly();
+  /**
+   * @deprecated No longer populated — always emits `null`. It only ever held
+   * `END_OF_LIST` during a drag and never reflected the real placeholder
+   * position. Use `placeholderIndex` instead. This constant shim will be removed
+   * entirely in the next major version.
+   */
+  readonly placeholderId = signal<string | null>(null).asReadonly();
 
   /** Index where the placeholder should be inserted */
   readonly placeholderIndex = this.#placeholderIndex.asReadonly();
@@ -142,6 +144,9 @@ export class DragStateService {
 
   /**
    * Start a drag operation.
+   *
+   * @param placeholderId Deprecated and ignored — retained only to preserve the
+   *   positional signature. The placeholder is tracked solely by index now.
    */
   startDrag(
     item: DraggedItem,
@@ -155,13 +160,13 @@ export class DragStateService {
     isKeyboardDrag?: boolean,
     axisLockPosition?: CursorPosition,
   ): void {
+    void placeholderId;
     // Reset terminal drag metadata at start of new drag
     this.#endedDragState.set(null);
     this.#wasCancelled.set(false);
     this.#cursorPosition.set(cursorPosition ?? null);
     this.#keyboardTargetIndex.set(isKeyboardDrag ? (sourceIndex ?? 0) : null);
     this.#activeDroppableId.set(activeDroppableId ?? null);
-    this.#placeholderId.set(placeholderId ?? null);
     this.#placeholderIndex.set(placeholderIndex ?? null);
     this.#state.set({
       isDragging: true,
@@ -177,11 +182,15 @@ export class DragStateService {
 
   /**
    * Update the drag position and targets.
+   *
+   * @param update.placeholderId Deprecated and ignored — the placeholder is
+   *   tracked solely by index now. The optional field is retained so existing
+   *   callers keep compiling.
    */
   updateDragPosition(update: {
     cursorPosition: CursorPosition;
     activeDroppableId: string | null;
-    placeholderId: string | null;
+    placeholderId?: string | null;
     placeholderIndex: number | null;
   }): void {
     if (!this.#state().isDragging) {
@@ -195,7 +204,6 @@ export class DragStateService {
     // rebuilds the core state object or re-fires the rarely-changing computeds.
     // Signals already no-op on identical values, so unconditional sets are safe.
     this.#activeDroppableId.set(update.activeDroppableId);
-    this.#placeholderId.set(update.placeholderId);
     this.#placeholderIndex.set(update.placeholderIndex);
   }
 
@@ -211,29 +219,29 @@ export class DragStateService {
   }
 
   /**
-   * Update just the placeholder position.
+   * @deprecated No-op — the placeholder ID is no longer tracked. Retained so
+   * existing callers keep compiling; will be removed in the next major version.
    */
   setPlaceholder(placeholderId: string | null): void {
-    if (!this.#state().isDragging) {
-      return;
-    }
-
-    this.#placeholderId.set(placeholderId);
+    void placeholderId;
   }
 
   /**
-   * Update only the placeholder signals without touching cursor position or active droppable.
+   * Update only the placeholder index without touching cursor position or active droppable.
    *
    * Used by the autoscroll scroll-only fast path: when a scroll fires, the cursor has not
    * moved, so only the placeholder index needs recalculation. Skipping the cursor and
    * active-droppable writes avoids spurious re-evaluation of computeds that read those signals.
+   *
+   * @param placeholderId Deprecated and ignored — retained only to preserve the
+   *   positional signature.
    */
   updateScrollOnlyPlaceholder(placeholderId: string | null, placeholderIndex: number | null): void {
+    void placeholderId;
     if (!this.#state().isDragging) {
       return;
     }
 
-    this.#placeholderId.set(placeholderId);
     this.#placeholderIndex.set(placeholderIndex);
   }
 
@@ -264,7 +272,6 @@ export class DragStateService {
     this.#cursorPosition.set(null);
     this.#keyboardTargetIndex.set(null);
     this.#activeDroppableId.set(null);
-    this.#placeholderId.set(null);
     this.#placeholderIndex.set(null);
   }
 
@@ -282,7 +289,6 @@ export class DragStateService {
     return {
       ...this.#state(),
       activeDroppableId: this.#activeDroppableId(),
-      placeholderId: this.#placeholderId(),
       placeholderIndex: this.#placeholderIndex(),
       cursorPosition: this.#cursorPosition(),
       keyboardTargetIndex: this.#keyboardTargetIndex(),

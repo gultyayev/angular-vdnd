@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { KeyboardDragService } from './keyboard-drag.service';
 import { DragStateService } from './drag-state.service';
-import { DraggedItem, END_OF_LIST } from '../models/drag-drop.models';
+import { DraggedItem } from '../models/drag-drop.models';
 
 describe('KeyboardDragService', () => {
   let service: KeyboardDragService;
@@ -109,11 +109,11 @@ describe('KeyboardDragService', () => {
       expect(dragState.isDragging()).toBe(true);
     });
 
-    it('should set placeholderId to END_OF_LIST', () => {
+    it('leaves the deprecated placeholderId null', () => {
       const item = createMockItem();
       service.startKeyboardDrag(item, 2, 10, 'list-1');
 
-      expect(dragState.placeholderId()).toBe(END_OF_LIST);
+      expect(dragState.placeholderId()).toBeNull();
     });
 
     it('should set placeholderIndex with same-list +1 adjustment', () => {
