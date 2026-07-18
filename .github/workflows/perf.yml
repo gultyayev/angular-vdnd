@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   harness-unit-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -32,7 +32,12 @@ jobs:
   benchmark:
     if: github.event_name == 'pull_request'
     needs: harness-unit-tests
-    runs-on: ubuntu-latest
+    # Pinned (not ubuntu-latest): the committed baseline is only comparable to
+    # runs on the same runner image. A silent latest -> new-LTS migration would
+    # shift absolute numbers and show up as a phantom regression. Keep this in
+    # sync with refresh-baseline below and bump both together (then regenerate
+    # the baseline).
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -140,7 +145,7 @@ jobs:
   refresh-baseline:
     if: github.event_name == 'workflow_dispatch'
     needs: harness-unit-tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v7

@@ -60,8 +60,21 @@ only when the current median is worse than the baseline median by **all** of:
 
 - more than the percent `--threshold` (default 25%),
 - more than a per-metric **absolute floor** (`MIN_ABS_DELTA` in
-  `fixtures/compare-metrics.ts`), and
-- more than **3× the baseline MAD** (median absolute deviation).
+  `fixtures/compare-metrics.ts`),
+- more than **3× the baseline MAD** (median absolute deviation), and
+- the change is **sustained**: the current run's **minimum** sample is worse
+  than the baseline median.
+
+The sustained check targets the remaining CI false-positive mode: intermittent
+runner noise (GC, noisy neighbors) can elevate 3 of 5 iterations — shifting the
+median — while the clean iterations stay at baseline level. A real code
+regression slows down _every_ iteration, so even the best current sample ends up
+above the baseline's typical one. Trade-off: a regression that only manifests
+intermittently is reported (`noise (not sustained)`) but not gated.
+
+An over-threshold change that fails one of the guards is reported as
+informational with the guard that suppressed it: `noise (below floor)`,
+`noise (within band)`, or `noise (not sustained)`.
 
 MAD is used instead of standard deviation because, with only five samples, a
 single outlier inflates stddev enough to hide a real, sustained regression — a
@@ -72,14 +85,18 @@ data.
 The absolute floor is what keeps a **zero baseline** from auto-failing: a metric
 that was `0` and becomes `1` (e.g. a single 51 ms long task) is `+100%` but stays
 below its floor, so it is reported as informational ("noise (below floor)")
-rather than gating. The floors are deliberately conservative:
+rather than gating. A floor must guard small baselines **without exceeding the
+committed baseline medians themselves** — layout/style-recalc counts are
+near-deterministic (MAD ≈ 0), and their original floor of 25 was larger than the
+drag-within-list layout baseline (24), which let a full doubling of layout work
+slip through as "noise". Current floors:
 
 | Metric            | Floor | Unit   |
 | ----------------- | ----- | ------ |
 | totalBlockingTime | 20    | ms     |
 | longTaskCount     | 2     | tasks  |
-| layoutCount       | 25    | count  |
-| recalcStyleCount  | 25    | count  |
+| layoutCount       | 10    | count  |
+| recalcStyleCount  | 10    | count  |
 | avgFrameTime      | 1.5   | ms     |
 | maxFrameGap       | 15    | ms     |
 | droppedFrames     | 3     | frames |
@@ -99,13 +116,24 @@ baseline is not comparable to the current run:
   a **semantics** change (e.g. dropped frames 60 → 0) to the library.
 - **Playwright version.** Embedded in the baseline's JSON report; different
   browser builds produce different numbers.
+- **Mixed schemas within one run.** A results file whose scenarios carry more
+  than one `metricsSchemaVersion` mixes collector versions (e.g. a stale
+  results file) and is rejected outright.
 
-Both versions are printed in the output. Mismatches fail the run and tell you to
-regenerate; pass `--allow-baseline-mismatch` to compare anyway (unreliable).
+Both versions are printed in the output — along with each run's **git commit and
+date** (embedded by Playwright's JSON reporter) so it is always visible what the
+baseline was measured from. Mismatches fail the run and tell you to regenerate;
+pass `--allow-baseline-mismatch` to compare anyway (unreliable).
 
 The comparison also fails when a scenario or metric present in the baseline is
 **missing** from the current run — a renamed, skipped, or crashed benchmark must
-not silently disappear behind a green check.
+not silently disappear behind a green check. The reverse case — a scenario in
+the current run with no baseline entry — is a **new benchmark**: it is listed as
+`NEW (no baseline)` and stays ungated until the baseline is regenerated.
+
+When the baseline run is more than 60 days older than the current run, the
+output includes a non-fatal **stale baseline** warning: perf improvements landed
+on master since then leave slack in the old numbers that can hide regressions.
 
 ## Regenerating the baseline
 
@@ -119,3 +147,8 @@ absolute numbers match where PRs are measured:
 
 Because the baseline is hardware-sensitive, regenerate it whenever the harness
 semantics (schema) or Playwright version changes, or the gate will fail closed.
+The CI jobs are pinned to a specific runner image (`ubuntu-24.04`, not
+`ubuntu-latest`) for the same reason: a silent runner-image migration would
+shift absolute numbers under the committed baseline. When bumping the pin,
+bump the `benchmark` and `refresh-baseline` jobs together and regenerate the
+baseline on the new image.

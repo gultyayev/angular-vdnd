@@ -21,6 +21,7 @@ test('zero-baseline metric is not gated on a below-floor absolute change', () =>
   assert.equal(result.percentChange, 100);
   assert.equal(result.regression, false);
   assert.equal(result.suppressed, true);
+  assert.equal(result.suppressedReason, 'below-floor');
 });
 
 test('zero-baseline metric IS gated once it clears the absolute floor', () => {
@@ -59,6 +60,42 @@ test('a change within the MAD noise band is not gated', () => {
   assert.equal(result.absDelta, 30); // exactly on the band edge -> not "> band"
   assert.equal(result.regression, false);
   assert.equal(result.suppressed, true);
+  assert.equal(result.suppressedReason, 'within-noise-band');
+});
+
+test('a median shift caused by majority noise is not gated (sustained check)', () => {
+  // A noisy runner elevates 3 of 5 iterations: the median doubles, but the two
+  // clean iterations prove the code itself did not get slower — the current
+  // MIN is still at baseline level, so the change must not gate.
+  const baseline = aggregate([100, 100, 100, 100, 100]); // median 100, MAD 0
+  const current = aggregate([210, 200, 205, 100, 95]); // median 200, min 95
+  const result = evaluateMetric('totalBlockingTime', baseline, current, 25);
+  assert.equal(result.regression, false);
+  assert.equal(result.suppressed, true);
+  assert.equal(result.suppressedReason, 'not-sustained');
+});
+
+test('a sustained regression (every iteration worse than baseline median) is gated', () => {
+  const baseline = aggregate([100, 100, 100, 100, 100]);
+  const current = aggregate([210, 200, 205, 195, 190]); // min 190 > baseline median
+  const result = evaluateMetric('totalBlockingTime', baseline, current, 25);
+  assert.equal(result.regression, true);
+  assert.equal(result.suppressed, false);
+});
+
+test('layout/style-recalc floors sit below the smallest committed baseline medians', () => {
+  // With a floor of 25 a drag-within-list layoutCount doubling (24 -> 48,
+  // delta 24) was suppressed as noise. These counts are near-deterministic, so
+  // the floor only needs to guard tiny baselines.
+  assert.equal(MIN_ABS_DELTA.layoutCount, 10);
+  assert.equal(MIN_ABS_DELTA.recalcStyleCount, 10);
+  const result = evaluateMetric(
+    'layoutCount',
+    aggregate([24, 24, 24, 24, 24]),
+    aggregate([48, 48, 48, 48, 48]),
+    25,
+  );
+  assert.equal(result.regression, true);
 });
 
 test('a change beyond threshold, floor, and MAD band is gated', () => {
