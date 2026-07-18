@@ -12,6 +12,7 @@ export class DemoPage {
   readonly list2VirtualScroll: Locator;
   readonly list1Wrapper: Locator;
   readonly list2Wrapper: Locator;
+  readonly settingsCollapse: Locator;
   readonly lockAxisSelect: Locator;
   readonly keyboardInstructions: Locator;
   readonly placeholder: Locator;
@@ -28,6 +29,7 @@ export class DemoPage {
     this.dragPreview = page.getByTestId('vdnd-drag-preview');
     this.list1Wrapper = page.getByTestId('list-1-card');
     this.list2Wrapper = page.getByTestId('list-2-card');
+    this.settingsCollapse = page.getByTestId('settings-collapse');
     this.lockAxisSelect = page.getByTestId('lock-axis-select');
     this.keyboardInstructions = page.locator('#vdnd-keyboard-instructions');
     // Placeholder visible class is a documented public API for styling, making it a stable selector
@@ -38,6 +40,12 @@ export class DemoPage {
     await this.page.goto('/', { waitUntil: 'domcontentloaded' });
     // Wait for items to be rendered using auto-waiting assertion
     await expect(this.list1Items.first()).toBeVisible();
+    // The expanded settings panel animates from 0fr to 1fr on initial render. Wait for the
+    // real transition to finish before scrolling or exposing geometry to drag helpers.
+    await expect(this.settingsCollapse).toHaveClass(/is-open/);
+    await this.settingsCollapse.evaluate(async (element) => {
+      await Promise.allSettled(element.getAnimations().map((animation) => animation.finished));
+    });
     // Scroll lists into view (in case header/settings push them below viewport)
     await this.list1Container.evaluate((el) =>
       el.scrollIntoView({ block: 'center', inline: 'nearest' }),
