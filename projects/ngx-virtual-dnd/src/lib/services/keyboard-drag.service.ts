@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { DragStateService } from './drag-state.service';
-import { DraggedItem, END_OF_LIST, GrabOffset } from '../models/drag-drop.models';
+import { DraggedItem, GrabOffset } from '../models/drag-drop.models';
 
 /**
  * Service for managing keyboard-initiated drag operations.
@@ -60,7 +60,7 @@ export class KeyboardDragService {
       grabOffset,
       null, // no axis lock for keyboard drag
       activeDroppableId,
-      END_OF_LIST,
+      null, // deprecated placeholderId (ignored)
       initialPlaceholderIndex,
       sourceIndex,
       true, // isKeyboardDrag

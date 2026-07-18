@@ -3,7 +3,6 @@ import { DemoPage } from './fixtures/demo.page';
 
 interface DebugState {
   activeDroppable: string | null;
-  placeholder: string | null;
   placeholderIndex: number | null;
   sourceIndex: number | null;
 }
@@ -34,7 +33,6 @@ test.describe('Constrain to Container', () => {
     await expect(async () => {
       const debugState = await getDebugState(page);
       expect(debugState.activeDroppable).toBe('list-1');
-      expect(debugState.placeholder).not.toBeNull();
       expect(debugState.placeholderIndex).not.toBeNull();
       expect(debugState.sourceIndex).not.toBeNull();
       expect(debugState.placeholderIndex!).toBeGreaterThan(debugState.sourceIndex! + 1);
@@ -45,7 +43,7 @@ test.describe('Constrain to Container', () => {
     await expect(async () => {
       const debugState = await getDebugState(page);
       expect(debugState.activeDroppable).toBe('list-1');
-      expect(debugState.placeholder).not.toBeNull();
+      expect(debugState.placeholderIndex).not.toBeNull();
     }).toPass({ timeout: 3000 });
   }
 

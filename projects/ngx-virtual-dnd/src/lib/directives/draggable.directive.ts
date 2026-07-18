@@ -377,7 +377,6 @@ export class DraggableDirective implements OnInit, OnDestroy {
     // This is critical because getBoundingClientRect() returns all zeros for hidden elements
     const sourceIndex = this.#calculateSourceIndex(element, parentDroppableElement);
 
-    let initialPlaceholderId: string | null = null;
     let initialPlaceholderIndex: number | null = null;
 
     if (droppableElement) {
@@ -391,7 +390,6 @@ export class DraggableDirective implements OnInit, OnDestroy {
         sourceIndex,
       });
       initialPlaceholderIndex = indexResult.index;
-      initialPlaceholderId = indexResult.placeholderId;
     }
 
     const lockAxis = this.lockAxis();
@@ -413,7 +411,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
       grabOffset,
       lockAxis,
       activeDroppableId,
-      initialPlaceholderId,
+      null,
       initialPlaceholderIndex,
       sourceIndex,
       undefined,
@@ -547,7 +545,7 @@ export class DraggableDirective implements OnInit, OnDestroy {
           sourceDroppableId: this.#dragState.sourceDroppableId(),
           sourceIndex: this.#dragState.sourceIndex(),
         });
-        this.#dragState.updateScrollOnlyPlaceholder(indexResult.placeholderId, indexResult.index);
+        this.#dragState.updateScrollOnlyPlaceholder(null, indexResult.index);
         return;
       }
     }
@@ -647,7 +645,6 @@ export class DraggableDirective implements OnInit, OnDestroy {
       ? this.#positionCalculator.getDroppableId(droppableElement)
       : null;
 
-    let placeholderId: string | null = null;
     let placeholderIndex: number | null = null;
 
     if (droppableElement) {
@@ -665,7 +662,6 @@ export class DraggableDirective implements OnInit, OnDestroy {
         sourceIndex: this.#dragState.sourceIndex(),
       });
       placeholderIndex = indexResult.index;
-      placeholderId = indexResult.placeholderId;
     }
 
     // Update drag state with effective position (respects axis locking and container clamping)
@@ -673,7 +669,6 @@ export class DraggableDirective implements OnInit, OnDestroy {
     this.#dragState.updateDragPosition({
       cursorPosition: effectivePosition,
       activeDroppableId,
-      placeholderId,
       placeholderIndex,
     });
   }

@@ -13,7 +13,7 @@ import {
 import { DragStateService } from '../services/drag-state.service';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
 import { PositionCalculatorService } from '../services/position-calculator.service';
-import { DragState, DropEvent, END_OF_LIST } from '../models/drag-drop.models';
+import { DragState, DropEvent } from '../models/drag-drop.models';
 import { VDND_GROUP_TOKEN } from './droppable-group.directive';
 import { createEffectiveGroupSignal } from '../utils/group-resolution';
 import { createAutoScrollRegistration } from '../utils/auto-scroll-registration';
@@ -107,19 +107,12 @@ export class DroppableDirective implements OnDestroy {
   });
 
   /**
-   * The current placeholder ID when this droppable is active.
-   *
-   * @deprecated Mirrors the always-`END_OF_LIST` `DragStateService.placeholderId`
-   * and never reflects the real placeholder position. Read
-   * `DragStateService.placeholderIndex` instead. Slated for removal in the next
-   * major version.
+   * @deprecated No longer populated — always emits `null`. It mirrored the
+   * defunct `DragStateService.placeholderId`, which never reflected the real
+   * placeholder position. Read `DragStateService.placeholderIndex` instead. This
+   * constant shim will be removed entirely in the next major version.
    */
-  readonly placeholderId = computed(() => {
-    if (!this.isActive()) {
-      return null;
-    }
-    return this.#dragState.placeholderId();
-  });
+  readonly placeholderId = computed<string | null>(() => null);
 
   /** Track previous active state to detect the drag-end transition */
   #wasActive = false;
@@ -223,7 +216,6 @@ export class DroppableDirective implements OnDestroy {
     }
 
     const sourceDroppableId = state.sourceDroppableId ?? '';
-    const placeholderId = state.placeholderId ?? END_OF_LIST;
 
     // Use the stored source index from drag state
     // This is critical for virtual scrolling where the original element may no longer
@@ -254,7 +246,6 @@ export class DroppableDirective implements OnDestroy {
       },
       destination: {
         droppableId: this.vdndDroppable(),
-        placeholderId,
         index: destinationIndex,
         data: this.vdndDroppableData(),
       },

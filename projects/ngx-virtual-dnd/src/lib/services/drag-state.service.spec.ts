@@ -140,10 +140,10 @@ describe('DragStateService', () => {
       expect(service.activeDroppableId()).toBe('target-list');
     });
 
-    it('should set placeholderId when provided', () => {
+    it('ignores the deprecated placeholderId argument (stays null)', () => {
       const item = createMockDraggedItem();
       service.startDrag(item, undefined, undefined, null, null, 'placeholder-id');
-      expect(service.placeholderId()).toBe('placeholder-id');
+      expect(service.placeholderId()).toBeNull();
     });
 
     it('should set placeholderIndex when provided', () => {
@@ -172,7 +172,7 @@ describe('DragStateService', () => {
       expect(service.grabOffset()).toEqual(offset);
       expect(service.lockAxis()).toBe('x');
       expect(service.activeDroppableId()).toBe('list-2');
-      expect(service.placeholderId()).toBe('item-5');
+      expect(service.placeholderId()).toBeNull(); // deprecated arg ignored
       expect(service.placeholderIndex()).toBe(4);
       expect(service.sourceIndex()).toBe(2);
     });
@@ -222,7 +222,7 @@ describe('DragStateService', () => {
       expect(service.activeDroppableId()).toBe('new-list');
     });
 
-    it('should update placeholderId when dragging', () => {
+    it('ignores the deprecated placeholderId update (stays null)', () => {
       const item = createMockDraggedItem();
       service.startDrag(item);
 
@@ -233,7 +233,7 @@ describe('DragStateService', () => {
         placeholderIndex: null,
       });
 
-      expect(service.placeholderId()).toBe('target-item');
+      expect(service.placeholderId()).toBeNull();
     });
 
     it('should update placeholderIndex when dragging', () => {
@@ -294,25 +294,17 @@ describe('DragStateService', () => {
     });
   });
 
-  describe('setPlaceholder', () => {
-    it('should not update if not dragging', () => {
+  describe('setPlaceholder (deprecated no-op)', () => {
+    it('does nothing when not dragging', () => {
       service.setPlaceholder('item-1');
       expect(service.placeholderId()).toBeNull();
     });
 
-    it('should update placeholderId when dragging', () => {
+    it('leaves placeholderId null even when dragging', () => {
       const item = createMockDraggedItem();
       service.startDrag(item);
 
       service.setPlaceholder('target-item');
-      expect(service.placeholderId()).toBe('target-item');
-    });
-
-    it('should allow setting to null', () => {
-      const item = createMockDraggedItem();
-      service.startDrag(item, undefined, undefined, null, null, 'initial-placeholder');
-
-      service.setPlaceholder(null);
       expect(service.placeholderId()).toBeNull();
     });
   });
@@ -410,13 +402,13 @@ describe('DragStateService', () => {
   });
 
   describe('updateScrollOnlyPlaceholder', () => {
-    it('updates placeholderId and placeholderIndex when dragging', () => {
+    it('updates placeholderIndex when dragging (deprecated placeholderId ignored)', () => {
       const item = createMockDraggedItem();
       service.startDrag(item, { x: 50, y: 50 }, undefined, null, 'list-1', 'item-0', 0);
 
       service.updateScrollOnlyPlaceholder('item-3', 3);
 
-      expect(service.placeholderId()).toBe('item-3');
+      expect(service.placeholderId()).toBeNull();
       expect(service.placeholderIndex()).toBe(3);
     });
 
@@ -434,7 +426,6 @@ describe('DragStateService', () => {
     it('is a no-op when not dragging', () => {
       service.updateScrollOnlyPlaceholder('item-1', 1);
 
-      expect(service.placeholderId()).toBeNull();
       expect(service.placeholderIndex()).toBeNull();
     });
   });
@@ -458,7 +449,7 @@ describe('DragStateService', () => {
       expect(snapshot.sourceDroppableId).toBe('list-1');
       expect(snapshot.sourceIndex).toBe(1);
       expect(snapshot.activeDroppableId).toBe('list-1');
-      expect(snapshot.placeholderId).toBe('item-3');
+      expect(snapshot.placeholderId).toBeUndefined(); // deprecated, no longer populated
       expect(snapshot.placeholderIndex).toBe(3);
       expect(snapshot.cursorPosition).toEqual(position);
       expect(snapshot.grabOffset).toEqual(offset);

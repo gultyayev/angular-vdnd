@@ -50,11 +50,13 @@ export interface DragState {
   /** ID of the droppable currently being hovered over */
   activeDroppableId: string | null;
   /**
-   * @deprecated Always resolves to `END_OF_LIST` and never reflects the real
-   * insertion point. Use `placeholderIndex` instead — it is the single source of
-   * truth for placeholder position. Slated for removal in the next major version.
+   * @deprecated No longer populated — always absent/`null`. It only ever held
+   * `END_OF_LIST` and never reflected the real insertion point. Use
+   * `placeholderIndex`, the single source of truth for placeholder position.
+   * This optional field is a compatibility shim and will be removed entirely in
+   * the next major version.
    */
-  placeholderId: string | null;
+  placeholderId?: string | null;
   /** Index where the placeholder should be inserted (the reliable insertion point) */
   placeholderIndex: number | null;
   /** Current cursor position */
@@ -108,12 +110,13 @@ export interface DropDestination {
   /** ID of the droppable container receiving the item */
   droppableId: string;
   /**
-   * @deprecated Always emitted as `END_OF_LIST` regardless of the real drop
-   * position, so branching on it is unreliable. Use `index` — the actual
-   * insertion index in the destination list. Slated for removal in the next
-   * major version.
+   * @deprecated No longer emitted — always absent. It only ever carried
+   * `END_OF_LIST` regardless of the real drop position, so branching on it was
+   * unreliable. Use `index`, the actual insertion index in the destination list.
+   * This optional field is a compatibility shim and will be removed entirely in
+   * the next major version.
    */
-  placeholderId: string;
+  placeholderId?: string;
   /** Target index in the destination list */
   index: number;
   /** Optional user-provided data associated with the droppable */
@@ -166,7 +169,6 @@ export const INITIAL_DRAG_STATE: DragState = {
   sourceDroppableId: null,
   sourceIndex: null,
   activeDroppableId: null,
-  placeholderId: null,
   placeholderIndex: null,
   cursorPosition: null,
   grabOffset: null,

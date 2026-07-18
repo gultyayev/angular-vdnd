@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { END_OF_LIST, type CursorPosition, type GrabOffset } from '../models/drag-drop.models';
+import type { CursorPosition, GrabOffset } from '../models/drag-drop.models';
 import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
 import { DragIndexCalculatorService } from './drag-index-calculator.service';
 import { PositionCalculatorService } from './position-calculator.service';
@@ -167,11 +167,10 @@ describe('DragIndexCalculatorService', () => {
     }).index;
   }
 
-  // Guards the deprecated `DropDestination.placeholderId` contract: the calculator
-  // always reports END_OF_LIST for the ID while the real insertion point lives in
-  // `index`. This locks in the documented (deprecated) behavior so consumers know
-  // to branch on `index`, not the sentinel ID. See issue #31.
-  it('always returns END_OF_LIST for placeholderId while index tracks the real position', () => {
+  // The deprecated `placeholderId` has been removed from the calculator result:
+  // it only ever carried END_OF_LIST and never reflected the real insertion point.
+  // Consumers must branch on `index` — the single source of truth. See issue #31.
+  it('returns only { index } (no placeholderId) and index tracks the real position', () => {
     const strategy = new MockStrategy([0, 50, 100, 150, 200, 250], (offset) =>
       Math.floor(offset / 50),
     );
@@ -200,9 +199,9 @@ describe('DragIndexCalculatorService', () => {
 
     // The real insertion point differs between the two positions...
     expect(far.index).toBeGreaterThan(near.index);
-    // ...but placeholderId is the same useless sentinel for both.
-    expect(near.placeholderId).toBe(END_OF_LIST);
-    expect(far.placeholderId).toBe(END_OF_LIST);
+    // ...and the defunct placeholderId is gone from the result entirely.
+    expect('placeholderId' in near).toBe(false);
+    expect('placeholderId' in far).toBe(false);
   });
 
   it('applies same-list +1 when strategy does not yet exclude source index', () => {
