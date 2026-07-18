@@ -503,6 +503,28 @@ describe('DroppableDirective', () => {
   });
 
   describe('auto-scroll integration', () => {
+    it('should register even when the element is not scrollable at init', () => {
+      // Registration must NOT depend on live DOM dimensions: a list populated from an
+      // observable/HTTP renders empty first (scrollHeight === clientHeight), then grows
+      // scrollable. DOM size is not reactive, so gating registration on it would leave
+      // such a list permanently unregistered. AutoScrollService checks scrollability
+      // fresh per drag instead.
+      const registerSpy = jest.spyOn(autoScrollService, 'registerContainer');
+      registerSpy.mockClear();
+
+      const newFixture = TestBed.createComponent(TestHostComponent);
+      newFixture.detectChanges();
+
+      const newDroppableEl = newFixture.debugElement.query(By.directive(DroppableDirective))
+        .nativeElement as HTMLElement;
+
+      // No makeScrollable() call — element reports scrollHeight === clientHeight (0 in jsdom).
+      expect(newDroppableEl.scrollHeight).toBe(newDroppableEl.clientHeight);
+      expect(registerSpy).toHaveBeenCalledWith('test-list', newDroppableEl, {});
+
+      newFixture.destroy();
+    });
+
     it('should register when autoScrollEnabled changes to true after init', () => {
       const registerSpy = jest.spyOn(autoScrollService, 'registerContainer');
       registerSpy.mockClear();

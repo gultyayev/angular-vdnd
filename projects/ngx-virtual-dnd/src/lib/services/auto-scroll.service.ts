@@ -143,6 +143,14 @@ export class AutoScrollService {
       depth: number;
     }[] = [];
     for (const [id, { element, config }] of this.#scrollableContainers) {
+      // Registration is unconditional (directives can't expose DOM size as a signal, so
+      // gating registration on it goes stale — see #27). Filter by live scroll geometry
+      // here instead: this list is rebuilt per drag (startMonitoring nulls the cache) and
+      // on register/unregister, so a container that grew scrollable after init is picked
+      // up on the next drag, and one that shrank stops occupying a candidate slot.
+      if (!this.#isScrollable(element)) {
+        continue;
+      }
       entries.push({ id, element, config, depth: this.#domDepth(element) });
     }
 
@@ -151,6 +159,15 @@ export class AutoScrollService {
 
     this.#orderedContainers = entries;
     return entries;
+  }
+
+  /**
+   * Whether the element currently has room to scroll on either axis. Read fresh each
+   * time the candidate list is (re)built — never cached — so it always reflects the
+   * live layout at drag start rather than a stale value captured at registration.
+   */
+  #isScrollable(element: HTMLElement): boolean {
+    return element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth;
   }
 
   /** Number of ancestor elements — the element's absolute depth in the DOM tree. */
