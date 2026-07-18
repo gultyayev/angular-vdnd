@@ -11,7 +11,9 @@ const METRIC_LABELS: Record<string, { label: string; unit: string }> = {
   avgFrameTime: { label: 'Avg Frame Time', unit: 'ms' },
   maxFrameGap: { label: 'Max Frame Gap', unit: 'ms' },
   droppedFrames: { label: 'Dropped Frames (>25ms)', unit: '' },
-  p99FrameTime: { label: 'p99 Frame Time', unit: 'ms' },
+  // Informational only — not gated: at the frame counts our scenarios collect,
+  // nearest-rank p99 resolves to the maximum, duplicating Max Frame Gap.
+  p99FrameTime: { label: 'p99 Frame Time (not gated)', unit: 'ms' },
 };
 
 function formatValue(value: number, unit: string): string {
@@ -25,20 +27,23 @@ function generateReport(scenarios: { scenario: string; [k: string]: unknown }[])
   lines.push('## Performance Benchmark Results');
   lines.push('');
   lines.push(`> CPU throttling: **4x** · Samples: **5** (1 warmup iteration excluded)`);
+  lines.push(
+    '> The regression gate compares **medians** (noise band = 3 × baseline MAD); Max shows the worst single iteration.',
+  );
   lines.push('');
 
   for (const scenario of scenarios) {
     lines.push(`### ${scenario.scenario}`);
     lines.push('');
-    lines.push('| Metric | Max | Mean | Stddev |');
-    lines.push('|--------|-----|------|--------|');
+    lines.push('| Metric | Median | MAD | Mean | Max |');
+    lines.push('|--------|--------|-----|------|-----|');
 
     for (const [key, meta] of Object.entries(METRIC_LABELS)) {
       const m = scenario[key] as AggregatedMetrics | undefined;
       if (!m) continue;
 
       lines.push(
-        `| ${meta.label} | **${formatValue(m.max, meta.unit)}** | ${formatValue(m.mean, meta.unit)} | ±${formatValue(m.stddev, meta.unit)} |`,
+        `| ${meta.label} | **${formatValue(m.median, meta.unit)}** | ±${formatValue(m.mad ?? 0, meta.unit)} | ${formatValue(m.mean, meta.unit)} | ${formatValue(m.max, meta.unit)} |`,
       );
     }
 
