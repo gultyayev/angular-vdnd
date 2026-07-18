@@ -33,6 +33,24 @@ test.describe('Drag UX Features - Cursor Management', () => {
     await demoPage.goto();
   });
 
+  test('should expose stable draggable geometry after demo navigation', async ({ page }) => {
+    const firstItem = demoPage.list1Items.first();
+    const initialBox = await firstItem.boundingBox();
+
+    await page.getByTestId('settings-collapse').evaluate(async (element) => {
+      const animations = element.getAnimations();
+      await Promise.all(animations.map((animation) => animation.finished));
+    });
+
+    const settledBox = await firstItem.boundingBox();
+    expect(initialBox, 'Initial draggable geometry should be available').not.toBeNull();
+    expect(settledBox, 'Settled draggable geometry should be available').not.toBeNull();
+    expect(
+      Math.abs(settledBox!.y - initialBox!.y),
+      'DemoPage.goto() should not return while the settings panel is shifting the lists',
+    ).toBeLessThan(0.5);
+  });
+
   test('should add vdnd-dragging class to body during drag', async ({ page }) => {
     // Get first item
     const firstItem = demoPage.list1Items.first();
