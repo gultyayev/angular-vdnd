@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { aggregate } from './statistics.ts';
-import { percentChange, evaluateMetric, MIN_ABS_DELTA } from './compare-metrics.ts';
+import { percentChange, evaluateMetric, GATED_METRICS, MIN_ABS_DELTA } from './compare-metrics.ts';
 
 test('percentChange handles a zero baseline without dividing by zero', () => {
   assert.equal(percentChange(0, 0), 0);
@@ -63,24 +63,27 @@ test('a change within the MAD noise band is not gated', () => {
   assert.equal(result.suppressedReason, 'within-noise-band');
 });
 
-test('a median shift caused by majority noise is not gated (sustained check)', () => {
-  // A noisy runner elevates 3 of 5 iterations: the median doubles, but the two
-  // clean iterations prove the code itself did not get slower — the current
-  // MIN is still at baseline level, so the change must not gate.
-  const baseline = aggregate([100, 100, 100, 100, 100]); // median 100, MAD 0
-  const current = aggregate([210, 200, 205, 100, 95]); // median 200, min 95
-  const result = evaluateMetric('totalBlockingTime', baseline, current, 25);
-  assert.equal(result.regression, false);
-  assert.equal(result.suppressed, true);
-  assert.equal(result.suppressedReason, 'not-sustained');
-});
-
-test('a sustained regression (every iteration worse than baseline median) is gated', () => {
+test('one unusually fast sample cannot veto a large median regression', () => {
+  // A min-based "sustained" guard was tried and reverted (PR #63): the minimum
+  // is the most outlier-sensitive of the five samples, and a single fast
+  // iteration must not suppress a genuine doubling of the median.
   const baseline = aggregate([100, 100, 100, 100, 100]);
-  const current = aggregate([210, 200, 205, 195, 190]); // min 190 > baseline median
+  const current = aggregate([210, 200, 205, 210, 95]); // median 205, min below baseline
   const result = evaluateMetric('totalBlockingTime', baseline, current, 25);
   assert.equal(result.regression, true);
   assert.equal(result.suppressed, false);
+});
+
+test('p99FrameTime is not a gated metric (duplicates maxFrameGap at low frame counts)', () => {
+  // Scenarios collect <300 frame intervals, so nearest-rank p99 = max. Gating
+  // it would re-evaluate maxFrameGap with a contradictory floor.
+  assert.equal(GATED_METRICS.includes('p99FrameTime' as never), false);
+  assert.equal('p99FrameTime' in MIN_ABS_DELTA, false);
+  assert.ok(GATED_METRICS.includes('maxFrameGap'));
+  // Every gated metric that can have a small baseline carries a floor.
+  for (const metric of GATED_METRICS) {
+    assert.ok(MIN_ABS_DELTA[metric] > 0, `${metric} has an absolute floor`);
+  }
 });
 
 test('layout/style-recalc floors sit below the smallest committed baseline medians', () => {
@@ -119,7 +122,7 @@ test('improvements (lower is better) are never flagged as regressions', () => {
 
 test('a small percent change under the threshold is neither regression nor suppressed', () => {
   const result = evaluateMetric(
-    'p99FrameTime',
+    'maxFrameGap',
     aggregate([20, 20, 20, 20, 20]),
     aggregate([22, 22, 22, 22, 22]),
     25,

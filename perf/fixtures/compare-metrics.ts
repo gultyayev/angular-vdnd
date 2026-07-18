@@ -7,13 +7,35 @@
  * All gated metrics are "higher is worse", so only increases are treated as
  * regressions. A change is gated only when it is worse on the **median** by
  * more than the percent threshold AND by more than the noise floor — a
- * per-metric absolute minimum combined with a robust MAD-based band — AND is
- * **sustained** (even the current run's best iteration is worse than the
- * baseline median). This removes the "p95-of-5 = max", "zero-baseline = +100%",
- * single-noisy-run, and majority-noise failure modes (issue #42, problems 4 & 5).
+ * per-metric absolute minimum combined with a robust MAD-based band. This
+ * removes the "p95-of-5 = max", "zero-baseline = +100%", and single-noisy-run
+ * failure modes (issue #42, problems 4 & 5).
+ *
+ * Within-run guards cannot correct for cross-run/host drift — a run on a
+ * different machine shifts *all* samples together (PR #63's own benchmark
+ * disproved a min-based "sustained" guard exactly this way). That failure mode
+ * is instead eliminated structurally: CI measures the PR's base and head on the
+ * same runner in the same workflow run (see `.github/workflows/perf.yml`).
  */
 
 import type { AggregatedMetrics } from './statistics.ts';
+
+/**
+ * Metrics evaluated by the regression gate, in report order. `p99FrameTime` is
+ * deliberately absent: with the <300 frame intervals our scenarios collect,
+ * nearest-rank p99 resolves to (or next to) the maximum, so it duplicates
+ * `maxFrameGap` — the same noisy value must not be gated twice with different
+ * floors. It stays in the benchmark report as informational context.
+ */
+export const GATED_METRICS = [
+  'totalBlockingTime',
+  'longTaskCount',
+  'layoutCount',
+  'recalcStyleCount',
+  'avgFrameTime',
+  'maxFrameGap',
+  'droppedFrames',
+] as const;
 
 /**
  * Multiplier applied to the baseline **MAD** (median absolute deviation) to form
@@ -41,11 +63,14 @@ export const MIN_ABS_DELTA: Record<string, number> = {
   avgFrameTime: 1.5, // ms
   maxFrameGap: 15, // ms
   droppedFrames: 3, // frames
-  p99FrameTime: 5, // ms
+  // p99FrameTime has no floor because it is not gated: the scenarios collect
+  // fewer than ~300 frame intervals, so nearest-rank p99 resolves to (or next
+  // to) the maximum — gating it would evaluate the same noisy value as
+  // maxFrameGap a second time, with a contradictory tolerance.
 };
 
 /** Why an over-threshold change was suppressed instead of gated. */
-export type SuppressedReason = 'below-floor' | 'within-noise-band' | 'not-sustained';
+export type SuppressedReason = 'below-floor' | 'within-noise-band';
 
 export interface MetricEvaluation {
   metric: string;
@@ -92,23 +117,13 @@ export function evaluateMetric(
   const overThreshold = pct > threshold;
   const overFloor = absDelta >= floor;
   const overNoise = absDelta > noiseBand;
-  // A real code regression slows down *every* iteration, so even the current
-  // run's best sample should be worse than the baseline's typical one. Runner
-  // noise (GC, noisy CI neighbors) is intermittent: it can elevate a majority
-  // of the 5 samples — shifting the median — while the clean iterations stay at
-  // baseline level. Requiring the current MIN to exceed the baseline median
-  // filters exactly that case. Trade-off: a regression that only manifests
-  // intermittently (e.g. a probabilistic stall) is reported but not gated.
-  const sustained = (current.min ?? c) > b;
 
-  const regression = worse && overThreshold && overFloor && overNoise && sustained;
+  const regression = worse && overThreshold && overFloor && overNoise;
   const suppressed = worse && overThreshold && !regression;
 
   let suppressedReason: SuppressedReason | undefined;
   if (suppressed) {
-    if (!overFloor) suppressedReason = 'below-floor';
-    else if (!overNoise) suppressedReason = 'within-noise-band';
-    else suppressedReason = 'not-sustained';
+    suppressedReason = !overFloor ? 'below-floor' : 'within-noise-band';
   }
 
   return {

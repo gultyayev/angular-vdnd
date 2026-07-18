@@ -1,19 +1,8 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { AggregatedMetrics } from './fixtures/statistics.ts';
-import { evaluateMetric } from './fixtures/compare-metrics.ts';
+import { evaluateMetric, GATED_METRICS } from './fixtures/compare-metrics.ts';
 import { extractScenarios, type ScenarioReport } from './fixtures/extract-scenarios.ts';
-
-const COMPARISON_METRICS = [
-  'totalBlockingTime',
-  'longTaskCount',
-  'layoutCount',
-  'recalcStyleCount',
-  'avgFrameTime',
-  'maxFrameGap',
-  'droppedFrames',
-  'p99FrameTime',
-];
 
 function parseArg(args: string[], flag: string): string | undefined {
   const idx = args.indexOf(flag);
@@ -45,17 +34,28 @@ function readRunInfo(filePath: string): RunInfo {
   }
 }
 
+interface SchemaInfo {
+  /** Distinct numeric schema versions found across the run's scenarios. */
+  versions: number[];
+  /** Scenarios with no `metricsSchemaVersion` at all (pre-#42 collector). */
+  unversioned: number;
+}
+
 /**
- * Collect every distinct metrics schema version present in a run. A healthy run
- * has exactly one; more than one means scenarios were produced by different
- * collector versions (e.g. a stale results file merged with a fresh one).
+ * Collect the metrics schema versions present in a run. A healthy run has
+ * exactly one distinct version on **every** scenario; multiple versions — or a
+ * mix of versioned and unversioned scenarios — means the results file mixes
+ * collector outputs (e.g. a stale file merged with a fresh one) and must not
+ * be compared.
  */
-function readSchemaVersions(scenarios: ScenarioReport[]): number[] {
+function readSchemaVersions(scenarios: ScenarioReport[]): SchemaInfo {
   const versions = new Set<number>();
+  let unversioned = 0;
   for (const s of scenarios) {
     if (typeof s.metricsSchemaVersion === 'number') versions.add(s.metricsSchemaVersion);
+    else unversioned++;
   }
-  return [...versions].sort((a, b) => a - b);
+  return { versions: [...versions].sort((a, b) => a - b), unversioned };
 }
 
 /** Age of the baseline relative to the current run, in whole days (NaN if unknown). */
@@ -126,8 +126,12 @@ function main(): void {
   const currentVersion = currentInfo.playwrightVersion;
   const baselineSchemas = readSchemaVersions(baselineArr);
   const currentSchemas = readSchemaVersions(latestArr);
-  const baselineSchema = baselineSchemas.length === 1 ? baselineSchemas[0] : undefined;
-  const currentSchema = currentSchemas.length === 1 ? currentSchemas[0] : undefined;
+  // A side has a well-defined schema only when every scenario carries the same
+  // numeric version — a partially unversioned run is as unhealthy as a mixed one.
+  const schemaOf = (info: SchemaInfo) =>
+    info.versions.length === 1 && info.unversioned === 0 ? info.versions[0] : undefined;
+  const baselineSchema = schemaOf(baselineSchemas);
+  const currentSchema = schemaOf(currentSchemas);
 
   const describeOrigin = (info: RunInfo) => {
     const parts: string[] = [];
@@ -142,28 +146,34 @@ function main(): void {
     `- Current Playwright: **${currentVersion ?? 'unknown'}** · metrics schema: **${currentSchema ?? 'unknown'}**${describeOrigin(currentInfo)}`,
   );
 
-  // Staleness is a warning, not a gate: an old baseline still compares cleanly
-  // as long as the harness matches, but its absolute numbers no longer reflect
-  // master (perf improvements since then leave slack that hides regressions).
+  // Staleness is a warning, not a gate. In CI both sides are measured in the
+  // same workflow run, so this only fires for local comparisons against an old
+  // saved baseline whose absolute numbers no longer reflect the current code.
   const ageDays = baselineAgeDays(baselineInfo.startTime, currentInfo.startTime);
   if (ageDays > STALE_BASELINE_DAYS) {
     emit(
-      `\n> ⚠️ **Stale baseline:** the committed baseline is ${ageDays} days older than this run. ` +
-        'Consider regenerating it (`Performance Benchmarks` workflow → `workflow_dispatch`) so the gate tracks current master.',
+      `\n> ⚠️ **Stale baseline:** the baseline run is ${ageDays} days older than the current run. ` +
+        'Regenerate it (`npm run perf:baseline`) so the comparison reflects current code.',
     );
   }
 
   const versionMismatch =
     !!baselineVersion && !!currentVersion && baselineVersion !== currentVersion;
-  const mixedSchemas = baselineSchemas.length > 1 || currentSchemas.length > 1;
-  const schemaMismatch = mixedSchemas || baselineSchema !== currentSchema;
+  const describeSchemas = (info: SchemaInfo) =>
+    [...info.versions, ...(info.unversioned > 0 ? [`${info.unversioned} unversioned`] : [])].join(
+      ', ',
+    );
+  const mixedSchemas = (info: SchemaInfo) =>
+    info.versions.length > 1 || (info.versions.length > 0 && info.unversioned > 0);
+  const hasMixedSchemas = mixedSchemas(baselineSchemas) || mixedSchemas(currentSchemas);
+  const schemaMismatch = hasMixedSchemas || baselineSchema !== currentSchema;
   const incompatible = versionMismatch || schemaMismatch;
 
   if (incompatible) {
     const reasons: string[] = [];
-    if (mixedSchemas) {
+    if (hasMixedSchemas) {
       reasons.push(
-        `a single run contains multiple metrics schemas (baseline [${baselineSchemas.join(', ')}] vs current [${currentSchemas.join(', ')}]) — the results file mixes collector versions`,
+        `a single run contains scenarios from different collector versions (baseline [${describeSchemas(baselineSchemas)}] vs current [${describeSchemas(currentSchemas)}]) — the results file mixes collector outputs`,
       );
     } else if (schemaMismatch) {
       reasons.push(
@@ -207,7 +217,7 @@ function main(): void {
       continue;
     }
 
-    for (const metric of COMPARISON_METRICS) {
+    for (const metric of GATED_METRICS) {
       const bMetric = baselineReport[metric] as AggregatedMetrics | undefined;
       if (!bMetric) continue;
 
@@ -225,11 +235,10 @@ function main(): void {
         status = 'REGRESSION';
         hasRegression = true;
       } else if (evaluation.suppressed) {
-        status = {
-          'below-floor': 'noise (below floor)',
-          'within-noise-band': 'noise (within band)',
-          'not-sustained': 'noise (not sustained)',
-        }[evaluation.suppressedReason ?? 'below-floor'];
+        status =
+          evaluation.suppressedReason === 'within-noise-band'
+            ? 'noise (within band)'
+            : 'noise (below floor)';
       }
 
       emit(

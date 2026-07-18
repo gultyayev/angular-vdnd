@@ -11,7 +11,9 @@ const METRIC_LABELS: Record<string, { label: string; unit: string }> = {
   avgFrameTime: { label: 'Avg Frame Time', unit: 'ms' },
   maxFrameGap: { label: 'Max Frame Gap', unit: 'ms' },
   droppedFrames: { label: 'Dropped Frames (>25ms)', unit: '' },
-  p99FrameTime: { label: 'p99 Frame Time', unit: 'ms' },
+  // Informational only — not gated: at the frame counts our scenarios collect,
+  // nearest-rank p99 resolves to the maximum, duplicating Max Frame Gap.
+  p99FrameTime: { label: 'p99 Frame Time (not gated)', unit: 'ms' },
 };
 
 function formatValue(value: number, unit: string): string {
@@ -26,7 +28,7 @@ function generateReport(scenarios: { scenario: string; [k: string]: unknown }[])
   lines.push('');
   lines.push(`> CPU throttling: **4x** · Samples: **5** (1 warmup iteration excluded)`);
   lines.push(
-    '> The regression gate compares **medians** (MAD = noise band); Max shows the worst single iteration.',
+    '> The regression gate compares **medians** (noise band = 3 × baseline MAD); Max shows the worst single iteration.',
   );
   lines.push('');
 

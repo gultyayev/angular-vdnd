@@ -3,7 +3,6 @@ name: Performance Benchmarks
 on:
   pull_request:
     branches: [master]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,7 +14,7 @@ concurrency:
 
 jobs:
   harness-unit-tests:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -29,47 +28,82 @@ jobs:
       - name: Unit-test perf harness logic
         run: npm run perf:test
 
+  # Measures the PR's base commit and head (merge commit) on the SAME runner in
+  # the SAME job, then compares the two runs. A committed baseline was tried
+  # first and produced false positives (#62, #63): cross-run/host drift on
+  # shared runners shifts every sample of a run together, which no within-run
+  # statistical guard can distinguish from a real regression. Measuring both
+  # sides back-to-back on one host removes that drift from the comparison.
   benchmark:
-    if: github.event_name == 'pull_request'
     needs: harness-unit-tests
-    # Pinned (not ubuntu-latest): the committed baseline is only comparable to
-    # runs on the same runner image. A silent latest -> new-LTS migration would
-    # shift absolute numbers and show up as a phantom regression. Keep this in
-    # sync with refresh-baseline below and bump both together (then regenerate
-    # the baseline).
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout PR head (merge commit)
         uses: actions/checkout@v7
+        with:
+          path: head
+
+      - name: Checkout PR base
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: 'npm'
+          cache-dependency-path: |
+            head/package-lock.json
+            base/package-lock.json
 
-      - name: Install dependencies
+      - name: Install dependencies (base)
+        working-directory: base
         run: npm ci
 
-      - name: Build Angular Library
-        run: npm run build:lib
+      - name: Install dependencies (head)
+        working-directory: head
+        run: npm ci
 
       - name: Install Playwright browsers
+        working-directory: head
         run: npx playwright install --with-deps chromium
 
-      - name: Run performance benchmarks
+      # Base may pin a different Playwright; its install is a no-op when equal.
+      - name: Install Playwright browsers (base)
+        working-directory: base
+        run: npx playwright install --with-deps chromium
+
+      - name: Build library (base)
+        working-directory: base
+        run: npm run build:lib
+
+      - name: Build library (head)
+        working-directory: head
+        run: npm run build:lib
+
+      - name: Run benchmarks (base)
+        working-directory: base
+        run: npm run perf
+
+      - name: Run benchmarks (head)
+        working-directory: head
         run: npm run perf
 
       - name: Generate report
+        working-directory: head
         run: npm run perf:report -- --output "$GITHUB_STEP_SUMMARY"
 
-      - name: Compare against baseline
+      - name: Compare head against base
         id: compare
         if: always()
+        working-directory: head
         run: |
           # Capture perf:compare's real exit code (a pipe would mask it) so the
-          # gate below can actually fail the build on a regression / bad baseline.
-          npm run --silent perf:compare 2>&1 | tee perf/results/comparison.txt
+          # gate below can actually fail the build on a regression / bad run.
+          npm run --silent perf:compare -- \
+            --baseline ../base/perf/results/latest.json 2>&1 | tee perf/results/comparison.txt
           status=${PIPESTATUS[0]}
           cat perf/results/comparison.txt >> "$GITHUB_STEP_SUMMARY"
           if [ "$status" -eq 0 ]; then
@@ -79,17 +113,20 @@ jobs:
           fi
 
       - name: Comment on PR
-        if: always() && github.event_name == 'pull_request'
+        if: always()
         uses: actions/github-script@v9
         with:
           script: |
             const { readFileSync, existsSync } = require('fs');
             const { execSync } = require('child_process');
 
-            const report = execSync('npm run --silent perf:report', { encoding: 'utf-8' });
+            const report = execSync('npm run --silent perf:report', {
+              encoding: 'utf-8',
+              cwd: 'head',
+            });
 
             let comparison = '';
-            const compPath = 'perf/results/comparison.txt';
+            const compPath = 'head/perf/results/comparison.txt';
             if (existsSync(compPath)) {
               comparison = '\n---\n' + readFileSync(compPath, 'utf-8');
             }
@@ -127,50 +164,15 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: perf-results
-          path: perf/results/
+          path: |
+            head/perf/results/
+            base/perf/results/
           retention-days: 30
 
       # Runs last so the PR comment and artifact upload still happen, but the job
-      # (and therefore the check) fails when a regression or bad baseline was found.
+      # (and therefore the check) fails when a regression or bad run was found.
       - name: Enforce performance gate
         if: always() && steps.compare.outputs.regression == 'true'
         run: |
-          echo "::error::Performance regression or incompatible baseline detected — see the comparison table."
+          echo "::error::Performance regression or incomparable base/head runs detected — see the comparison table."
           exit 1
-
-  # Regenerate the committed baseline on the current Playwright, in the same
-  # environment PRs are measured in. Triggered manually; the fresh baseline is
-  # uploaded as an artifact to download and commit (avoids machine-to-machine
-  # drift from regenerating locally).
-  refresh-baseline:
-    if: github.event_name == 'workflow_dispatch'
-    needs: harness-unit-tests
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build Angular Library
-        run: npm run build:lib
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-
-      - name: Regenerate baseline
-        run: npm run perf:baseline
-
-      - name: Upload updated baseline
-        uses: actions/upload-artifact@v7
-        with:
-          name: updated-baseline
-          path: perf/baselines/baseline.json
-          retention-days: 30
