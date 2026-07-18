@@ -38,7 +38,7 @@ jobs:
 
       - name: Build Angular App
         run: |
-          npx ng build --base-href "/angular-vdnd/"
+          npx ng build --base-href "/ngx-virtual-dnd/"
         # Replace 'my-app-name' with your app project name
         # Replace 'your-repo-name' with your actual repository name (for project sites)
         # If it's a user/org site (repo named username.github.io), use --base-href "/"
