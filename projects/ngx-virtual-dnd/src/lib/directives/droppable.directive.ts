@@ -114,11 +114,8 @@ export class DroppableDirective implements OnDestroy {
     return this.#dragState.placeholderId();
   });
 
-  /** Track previous active state for cache clearing on leave */
+  /** Track previous active state to detect the drag-end transition */
   #wasActive = false;
-
-  /** Cached state for handling drop (since state is cleared before effect fires) */
-  #cachedDragState: DragState | null = null;
 
   /**
    * The terminal drag snapshot this droppable has already processed. `endedDragState`
@@ -150,24 +147,17 @@ export class DroppableDirective implements OnDestroy {
       }
     });
 
-    // React to state changes and handle drop events
+    // React to state changes and handle drop events.
+    //
+    // Keyed only on the low-frequency fields (isActive/isDragging/draggedItem). The final
+    // placeholder/index values #handleDrop needs are captured by DragStateService.endDrag()
+    // into endedDragState() at the drag-end boundary, so this effect never has to poll the
+    // high-frequency cursor/placeholder signals — reading them here would make it re-run and
+    // re-allocate a snapshot on every 60fps frame, defeating the service's signal splitting.
     effect(() => {
       const active = this.isActive();
       const draggedItem = this.#dragState.draggedItem();
       const isDragging = this.#dragState.isDragging();
-
-      // Track target/index signals explicitly so the cached drop state stays current as the
-      // placeholder moves. Read the full snapshot untracked to avoid making cursorPosition
-      // part of this effect's dependency graph.
-      this.#dragState.placeholderId();
-      this.#dragState.placeholderIndex();
-      this.#dragState.sourceIndex();
-      this.#dragState.sourceDroppableId();
-
-      // Cache state while active for use during drop handling
-      if (active && isDragging && draggedItem) {
-        this.#cachedDragState = untracked(() => this.#dragState.getStateSnapshot());
-      }
 
       // Handle drag end (drop). This droppable is the release target when it was either
       // observed active during the drag (#wasActive) OR named as the target in the ended
@@ -189,13 +179,7 @@ export class DroppableDirective implements OnDestroy {
           if (!this.disabled() && !this.#dragState.wasCancelled()) {
             this.#handleDrop();
           }
-          this.#cachedDragState = null;
         }
-      }
-
-      // Clear cached state when leaving without dropping
-      if (!active && this.#wasActive && isDragging) {
-        this.#cachedDragState = null;
       }
 
       this.#wasActive = active;
@@ -223,8 +207,9 @@ export class DroppableDirective implements OnDestroy {
    * Handle a drop on this droppable.
    */
   #handleDrop(): void {
-    // Use cached state since the actual state is cleared before this effect fires
-    const state = this.#dragState.endedDragState() ?? this.#cachedDragState;
+    // The live state is cleared before this effect fires, so read the terminal snapshot
+    // captured by endDrag()/cancelDrag() immediately before the reset.
+    const state = untracked(() => this.#dragState.endedDragState());
 
     if (!state?.draggedItem || state.activeDroppableId !== this.vdndDroppable()) {
       return;

@@ -5,7 +5,7 @@ import { DroppableDirective } from './droppable.directive';
 import { DragStateService } from '../services/drag-state.service';
 import { AutoScrollConfig, AutoScrollService } from '../services/auto-scroll.service';
 import { PositionCalculatorService } from '../services/position-calculator.service';
-import { DraggedItem, DropEvent } from '../models/drag-drop.models';
+import { DraggedItem, DropEvent, END_OF_LIST } from '../models/drag-drop.models';
 
 // Test host component
 @Component({
@@ -452,6 +452,87 @@ describe('DroppableDirective', () => {
       fixture.detectChanges();
 
       expect(component.dropEvents.at(-1)?.destination.index).toBe(2);
+    });
+  });
+
+  describe('performance: signal splitting', () => {
+    it('does not re-snapshot drag state on placeholder-only updates while active', () => {
+      // The active droppable caches the terminal drop state at drag end via endedDragState,
+      // NOT by polling every frame. Its effect must therefore stay keyed on the low-frequency
+      // fields (active/dragging/draggedItem) and NOT re-run — nor re-allocate a full snapshot —
+      // as the placeholder marches across items at 60fps. See issue #28.
+      const item = createMockDraggedItem();
+      dragStateService.startDrag(item);
+      dragStateService.updateDragPosition({
+        cursorPosition: { x: 100, y: 100 },
+        activeDroppableId: 'test-list',
+        placeholderId: 'item-1',
+        placeholderIndex: 0,
+      });
+      fixture.detectChanges();
+      expect(directive.isActive()).toBe(true);
+
+      // Only the directive's active-drop effect reads getStateSnapshot() during a live drag,
+      // so it is a faithful proxy for "the effect re-ran". Count calls triggered purely by
+      // placeholder movement (activeDroppableId held constant).
+      const snapshotSpy = jest.spyOn(dragStateService, 'getStateSnapshot');
+      snapshotSpy.mockClear();
+
+      for (let i = 1; i <= 5; i++) {
+        dragStateService.updateDragPosition({
+          cursorPosition: { x: 100, y: 100 + i },
+          activeDroppableId: 'test-list',
+          placeholderId: `item-${i}`,
+          placeholderIndex: i,
+        });
+        fixture.detectChanges();
+      }
+
+      expect(snapshotSpy).not.toHaveBeenCalled();
+
+      snapshotSpy.mockRestore();
+      dragStateService.endDrag();
+    });
+
+    it('still emits the final placeholder index after placeholder-only updates', () => {
+      // Removing per-frame caching must not lose the last placeholder position: endDrag()
+      // snapshots the live signals, so the drop still carries the final index. Cross-list
+      // drop keeps the index free of the same-list hidden-source adjustment.
+      const item = createMockDraggedItem({ draggableId: 'item-2', droppableId: 'other-list' });
+      dragStateService.startDrag(
+        item,
+        { x: 100, y: 100 },
+        { x: 0, y: 0 },
+        null,
+        'other-list',
+        'item-1',
+        0,
+        0,
+      );
+      fixture.detectChanges();
+
+      // First frame becomes the active target, later frames move the placeholder only.
+      dragStateService.updateDragPosition({
+        cursorPosition: { x: 100, y: 120 },
+        activeDroppableId: 'test-list',
+        placeholderId: 'item-1',
+        placeholderIndex: 0,
+      });
+      fixture.detectChanges();
+
+      dragStateService.updateDragPosition({
+        cursorPosition: { x: 100, y: 200 },
+        activeDroppableId: 'test-list',
+        placeholderId: END_OF_LIST,
+        placeholderIndex: 3,
+      });
+      fixture.detectChanges();
+
+      dragStateService.endDrag();
+      fixture.detectChanges();
+
+      expect(component.dropEvents.length).toBe(1);
+      expect(component.dropEvents.at(-1)?.destination.index).toBe(3);
     });
   });
 
