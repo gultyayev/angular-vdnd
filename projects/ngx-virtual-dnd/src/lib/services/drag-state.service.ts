@@ -91,7 +91,11 @@ export class DragStateService {
   /** ID of the droppable currently being hovered over */
   readonly activeDroppableId = this.#activeDroppableId.asReadonly();
 
-  /** ID of the item the placeholder should appear before */
+  /**
+   * @deprecated Always holds `END_OF_LIST` during a drag and never reflects the
+   * real placeholder position. Use `placeholderIndex` instead. Slated for removal
+   * in the next major version.
+   */
   readonly placeholderId = this.#placeholderId.asReadonly();
 
   /** Index where the placeholder should be inserted */

@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import type { CursorPosition, GrabOffset } from '../models/drag-drop.models';
+import { END_OF_LIST, type CursorPosition, type GrabOffset } from '../models/drag-drop.models';
 import type { VirtualScrollStrategy } from '../models/virtual-scroll-strategy';
 import { DragIndexCalculatorService } from './drag-index-calculator.service';
 import { PositionCalculatorService } from './position-calculator.service';
@@ -166,6 +166,44 @@ describe('DragIndexCalculatorService', () => {
       sourceIndex: args.sourceIndex,
     }).index;
   }
+
+  // Guards the deprecated `DropDestination.placeholderId` contract: the calculator
+  // always reports END_OF_LIST for the ID while the real insertion point lives in
+  // `index`. This locks in the documented (deprecated) behavior so consumers know
+  // to branch on `index`, not the sentinel ID. See issue #31.
+  it('always returns END_OF_LIST for placeholderId while index tracks the real position', () => {
+    const strategy = new MockStrategy([0, 50, 100, 150, 200, 250], (offset) =>
+      Math.floor(offset / 50),
+    );
+    const droppable = createDroppable('list-1', 5, false);
+    service.registerStrategy('list-1', strategy);
+
+    const near = service.calculatePlaceholderIndex({
+      droppableElement: droppable,
+      position: { x: 10, y: 30 }, // near the top
+      previousPosition: null,
+      grabOffset: null,
+      draggedItemHeight: 50,
+      sourceDroppableId: null,
+      sourceIndex: null,
+    });
+
+    const far = service.calculatePlaceholderIndex({
+      droppableElement: droppable,
+      position: { x: 10, y: 180 }, // further down the list
+      previousPosition: null,
+      grabOffset: null,
+      draggedItemHeight: 50,
+      sourceDroppableId: null,
+      sourceIndex: null,
+    });
+
+    // The real insertion point differs between the two positions...
+    expect(far.index).toBeGreaterThan(near.index);
+    // ...but placeholderId is the same useless sentinel for both.
+    expect(near.placeholderId).toBe(END_OF_LIST);
+    expect(far.placeholderId).toBe(END_OF_LIST);
+  });
 
   it('applies same-list +1 when strategy does not yet exclude source index', () => {
     const strategy = new MockStrategy([0, 50, 100, 150, 200, 250], (offset) =>

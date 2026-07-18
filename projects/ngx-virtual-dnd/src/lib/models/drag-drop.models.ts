@@ -49,9 +49,13 @@ export interface DragState {
   sourceIndex: number | null;
   /** ID of the droppable currently being hovered over */
   activeDroppableId: string | null;
-  /** ID of the item the placeholder should appear before, or 'END_OF_LIST' */
+  /**
+   * @deprecated Always resolves to `END_OF_LIST` and never reflects the real
+   * insertion point. Use `placeholderIndex` instead — it is the single source of
+   * truth for placeholder position. Slated for removal in the next major version.
+   */
   placeholderId: string | null;
-  /** Index where the placeholder should be inserted (more stable than placeholderId) */
+  /** Index where the placeholder should be inserted (the reliable insertion point) */
   placeholderIndex: number | null;
   /** Current cursor position */
   cursorPosition: CursorPosition | null;
@@ -103,7 +107,12 @@ export interface DropSource {
 export interface DropDestination {
   /** ID of the droppable container receiving the item */
   droppableId: string;
-  /** ID of the item to insert before, or 'END_OF_LIST' */
+  /**
+   * @deprecated Always emitted as `END_OF_LIST` regardless of the real drop
+   * position, so branching on it is unreliable. Use `index` — the actual
+   * insertion index in the destination list. Slated for removal in the next
+   * major version.
+   */
   placeholderId: string;
   /** Target index in the destination list */
   index: number;

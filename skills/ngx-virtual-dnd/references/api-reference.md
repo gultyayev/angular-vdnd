@@ -335,11 +335,14 @@ interface DropSource {
 
 interface DropDestination {
   droppableId: string;
+  /** @deprecated Always `END_OF_LIST`; use `index` instead. Removed next major. */
   placeholderId: string;
   index: number;
   data?: unknown;
 }
 ```
+
+> **Deprecated:** `DropDestination.placeholderId` is always emitted as `END_OF_LIST` regardless of the real drop position, so branching on it is unreliable. Use `index` — the actual insertion index in the destination list. Slated for removal in the next major version.
 
 ### DragEndEvent
 
@@ -401,7 +404,7 @@ function removeAt<T>(list: T[], index: number): T[];
 | `sourceDroppableId` | `Signal<string \| null>` |
 | `sourceIndex` | `Signal<number \| null>` |
 | `activeDroppableId` | `Signal<string \| null>` |
-| `placeholderId` | `Signal<string \| null>` |
+| `placeholderId` | `Signal<string \| null>` — **deprecated**, always `END_OF_LIST`; use `placeholderIndex` |
 | `placeholderIndex` | `Signal<number \| null>` |
 | `cursorPosition` | `Signal<CursorPosition \| null>` |
 | `grabOffset` | `Signal<GrabOffset \| null>` |
@@ -564,6 +567,7 @@ interface DragState {
   sourceDroppableId: string | null;
   sourceIndex: number | null;
   activeDroppableId: string | null;
+  /** @deprecated Always `END_OF_LIST`; use `placeholderIndex`. Removed next major. */
   placeholderId: string | null;
   placeholderIndex: number | null;
   cursorPosition: CursorPosition | null;

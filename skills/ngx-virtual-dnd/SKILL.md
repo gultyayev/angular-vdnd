@@ -106,6 +106,8 @@ interface DropEvent {
 }
 ```
 
+> **Deprecated:** `destination.placeholderId` is always emitted as `END_OF_LIST` and never reflects the real drop position — do not branch on it. Use `destination.index` for the insertion point. The field is slated for removal in the next major version.
+
 ### Utility functions
 
 | Function | Use When |
@@ -556,7 +558,7 @@ Available signals:
 | `sourceDroppableId` | `Signal<string \| null>` |
 | `sourceIndex` | `Signal<number \| null>` |
 | `activeDroppableId` | `Signal<string \| null>` |
-| `placeholderId` | `Signal<string \| null>` |
+| `placeholderId` | `Signal<string \| null>` — **deprecated**, always `END_OF_LIST`; use `placeholderIndex` |
 | `placeholderIndex` | `Signal<number \| null>` |
 | `cursorPosition` | `Signal<CursorPosition \| null>` |
 | `grabOffset` | `Signal<GrabOffset \| null>` |

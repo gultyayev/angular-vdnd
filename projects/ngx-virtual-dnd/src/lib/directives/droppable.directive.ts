@@ -106,7 +106,14 @@ export class DroppableDirective implements OnDestroy {
     return activeId === this.vdndDroppable() && !this.disabled();
   });
 
-  /** The current placeholder ID when this droppable is active */
+  /**
+   * The current placeholder ID when this droppable is active.
+   *
+   * @deprecated Mirrors the always-`END_OF_LIST` `DragStateService.placeholderId`
+   * and never reflects the real placeholder position. Read
+   * `DragStateService.placeholderIndex` instead. Slated for removal in the next
+   * major version.
+   */
   readonly placeholderId = computed(() => {
     if (!this.isActive()) {
       return null;
@@ -225,12 +232,12 @@ export class DroppableDirective implements OnDestroy {
       state.sourceIndex ?? this.#getItemIndex(state.draggedItem.draggableId, sourceDroppableId);
 
     // Use the pre-calculated placeholderIndex if available (more reliable)
-    // Fall back to DOM-based calculation if not. Then normalize to the same
-    // consumer-facing insertion index emitted by DragEndEvent.
+    // Fall back to a DOM append at the end of the list if not. Then normalize to
+    // the same consumer-facing insertion index emitted by DragEndEvent.
     const placeholderIndex =
       state.placeholderIndex !== null && state.placeholderIndex !== undefined
         ? state.placeholderIndex
-        : this.#getDestinationIndex(placeholderId);
+        : this.#getEndOfListIndex();
     const destinationIndex = normalizeDropDestinationIndex({
       sourceIndex,
       placeholderIndex,
@@ -276,26 +283,19 @@ export class DroppableDirective implements OnDestroy {
   }
 
   /**
-   * Get the destination index based on the placeholder.
+   * Fallback destination index used only when the pre-calculated
+   * `placeholderIndex` is unavailable.
+   *
+   * The placeholder always resolves to the end of the list at the model level
+   * (see the deprecated `DropDestination.placeholderId`), so this returns the
+   * count of real draggables — an append at the end.
    */
-  #getDestinationIndex(placeholderId: string): number {
+  #getEndOfListIndex(): number {
     // Exclude placeholder elements from the count
     const draggables = this.#elementRef.nativeElement.querySelectorAll(
       '[data-draggable-id]:not([data-draggable-id="placeholder"])',
     );
-
-    if (placeholderId === END_OF_LIST) {
-      return draggables.length;
-    }
-
-    // Find the index of the placeholder item
-    for (let i = 0; i < draggables.length; i++) {
-      if (draggables[i].getAttribute('data-draggable-id') === placeholderId) {
-        return i;
-      }
-    }
-
-    return 0;
+    return draggables.length;
   }
 
   /**
