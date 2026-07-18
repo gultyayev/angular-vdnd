@@ -19,11 +19,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gultyayev/angular-vdnd.git"
+    "url": "git+https://github.com/gultyayev/ngx-virtual-dnd.git"
   },
-  "homepage": "https://github.com/gultyayev/angular-vdnd#readme",
+  "homepage": "https://github.com/gultyayev/ngx-virtual-dnd#readme",
   "bugs": {
-    "url": "https://github.com/gultyayev/angular-vdnd/issues"
+    "url": "https://github.com/gultyayev/ngx-virtual-dnd/issues"
   },
   "peerDependencies": {
     "@angular/common": "^21.0.0 || ^22.0.0",

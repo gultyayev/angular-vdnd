@@ -533,7 +533,7 @@ npm run e2e                  # E2E tests
 Install a skill to teach AI coding assistants how to integrate this library:
 
 ```bash
-npx skills add gultyayev/angular-vdnd
+npx skills add gultyayev/ngx-virtual-dnd
 ```
 
 Works with Claude Code, Cursor, Windsurf, GitHub Copilot, and [40+ other agents](https://skills.sh).
