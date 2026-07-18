@@ -127,30 +127,6 @@ export class DroppableDirective implements OnDestroy {
    */
   #handledEndedState: DragState | null = null;
 
-  /**
-   * Check if this element is actually scrollable.
-   */
-  #isScrollable(): boolean {
-    const el = this.#elementRef.nativeElement;
-    const style = window.getComputedStyle(el);
-    const overflowY = style.overflowY;
-    const overflowX = style.overflowX;
-
-    // Check if overflow allows scrolling
-    const hasScrollableOverflow =
-      overflowY === 'auto' ||
-      overflowY === 'scroll' ||
-      overflowX === 'auto' ||
-      overflowX === 'scroll';
-
-    if (!hasScrollableOverflow) {
-      return false;
-    }
-
-    // Check if content is larger than container
-    return el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth;
-  }
-
   constructor() {
     createAutoScrollRegistration({
       autoScrollService: this.#autoScroll,
@@ -158,7 +134,10 @@ export class DroppableDirective implements OnDestroy {
       getId: () => this.vdndDroppable(),
       enabled: () => this.autoScrollEnabled(),
       config: () => this.autoScrollConfig(),
-      canRegister: () => Boolean(this.effectiveGroup()) && this.#isScrollable(),
+      // Register whenever a group is resolved; do NOT gate on scrollability. DOM size is
+      // not reactive, so a list that becomes scrollable after init (async data, resize)
+      // would never register. AutoScrollService filters by live scroll geometry per drag.
+      canRegister: () => Boolean(this.effectiveGroup()),
     });
 
     // Notify the calculator once this droppable is rendered (host data attributes applied).

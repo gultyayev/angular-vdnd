@@ -1075,6 +1075,102 @@ describe('AutoScrollService', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Scrollability filtering (registration is unconditional; the candidate list
+  // is filtered by live scroll geometry, refreshed per drag)
+  // ---------------------------------------------------------------------------
+  describe('scrollability filtering', () => {
+    /** Element whose content fits its box — nothing to scroll. */
+    function makeNonScrollable(): { el: HTMLElement; rectSpy: jest.Mock } {
+      const el = document.createElement('div');
+      Object.defineProperty(el, 'scrollHeight', { value: 400, configurable: true });
+      Object.defineProperty(el, 'clientHeight', { value: 400, configurable: true });
+      Object.defineProperty(el, 'scrollWidth', { value: 200, configurable: true });
+      Object.defineProperty(el, 'clientWidth', { value: 200, configurable: true });
+      let topVal = 0;
+      Object.defineProperty(el, 'scrollTop', {
+        get: () => topVal,
+        set: (v: number) => {
+          topVal = v;
+        },
+        configurable: true,
+      });
+      const rectSpy = jest.fn().mockReturnValue({
+        top: 100,
+        bottom: 500,
+        left: 50,
+        right: 250,
+        height: 400,
+        width: 200,
+      });
+      el.getBoundingClientRect = rectSpy;
+      return { el, rectSpy };
+    }
+
+    it('should skip a registered container that has nothing to scroll', () => {
+      const { el, rectSpy } = makeNonScrollable();
+
+      // Cursor sits right on the (would-be) bottom edge — the only reason not to
+      // touch this container is that it is excluded from the candidate list.
+      setupDrag({ x: 150, y: 480 });
+      service.registerContainer('non-scrollable', el);
+      startMonitoringWithScheduler();
+      flushRAF();
+
+      expect(rectSpy).not.toHaveBeenCalled();
+      expect(el.scrollTop).toBe(0);
+
+      service.unregisterContainer('non-scrollable');
+    });
+
+    it('should include a container once its content grows scrollable on the next drag', () => {
+      let scrollHeight = 400; // === clientHeight → not scrollable yet
+      const el = document.createElement('div');
+      Object.defineProperty(el, 'scrollHeight', { get: () => scrollHeight, configurable: true });
+      Object.defineProperty(el, 'clientHeight', { value: 400, configurable: true });
+      Object.defineProperty(el, 'scrollWidth', { value: 200, configurable: true });
+      Object.defineProperty(el, 'clientWidth', { value: 200, configurable: true });
+      let topVal = 0;
+      Object.defineProperty(el, 'scrollTop', {
+        get: () => topVal,
+        set: (v: number) => {
+          topVal = v;
+        },
+        configurable: true,
+      });
+      el.getBoundingClientRect = jest.fn().mockReturnValue({
+        top: 100,
+        bottom: 500,
+        left: 50,
+        right: 250,
+        height: 400,
+        width: 200,
+      });
+
+      // Registered up front, while not yet scrollable (mirrors a list awaiting data).
+      service.registerContainer('grow-list', el);
+
+      setupDrag({ x: 150, y: 480 });
+      startMonitoringWithScheduler();
+      flushRAF();
+      expect(el.scrollTop).toBe(0);
+
+      service.stopMonitoring();
+      scheduler.stop();
+      dragStateService.endDrag();
+
+      // Content arrives — container is now scrollable. No re-registration happens.
+      scrollHeight = 1000;
+
+      setupDrag({ x: 150, y: 480 });
+      startMonitoringWithScheduler();
+      flushRAF();
+      expect(el.scrollTop).toBeGreaterThan(0);
+
+      service.unregisterContainer('grow-list');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Callback invocation
   // ---------------------------------------------------------------------------
   describe('callback invocation', () => {
