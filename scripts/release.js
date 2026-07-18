@@ -115,9 +115,12 @@ function main() {
 
   // Step 6: Bump version and generate changelog
   console.log('\n=== Bumping version and generating changelog ===');
+  // Scope changelog + version bump to commits that touched the published
+  // library, so demo/e2e/CI/perf changes don't leak into the consumer changelog.
+  const scopePath = 'projects/ngx-virtual-dnd';
   let versionCmd = releaseType
-    ? `npx commit-and-tag-version --release-as ${releaseType}`
-    : 'npx commit-and-tag-version';
+    ? `npx commit-and-tag-version --path ${scopePath} --release-as ${releaseType}`
+    : `npx commit-and-tag-version --path ${scopePath}`;
 
   if (preRelease) {
     versionCmd += ` --prerelease ${preRelease}`;
