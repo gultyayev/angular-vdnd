@@ -187,7 +187,7 @@ Makes an element draggable via mouse, touch, or keyboard.
 | `dragHandle` | `string` | `undefined` | No | CSS selector restricting drag initiation area |
 | `dragThreshold` | `number` | `5` | No | Minimum distance (px) before drag starts |
 | `dragDelay` | `number` | `0` | No | Delay (ms) after pointer down before drag activates |
-| `lockAxis` | `'x' \| 'y' \| null` | `null` | No | Lock movement to horizontal or vertical axis |
+| `lockAxis` | `'x' \| 'y' \| null` | `null` | No | Freeze one axis: `'x'` = X frozen (vertical-only), `'y'` = Y frozen (horizontal-only). Opposite of CDK's `cdkDragLockAxis`. |
 
 **Outputs:**
 

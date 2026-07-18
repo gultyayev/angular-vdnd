@@ -127,7 +127,12 @@ export class DraggableDirective implements OnInit, OnDestroy {
    */
   dragDelay = input<number>(0);
 
-  /** Lock dragging to a single axis ('x' = horizontal only, 'y' = vertical only) */
+  /**
+   * Lock dragging by freezing one axis. The value names the axis that stays
+   * fixed: `'x'` freezes the X coordinate (vertical-only movement), `'y'`
+   * freezes the Y coordinate (horizontal-only movement). `null` allows free
+   * movement. Note: this is the opposite of Angular CDK's `cdkDragLockAxis`.
+   */
   lockAxis = input<'x' | 'y' | null>(null);
 
   /** Emits when drag starts */
